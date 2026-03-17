@@ -1,0 +1,5 @@
+{
+  "name": "tanks",
+  "main": "party/index.ts",
+  "compatibilityDate": "2024-03-26"
+}
