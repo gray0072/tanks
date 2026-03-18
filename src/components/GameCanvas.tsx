@@ -4,9 +4,21 @@ import { useGameStore } from '../store/useGameStore';
 import { draw } from '../game/renderer';
 import { onSocketMessage, sendMsg } from '../net/socket';
 import { W, H, FLAG_HP } from '../game/constants';
-import type { RenderState, Particle, GameEvent } from '../game/types';
+import type { RenderState, Tank, Particle, GameEvent } from '../game/types';
 
 const PARTICLE_LIFE = 30;
+const TICK_MS = 50;
+
+function lerpAngle(a: number, b: number, t: number): number {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
 
 function spawnParticles(particles: Particle[], event: GameEvent) {
   const count = event.count ?? (event.kind === 'hit' ? 6 : 20);
@@ -34,10 +46,20 @@ function mkRenderState(mySlot: number): RenderState {
   };
 }
 
+type TickSnapshot = {
+  tanks: Tank[];
+  bullets: { x: number; y: number; team: 0 | 1 }[];
+};
+
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderStateRef = useRef<RenderState>(mkRenderState(0));
   const rafRef = useRef<number>(0);
+
+  // Interpolation state
+  const prevSnapRef = useRef<TickSnapshot | null>(null);
+  const currSnapRef = useRef<TickSnapshot | null>(null);
+  const lastTickTimeRef = useRef<number>(0);
 
   const keysRef = useRef<Record<string, boolean>>({});
   const mouseXRef = useRef(0);
@@ -48,26 +70,25 @@ export default function GameCanvas() {
   const mySlot = useGameStore(s => s.mySlot);
   const walls = useGameStore(s => s.walls);
 
-  // Sync walls and mySlot into renderState when they change
   useEffect(() => {
     renderStateRef.current.walls = walls;
     renderStateRef.current.mySlot = mySlot;
   }, [walls, mySlot]);
 
-  // Subscribe to socket messages
   useEffect(() => {
     const unsub = onSocketMessage((msg) => {
       if (msg.type === 'TICK') {
+        // Shift snapshots for interpolation
+        prevSnapRef.current = currSnapRef.current;
+        currSnapRef.current = { tanks: msg.tanks, bullets: msg.bullets };
+        lastTickTimeRef.current = performance.now();
+
         const rs = renderStateRef.current;
-        rs.tanks = msg.tanks;
-        rs.bullets = msg.bullets;
         rs.flags = msg.flags;
         rs.pickups = msg.pickups;
 
-        // Spawn particles from server events
         for (const evt of msg.events) spawnParticles(rs.particles, evt);
 
-        // Update HUD
         const myTank = msg.tanks[rs.mySlot];
         useGameStore.getState().updateHUD({
           greenFlagHp: msg.flags[0].hp,
@@ -80,15 +101,12 @@ export default function GameCanvas() {
           winner: msg.winner,
         });
 
-        if (msg.gameOver) {
-          useGameStore.getState().setPhase('lobby');
-        }
+        if (msg.gameOver) useGameStore.getState().setPhase('lobby');
       }
     });
     return unsub;
   }, []);
 
-  // Game loop — runs once for component lifetime
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext('2d')!;
@@ -112,11 +130,45 @@ export default function GameCanvas() {
     canvas.addEventListener('contextmenu', onCtx);
 
     let lastInputSend = 0;
-    const INPUT_INTERVAL = 50; // send input at ~20Hz
+    const INPUT_INTERVAL = 50;
 
     const loop = (now: number) => {
-      // Update particles
       const rs = renderStateRef.current;
+
+      // Interpolate tank and bullet positions between ticks
+      const curr = currSnapRef.current;
+      const prev = prevSnapRef.current;
+      if (curr) {
+        const alpha = Math.min(1, (now - lastTickTimeRef.current) / TICK_MS);
+        if (prev) {
+          rs.tanks = curr.tanks.map((c, i) => {
+            const p = prev.tanks[i];
+            if (!p || c.dead || p.dead) return c;
+            return {
+              ...c,
+              x: lerp(p.x, c.x, alpha),
+              y: lerp(p.y, c.y, alpha),
+              angle: lerpAngle(p.angle, c.angle, alpha),
+              turretAngle: lerpAngle(p.turretAngle, c.turretAngle, alpha),
+            };
+          });
+          // Extrapolate bullets (they move fast, just continue at velocity)
+          rs.bullets = curr.bullets.map((c, i) => {
+            const p = prev.bullets[i];
+            if (!p || p.team !== c.team) return c;
+            return {
+              x: lerp(p.x, c.x, alpha),
+              y: lerp(p.y, c.y, alpha),
+              team: c.team,
+            };
+          });
+        } else {
+          rs.tanks = curr.tanks;
+          rs.bullets = curr.bullets;
+        }
+      }
+
+      // Update client-side particles
       for (const p of rs.particles) {
         p.x += p.vx; p.y += p.vy;
         p.vx *= 0.92; p.vy *= 0.92;
@@ -124,7 +176,7 @@ export default function GameCanvas() {
       }
       rs.particles = rs.particles.filter(p => p.life > 0);
 
-      // Send input to server
+      // Send input at 20 Hz
       if (now - lastInputSend >= INPUT_INTERVAL) {
         lastInputSend = now;
         const k = keysRef.current;
