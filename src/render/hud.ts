@@ -8,6 +8,8 @@
 import type { Snapshot, MatchEvent } from "../world/sim";
 import type { TeamId } from "../game/config";
 
+export type HudAction = "scoreboard" | "fullscreen" | "menu";
+
 export class Hud {
   private topRoot: HTMLDivElement;
   private overlayRoot: HTMLDivElement;
@@ -21,6 +23,7 @@ export class Hud {
   private bannerEl: HTMLDivElement;
   private feedEl: HTMLDivElement;
   private scoreboardEl: HTMLDivElement;
+  private actionEls: Record<HudAction, HTMLButtonElement>;
 
   constructor(topMount: HTMLElement, overlayMount: HTMLElement) {
     this.topRoot = document.createElement("div");
@@ -29,6 +32,11 @@ export class Hud {
       <div class="hud-team hud-blue"><span class="hud-respawns"></span> respawns · <span class="hud-frags"></span> frags <span class="hud-flag"></span></div>
       <div class="hud-timer"></div>
       <div class="hud-team hud-red"><span class="hud-flag"></span> <span class="hud-frags"></span> frags · <span class="hud-respawns"></span> respawns</div>
+      <div class="hud-actions">
+        <button class="hud-btn" type="button" data-a="scoreboard" title="Scoreboard (Tab)" aria-label="Scoreboard">≡</button>
+        <button class="hud-btn" type="button" data-a="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+        <button class="hud-btn" type="button" data-a="menu" title="Menu (Esc)" aria-label="Menu">❚❚</button>
+      </div>
     `;
     topMount.appendChild(this.topRoot);
 
@@ -58,6 +66,30 @@ export class Hud {
     this.bannerEl = this.overlayRoot.querySelector(".hud-banner")!;
     this.feedEl = this.overlayRoot.querySelector(".hud-feed")!;
     this.scoreboardEl = this.overlayRoot.querySelector(".hud-scoreboard")!;
+    this.actionEls = {
+      scoreboard: this.topRoot.querySelector("[data-a=scoreboard]")!,
+      fullscreen: this.topRoot.querySelector("[data-a=fullscreen]")!,
+      menu: this.topRoot.querySelector("[data-a=menu]")!,
+    };
+  }
+
+  /** Wires the top-bar buttons. They're the only way to reach the scoreboard,
+   *  the pause menu and fullscreen on a phone, where there is no Tab, no Esc
+   *  and no browser chrome — but they're bound unconditionally, since a mouse
+   *  user has no reason to be denied them either. */
+  onAction(action: HudAction, handler: () => void) {
+    this.actionEls[action].onclick = (e) => {
+      (e.currentTarget as HTMLButtonElement).blur(); // else Space/Enter re-triggers it mid-match
+      handler();
+    };
+  }
+
+  setActionActive(action: HudAction, active: boolean) {
+    this.actionEls[action].classList.toggle("active", active);
+  }
+
+  setActionAvailable(action: HudAction, available: boolean) {
+    this.actionEls[action].hidden = !available;
   }
 
   update(snap: Snapshot, mySlot: number | null) {

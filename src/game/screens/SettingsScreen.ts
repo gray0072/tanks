@@ -31,11 +31,14 @@ export class SettingsScreen implements Screen {
             <option value="low" ${s.quality === "low" ? "selected" : ""}>Low</option>
           </select>
         </label>
-        <label>Touch d-pad side
+        <label>Movement stick side (touch)
           <select data-f="touchSide">
-            <option value="left" ${s.touchSide === "left" ? "selected" : ""}>Left</option>
-            <option value="right" ${s.touchSide === "right" ? "selected" : ""}>Right</option>
+            <option value="left" ${s.touchSide === "left" ? "selected" : ""}>Left — fire on the right</option>
+            <option value="right" ${s.touchSide === "right" ? "selected" : ""}>Right — fire on the left</option>
           </select>
+        </label>
+        <label style="flex-direction:row;align-items:center;gap:6px;">
+          <input type="checkbox" data-f="autoFullscreen" style="width:auto" ${s.autoFullscreen ? "checked" : ""}/> Fullscreen on match start (touch)
         </label>
         <label style="flex-direction:row;align-items:center;gap:6px;">
           <input type="checkbox" data-f="showPing" style="width:auto" ${s.showPing ? "checked" : ""}/> Show ping
@@ -57,8 +60,9 @@ export class SettingsScreen implements Screen {
     const volume = Number(this.field("volume").value) / 100;
     const quality = this.field<HTMLSelectElement>("quality").value as Quality;
     const touchSide = this.field<HTMLSelectElement>("touchSide").value as TouchSide;
+    const autoFullscreen = (this.field("autoFullscreen") as HTMLInputElement).checked;
     const showPing = (this.field("showPing") as HTMLInputElement).checked;
-    saveUserSettings({ nickname, volume, quality, touchSide, showPing });
+    saveUserSettings({ nickname, volume, quality, touchSide, autoFullscreen, showPing });
     audio.setVolume(volume);
     this.screens.go(new MainMenuScreen(this.screens));
   }

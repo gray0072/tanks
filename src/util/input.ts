@@ -60,6 +60,7 @@ export class Input {
   private dirStack: [CardinalDir[], CardinalDir[]] = [[], []];
   private touch: [Partial<SeatInput>, Partial<SeatInput>] = [{}, {}];
   private tabDown = false;
+  private touchScoreboard = false;
   private escPressed = false;
 
   constructor() {
@@ -108,10 +109,16 @@ export class Input {
   }
 
   scoreboardHeld(): boolean {
-    return this.tabDown;
+    return this.tabDown || this.touchScoreboard;
   }
 
-  /** Mobile touch d-pad / fire / mine, seat 0 only (local co-op is desktop-only). */
+  /** Touch equivalent of holding Tab — a HUD toggle rather than a hold,
+   *  since there is no spare thumb to keep a button down with. */
+  setTouchScoreboard(on: boolean) {
+    this.touchScoreboard = on;
+  }
+
+  /** Mobile stick / fire / mine, seat 0 only (local co-op is desktop-only). */
   setTouchDir(dir: Dir | null) {
     this.touch[0].dir = dir ?? undefined;
   }

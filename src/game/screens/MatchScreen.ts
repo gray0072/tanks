@@ -9,9 +9,17 @@ import { createAtlas } from "../../render/atlas";
 import { Arena } from "../../render/arena";
 import { Hud } from "../../render/hud";
 import { Input } from "../../util/input";
-import { dirFromAngle } from "../../util/math";
 import { audio } from "../../audio/audio";
 import { loadUserSettings } from "../settings";
+import { TouchControls } from "../touchControls";
+import {
+  enterFullscreen,
+  fullscreenSupported,
+  isFullscreen,
+  lockLandscape,
+  onFullscreenChange,
+  toggleFullscreen,
+} from "../../util/fullscreen";
 import { ResultScreen } from "./ResultScreen";
 import { MainMenuScreen } from "./MainMenuScreen";
 import { CELL, type TeamId } from "../../game/config";
@@ -35,6 +43,9 @@ export class MatchScreen implements Screen {
   private paused = false;
   private ended = false;
   private unbindEnter: (() => void) | null = null;
+  private touchControls: TouchControls | null = null;
+  private unbindFullscreen: (() => void) | null = null;
+  private scoreboardPinned = false;
   private isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
 
   constructor(private screens: ScreenManager, private room: RoomController) {}
@@ -72,7 +83,9 @@ export class MatchScreen implements Screen {
 
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("resize", this.checkOrientation);
+    this.unbindFullscreen = onFullscreenChange(this.onFullscreenChange);
     this.checkOrientation();
+    this.autoFullscreen();
     this.loop();
   }
 
@@ -88,7 +101,18 @@ export class MatchScreen implements Screen {
     this.pixi.world.addChild(this.arena.world);
 
     this.hud = new Hud(this.topbarHost, this.arenaHost);
+    this.hud.onAction("menu", () => this.togglePause());
+    this.hud.onAction("scoreboard", () => this.toggleScoreboard());
+    this.hud.onAction("fullscreen", () => void toggleFullscreen());
+    this.hud.setActionAvailable("fullscreen", fullscreenSupported());
+    this.hud.setActionActive("fullscreen", isFullscreen());
     this.setupTouchControls();
+  }
+
+  private toggleScoreboard() {
+    this.scoreboardPinned = !this.scoreboardPinned;
+    this.input.setTouchScoreboard(this.scoreboardPinned);
+    this.hud?.setActionActive("scoreboard", this.scoreboardPinned);
   }
 
   private onSnapshot(snap: Snapshot) {
@@ -147,6 +171,9 @@ export class MatchScreen implements Screen {
       // running match would keep replaying whatever was held when it opened.
       this.room.setLocalInput(0, NO_INPUT);
       if (this.room.hasLocalSeat2()) this.room.setLocalInput(1, NO_INPUT);
+      // The overlay covers the touch zones, so their pointerup never arrives —
+      // without this the tank would resume still driving and firing.
+      this.touchControls?.release();
       if (!overlay) {
         overlay = document.createElement("div");
         overlay.className = "hud-scoreboard pause-overlay";
@@ -188,8 +215,20 @@ export class MatchScreen implements Screen {
       notice = document.createElement("div");
       notice.className = "rotate-notice";
       notice.style.display = "flex";
-      notice.textContent = "Rotate your device — Tanks plays in landscape.";
+      // The button is the only way out on a device with rotation locked in
+      // its own settings: an orientation lock can only be taken while
+      // fullscreen, so offering fullscreen here is offering the rotation.
+      notice.innerHTML = `
+        <div class="rotate-body">
+          <div>Rotate your device — Tanks plays in landscape.</div>
+          <button class="primary" data-a="fs" type="button" ${fullscreenSupported() ? "" : "hidden"}>Fullscreen &amp; rotate</button>
+        </div>
+      `;
+      notice.querySelector<HTMLButtonElement>("[data-a=fs]")!.onclick = () => {
+        void enterFullscreen().then((ok) => ok && void lockLandscape());
+      };
       this.el.appendChild(notice);
+      this.touchControls?.release();
     } else if (!shouldShow && notice) {
       notice.remove();
     }
@@ -197,38 +236,40 @@ export class MatchScreen implements Screen {
 
   private setupTouchControls() {
     if (!this.isTouch) return;
-    const side = loadUserSettings().touchSide;
-    const wrap = document.createElement("div");
-    wrap.className = "touch-controls active";
-    wrap.innerHTML = `
-      <div class="touch-dpad" style="${side === "left" ? "left:20px" : "right:20px"}"></div>
-      <div class="touch-fire" style="${side === "left" ? "right:30px" : "left:30px"}"></div>
-      <div class="touch-mine" style="${side === "left" ? "right:120px" : "left:120px"}">MINE</div>
-    `;
-    this.el.appendChild(wrap);
-
-    const dpad = wrap.querySelector<HTMLDivElement>(".touch-dpad")!;
-    const setFromTouch = (t: Touch) => {
-      const rect = dpad.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dx = t.clientX - cx;
-      const dy = t.clientY - cy;
-      if (Math.hypot(dx, dy) < 12) { this.input.setTouchDir(null); return; }
-      this.input.setTouchDir(dirFromAngle(Math.atan2(dy, dx)));
-    };
-    dpad.addEventListener("touchstart", (e) => { e.preventDefault(); setFromTouch(e.touches[0]); }, { passive: false });
-    dpad.addEventListener("touchmove", (e) => { e.preventDefault(); setFromTouch(e.touches[0]); }, { passive: false });
-    dpad.addEventListener("touchend", () => this.input.setTouchDir(null));
-
-    const fire = wrap.querySelector<HTMLDivElement>(".touch-fire")!;
-    fire.addEventListener("touchstart", (e) => { e.preventDefault(); this.input.setTouchFire(true); }, { passive: false });
-    fire.addEventListener("touchend", () => this.input.setTouchFire(false));
-
-    const mine = wrap.querySelector<HTMLDivElement>(".touch-mine")!;
-    mine.addEventListener("touchstart", (e) => { e.preventDefault(); this.input.setTouchMine(true); }, { passive: false });
-    mine.addEventListener("touchend", () => this.input.setTouchMine(false));
+    // Mounted on the arena, not the whole screen: the zones then line up with
+    // the battlefield and leave the top bar (and the system gesture strip
+    // above it) alone. See touchControls.ts for the scheme.
+    this.arenaHost.classList.add("has-touch");
+    this.touchControls = new TouchControls(this.arenaHost, this.input, loadUserSettings().touchSide);
   }
+
+  // --- fullscreen (SPEC §5.4) ----------------------------------------------
+
+  /** Phones only, and only if the player left the setting on. The request is
+   *  refused outside a user gesture, which is exactly what happens to a guest
+   *  whose match was started by the host — so when the immediate attempt
+   *  fails we arm the player's next touch to do it instead. */
+  private autoFullscreen() {
+    if (!this.isTouch || !fullscreenSupported()) return;
+    if (!loadUserSettings().autoFullscreen) return;
+    void enterFullscreen().then((ok) => {
+      if (ok) void lockLandscape();
+      else this.armFullscreenOnGesture();
+    });
+  }
+
+  private armFullscreenOnGesture() {
+    const once = () => {
+      this.el.removeEventListener("pointerdown", once);
+      void enterFullscreen().then((ok) => ok && void lockLandscape());
+    };
+    this.el.addEventListener("pointerdown", once);
+  }
+
+  private onFullscreenChange = () => {
+    this.hud?.setActionActive("fullscreen", isFullscreen());
+    this.checkOrientation();
+  };
 
   private loop = () => {
     if (!this.paused) {
@@ -252,6 +293,8 @@ export class MatchScreen implements Screen {
     cancelAnimationFrame(this.raf);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("resize", this.checkOrientation);
+    this.unbindFullscreen?.();
+    this.touchControls?.destroy();
     this.arena?.destroy();
     this.pixi?.destroy();
     this.hud?.destroy();

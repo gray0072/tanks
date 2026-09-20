@@ -295,7 +295,11 @@ export class Sim {
       const input = inputs[tank.slot];
       if (!input) continue;
 
-      if (input.mine && tank.mines > 0) {
+      // Rising edge only — `mine` is a level, and one mine per tick while the
+      // button is down would empty the whole stock in a fraction of a second.
+      const minePressed = input.mine && !tank.mineHeld;
+      tank.mineHeld = input.mine;
+      if (minePressed && tank.mines > 0) {
         const c = tankCenter(tank);
         const cx = Math.floor(c.x / CELL);
         const cy = Math.floor(c.y / CELL);
@@ -622,6 +626,7 @@ export class Sim {
     tank.alive = true;
     tank.invulnT = SPAWN_INVULN;
     tank.slideT = 0;
+    tank.mineHeld = false;
   }
 
   private stepWinConditions(dt: number) {

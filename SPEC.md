@@ -448,6 +448,10 @@ Bonuses spawn one at a time at a random point from the map's `bonusSpawns`, ever
 | `RESPAWN` | +3 respawns | **Your team** | permanent |
 | `MINE` | Drop up to 3 proximity mines; 1-cell blast, visible only to your team | Taker | until used |
 
+Mines are laid on the **press edge** of the mine control, not while it is held — one press, one mine,
+whether that press came from `Q` or the touch button (`Sim.stepFiring`; the per-tank `mineHeld` flag
+is a host-side transient and is not in the snapshot).
+
 A player holds **at most one** timed personal buff (`HELMET` / `SPEED`); taking a second replaces the
 first. `STAR`, `RESPAWN`, and the team-scoped bonuses stack freely.
 
@@ -481,12 +485,64 @@ the same team or on opposing teams. Bots take back both slots if the client disc
 
 ### 5.3 Mobile
 
-- **Left thumb** — virtual d-pad (4-directional, dead zone, drag-to-change-direction).
-- **Right thumb** — fire button; a second smaller button for mines when held.
-- Layout mirrors for left-handed players (setting). Buttons sit inside the safe area and stay clear
-  of iOS/Android system gestures.
-- Portrait shows a "rotate your device" screen — the arena is 16:10 and unplayable portrait.
+No fixed d-pad. The battlefield is split down the middle into two full-height touch zones, and the
+whole of each zone is the control:
+
+| Zone | Control |
+|---|---|
+| **Movement half** (left by default) | A **floating stick**: it has no home position — it appears wherever the thumb lands and follows the drag, giving any of the 8 `Dir` values. Lift to stop. |
+| **Fire half** (right by default) | **Tap anywhere to fire, hold to keep firing.** No aiming — the tank shoots where it faces, so the whole half can be one button. |
+| `MINE` button | The one fixed widget, in the outer bottom corner of the fire half, inside the safe area. |
+
+Why a floating stick rather than a d-pad in a corner: a phone held in landscape gives the thumbs a
+small, *unpredictable* arc, and a fixed pad means looking away from the fight to find it. Putting the
+origin under the thumb, wherever that is, means never looking down — the pattern Minecraft's mobile
+build uses, for the same reason.
+
+- **Dead zone** — 14px from the origin. Inside it the stick reads as "stop", so the tank can be held
+  still without lifting the thumb.
+- **Origin follow** — past 52px of travel the origin is dragged along behind the thumb at exactly one
+  radius, so a long swipe never runs out of stick and never needs a re-grab.
+- **Tap-to-fire latch** — a tap is shorter than `FIRE_COOLDOWN`, so a bare press-and-release gets
+  swallowed whenever it lands mid-reload. A tap therefore holds `fire` for one full reload: every tap
+  produces exactly one shot, fired the instant the gun is ready.
+- **Pointer Events with per-zone pointer capture**, not touch events. Each thumb gets an independent
+  stream; a second finger landing on the fire side cannot hijack the stick.
+- `touch-action: none` on the zones — the browser never claims a drag as a scroll or a double-tap as
+  a zoom.
+- **Scoreboard, fullscreen and the pause menu are buttons in the top bar** (§6.2), the touch
+  equivalents of `Tab` / `Esc`, which a phone doesn't have. The scoreboard button is a toggle, not a
+  hold — there is no spare thumb.
+- **Layout mirrors** for left-handed players (Settings → *Movement stick side*): the two halves and
+  the `MINE` button all swap sides.
+- The overlay is mounted on the **arena**, not the viewport, so the zones map exactly onto the
+  battlefield and leave the stats bar and the system gesture strip above it alone.
+- Portrait shows a "rotate your device" screen with a **Fullscreen & rotate** button — the arena is
+  16:10 and unplayable portrait, and an orientation lock can only be taken while fullscreen (below),
+  so offering fullscreen there is offering the rotation.
 - Local co-op is desktop-only.
+
+### 5.4 Fullscreen
+
+Browser chrome costs a landscape phone roughly a fifth of its height, and the URL bar's show/hide
+animation resizes the arena mid-fight. Fullscreen is therefore the intended way to play on a phone.
+
+- **Automatic on match start**, touch devices only, controlled by Settings → *Fullscreen on match
+  start* (on by default). On entering fullscreen the game also asks for an **orientation lock to
+  landscape**, which is only grantable while fullscreen.
+- The request is **refused outside a user gesture** — which is exactly the case for a guest whose
+  match was started by the host. When the immediate attempt fails, the player's next touch on the
+  match screen is armed to do it instead.
+- **Manual toggle** in three places: the `⛶` button in the match top bar, a `Fullscreen` button on
+  the main menu, and the `Fullscreen & rotate` button on the portrait notice. The menu one matters
+  because a phone has no `Esc` to leave fullscreen with.
+- Fullscreen **persists across screens** — match → result → menu — rather than dropping out between
+  matches. Exiting unlocks the orientation.
+- Every call is treated as *may fail and that's not an error*: iPhone Safari has no element
+  fullscreen at all, and desktop browsers refuse the orientation lock. The portrait notice stays in
+  the product precisely because the lock can't be relied on.
+- Vendor-prefixed spellings (`webkit*`, `ms*`) are handled in `util/fullscreen.ts`; nothing else in
+  the codebase touches the Fullscreen or Screen Orientation APIs directly.
 
 ---
 
@@ -504,8 +560,8 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
 5. **Match** — the arena plus HUD (§6.2).
 6. **Scoreboard overlay** — held `Tab` or a HUD button; per-player stats, ping, team totals.
 7. **Result** — winner banner, final scoreboard, MVP line, `Rematch` (host) / `Back to room`.
-8. **Settings** — sound and music volume, render quality (auto/low/high), touch layout side,
-   nickname, show-ping toggle.
+8. **Settings** — sound and music volume, render quality (auto/low/high), movement stick side
+   (§5.3), fullscreen-on-match-start (§5.4), nickname, show-ping toggle.
 9. **Disconnected overlay** — reconnect progress and a `Back to menu` escape hatch.
 
 ### 6.1 Room screen and slot preview
@@ -556,7 +612,11 @@ else layers on top of the arena only, so nothing else needs to dodge the stats b
 lives-equivalent state — upgrade stars, active buff with a shrinking timer, mine count; center-top,
 event banners (team bonuses, flag under attack, "flag critical"); top-right, a compact event feed,
 last 4 entries — kills and bonus pickups. A **flag-under-attack** warning pings the whole team with a
-sound and an arrow pointing at the base.
+sound and an arrow pointing at the base. The top bar also carries the three HUD buttons —
+**scoreboard**, **fullscreen**, **menu** — which are what a touch device has instead of `Tab`, the
+browser's own fullscreen control and `Esc`; they are bound unconditionally, since a mouse user has no
+reason to be denied them. On touch the personal-state line moves from the bottom-left of the arena to
+the top-left, out from under the `MINE` button.
 
 ---
 
@@ -915,13 +975,14 @@ tanks/
 ├─ scripts/
 │  ├─ checkMaps.ts          # `npm run maps:check` — validates every map outside the browser
 │  └─ runTests.mjs          # `npm test` — globs and runs tests/*.test.ts under node:test
-├─ tests/                   # headless suites: movement, map format, bot navigation, bot tactics
+├─ tests/                   # headless suites: movement, controls, map format, bot nav, bot tactics
 └─ src/
    ├─ main.ts                  # bootstrap, ScreenManager, ?room= deep link
    ├─ style.css                # the one stylesheet for every DOM screen + HUD
    ├─ game/
    │  ├─ config.ts             # all tunables from this spec
    │  ├─ settings.ts           # persisted per-viewer settings (volume, quality, ...)
+   │  ├─ touchControls.ts      # the mobile two-zone overlay (§5.3): floating stick + fire half
    │  ├─ ScreenManager.ts
    │  └─ screens/              # MainMenu, CreateRoom, JoinRoom, Room, Match, Result, Settings
    ├─ world/
@@ -952,9 +1013,10 @@ tanks/
    │  ├─ atlas.ts              # procedural texture generation
    │  ├─ arena.ts              # layers, sprites, snapshot interpolation, fx
    │  ├─ preview.ts            # room-screen map & tank preview (Canvas2D)
-   │  └─ hud.ts                # DOM HUD overlay
+   │  └─ hud.ts                # DOM HUD overlay + top-bar action buttons (§6.2)
    ├─ audio/audio.ts
-   └─ util/                    # math (incl. seeded RNG), input, storage, dialog (Enter binding)
+   └─ util/                    # math (incl. seeded RNG), input, storage, dialog (Enter binding),
+                               # fullscreen (§5.4: prefixes + orientation lock, all failure-tolerant)
 ```
 
 ### Deployment — GitHub Pages

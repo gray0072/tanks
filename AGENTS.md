@@ -22,8 +22,19 @@ set bot difficulty → local co-op seat → ready → start → live 5v5 match w
 kills, HUD). Followed by a bug-fixing pass: tank hitbox shrunk below its 32px slot + auto-center
 assist (tanks were snagging in same-width corridors), tank sprite redrawn with tracks + barrel,
 wall-hit/destruction VFX added, ally-vs-enemy forest concealment, bot stuck-detection with randomized
-escape. Multiplayer (PeerJS) and mobile touch controls are implemented and type-safe but not yet
-tried across two real devices or on an actual phone — that's the natural next verification gap.
+escape. Multiplayer (PeerJS) is implemented and type-safe but not yet tried across two
+real devices — that's the natural next verification gap.
+
+**2026-09-20:** mobile controls rebuilt (SPEC §5.3): the fixed d-pad/fire buttons are gone, replaced
+by two full-height touch zones over the arena — a floating stick under whichever thumb lands on the
+movement half, tap-anywhere-to-fire on the other, `MINE` in the outer corner. Pointer Events with
+per-zone capture (the old `e.touches[0]` version let a second finger hijack the stick). Added a
+fullscreen mode (SPEC §5.4, `util/fullscreen.ts`): automatic on match start on touch with a landscape
+orientation lock, plus toggles in the match top bar and on the main menu. Along the way, mine-laying
+became edge-triggered in `Sim.stepFiring` — holding the control used to lay one mine *per tick*.
+Verified by driving a real Chromium at 844x390 with `hasTouch` via Playwright (stick tracks, canvas
+changes while driving, fire/scoreboard/pause/rotate-notice/mirrored layout all behave); not yet run
+on real phone hardware.
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -54,14 +65,17 @@ Don't trust this paragraph's specifics for long; read the current code and git l
   SPEC §3.5 that nothing in the engine is tied to the built-ins' 33x25 / 5-a-side shape.
 - `tests/botNavigation.test.ts` — a full bot-vs-bot match on every production map, asserting no
   bot is wedged. The guard on movement changes that only show up under real pathing.
+- `tests/controls.test.ts` — the input rules the touch layer and the keyboard share: mine-laying
+  fires on the press edge (holding the control lays one mine, not one per tick) and the stick's
+  continuous angle resolves to the right one of the 8 `Dir`s across each whole sector.
 - `tests/bots.test.ts` — bot tactics per difficulty (SPEC §10): objective play, shooting through
   brick, bonus behaviour, fair perception, rate of fire, and an integration test that plays
   full bot-vs-bot matches and asserts **Hard > Medium > Easy**. That last one is the important
   one — every individual behaviour can look right while the profiles still rank backwards in a
   fight, which is exactly what was happening.
 
-There's still no project `/run` skill, so anything the suite doesn't cover (rendering, netcode,
-touch controls) is still verified ad hoc:
+There's still no project `/run` skill, so anything the suite doesn't cover (rendering, netcode, the
+touch overlay's layout and gestures) is still verified ad hoc:
 
 - **Dev server:** `npm run dev` (Vite, port 5173) — served at **`http://localhost:5173/tanks/`**, not
   the bare root, because `vite.config.ts` sets `base: "/tanks/"` for GitHub Pages. Poll

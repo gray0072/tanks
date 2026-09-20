@@ -10,8 +10,9 @@ match with a 6-character code, or hand a second player the arrow keys and share 
 > A full local match works today — menu, room/slot picking with live preview, PixiJS rendering, the
 > classic/crossroads/swamp maps, tanks/bullets/terrain/bonuses/flags/respawns, and bots at all three
 > difficulties, plus a headless test suite (`npm test`) covering movement, bot navigation and bot
-> tactics. Multiplayer (PeerJS star topology) and mobile touch controls are implemented but not
-> yet verified on two real devices over the internet or on an actual phone. See
+> tactics. Mobile touch controls and fullscreen are implemented and checked in an emulated phone
+> browser; multiplayer (PeerJS star topology) is implemented but not yet verified on two real
+> devices over the internet, and nothing has been tried on actual phone hardware. See
 > [SPEC.md §13](SPEC.md#13-plan) for what's left.
 
 ## What it is
@@ -31,7 +32,8 @@ match with a 6-character code, or hand a second player the arrow keys and share 
   its own time limit, respawn pool, bot difficulty and friendly-fire toggle.
 - **Join by code.** Peer-to-peer over WebRTC — no server to run, no public IP, no accounts.
 - **Two players, one keyboard.** WASD and the arrow keys, same team or opposite ones.
-- **Phone-ready.** Touch controls, the whole arena on screen, 60 fps as a target on mid-range devices.
+- **Phone-ready.** Split-screen touch controls and a real fullscreen mode, the whole arena on screen,
+  60 fps as a target on mid-range devices.
 
 ## Features
 
@@ -43,7 +45,8 @@ match with a 6-character code, or hand a second player the arrow keys and share 
 | Eight power-ups | `HELMET` `STAR` `SPEED` `MINE` are yours; `SHOVEL` `CLOCK` `GRENADE` `RESPAWN` swing the whole team |
 | Peer-to-peer multiplayer | Host's browser runs the authoritative sim; guests join with a 6-character code or an invite link. No backend |
 | Local co-op | A second player on the same keyboard, on either team |
-| Touch controls | Virtual d-pad and fire button, landscape-gated, for phones and tablets |
+| Touch controls | Split-screen: floating stick under one thumb, tap-anywhere fire under the other |
+| Fullscreen | Auto on match start on touch, with landscape lock; toggle in the top bar and menu |
 | Three maps with live preview | `classic`, `crossroads`, `swamp` — the lobby previews the arena and highlights the spawn you're hovering |
 | Per-map lobby memory | The map you played last reopens preselected, with the time limit, respawns, bot difficulty and friendly-fire setting you last used **on that map** |
 
@@ -81,7 +84,25 @@ primary button — create the room, join, save, start the match.
 and picks up where it left off. With other players connected the match can't be frozen, so it's
 just a menu over a running game.
 
-On mobile: a virtual d-pad under the left thumb, fire under the right. Landscape only.
+On a phone or tablet, the battlefield is split in half and each half *is* a control:
+
+- **Movement half** (left by default) — put a thumb down anywhere in it and drag. A stick appears
+  under your thumb, wherever that is, and the tank drives that way in any of 8 directions. Lift to
+  stop. Drag far and the stick follows you, so you never run out of travel or have to re-grab.
+- **Fire half** (right by default) — tap anywhere to fire, hold to keep firing. The tank shoots where
+  it faces, so there's nothing to aim and no button to find.
+- **`MINE`** sits in the outer bottom corner, the only fixed button.
+- Left-handed? *Settings → Movement stick side* swaps the two halves and the `MINE` button with them.
+- The top bar carries the three buttons a phone needs and a keyboard doesn't: scoreboard, fullscreen,
+  and the pause menu.
+
+Landscape only — portrait shows a rotate prompt.
+
+**Fullscreen** is how it's meant to be played on a phone: browser chrome eats a fifth of a landscape
+screen and its show/hide animation resizes the arena mid-fight. Starting a match on a touch device
+goes fullscreen and asks for a landscape orientation lock automatically (*Settings → Fullscreen on
+match start*, on by default). It's also a button in the match top bar and on the main menu — worth
+knowing, since a phone has no `Esc` to get back out with.
 
 ## Playing together
 
@@ -141,7 +162,8 @@ Milestones **M0 – M10** are laid out in [SPEC.md §13](SPEC.md#13-plan).
 - [x] M0–M6 — scaffold, terrain, tanks, match rules, bots, bonuses, screens + local co-op
 - [x] M7 — multiplayer (PeerJS star topology, room code, host-authoritative sim) — *implemented,
       not yet played across two real devices*
-- [x] M8 — mobile touch controls + orientation gate — *implemented, not yet tried on a real phone*
+- [x] M8 — mobile touch controls (floating stick + tap-to-fire halves), fullscreen and orientation
+  gate — *verified in an emulated phone browser, not yet on real hardware*
 - [ ] M9 — `fortress` and `iceworks` maps, real audio mixing pass, effects/kill-feed polish, balance
 - [ ] M10 — GitHub Pages deploy
 

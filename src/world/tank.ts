@@ -45,6 +45,10 @@ export type TankState = {
   invulnT: number; // remaining spawn invulnerability seconds
   fireCooldown: number;
   mines: number;
+  /** Was the mine button held on the previous tick? Host-side transient, not
+   *  in the snapshot — it exists only to make mine-laying edge-triggered, so
+   *  holding the key/button lays one mine instead of one per tick. */
+  mineHeld: boolean;
   respawnT: number; // > 0 while dead and waiting to respawn
 };
 
@@ -63,6 +67,7 @@ export function createTank(slot: number, team: TeamId, spawnCx: number, spawnCy:
     invulnT: 0,
     fireCooldown: 0,
     mines: 0,
+    mineHeld: false,
     respawnT: 0,
   };
 }

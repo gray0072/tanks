@@ -16,7 +16,8 @@ export type UserSettings = {
   nickname: string;
   volume: number; // 0..1
   quality: Quality;
-  touchSide: TouchSide; // which thumb gets the d-pad
+  touchSide: TouchSide; // which thumb gets the movement stick (SPEC §5.3)
+  autoFullscreen: boolean; // go fullscreen + landscape when a match starts, touch devices only
   showPing: boolean;
 };
 
@@ -25,6 +26,7 @@ const DEFAULTS: UserSettings = {
   volume: 0.6,
   quality: "auto",
   touchSide: "left",
+  autoFullscreen: true,
   showPing: true,
 };
 
