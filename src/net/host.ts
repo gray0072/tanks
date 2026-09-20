@@ -108,6 +108,18 @@ export class RoomHost implements RoomController {
     switch (msg.t) {
       case "hello":
         this.connNicknames.set(connId, msg.nickname.slice(0, 12) || "Player");
+        // Room state is otherwise only broadcast on change, so without this
+        // reply a fresh guest sits on a connected-but-silent socket forever.
+        this.net?.send(connId, { t: "roomState", slots: this.slots, mapId: this.mapId, settings: this.settings });
+        if (this.sim) {
+          this.net?.send(connId, {
+            t: "matchStart",
+            mapId: this.sim.map.id,
+            seed: 0,
+            settings: this.sim.settings,
+            slots: this.slots,
+          });
+        }
         break;
       case "claimSlot":
         this.doClaim(connId, msg.slot, msg.localSeat);

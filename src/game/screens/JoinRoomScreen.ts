@@ -10,6 +10,7 @@ import { bindEnter } from "../../util/dialog";
 export class JoinRoomScreen implements Screen {
   private el!: HTMLElement;
   private room: RoomClient | null = null;
+  private navigated = false;
   private unbindEnter: (() => void) | null = null;
 
   constructor(private screens: ScreenManager, private prefillCode = "") {}
@@ -58,11 +59,11 @@ export class JoinRoomScreen implements Screen {
     saveUserSettings({ ...loadUserSettings(), nickname });
     this.showError("Connecting…");
 
-    let navigated = false;
+    this.room?.destroy();
     this.room = new RoomClient(code, nickname, {
       onRoomState: () => {
-        if (navigated || !this.room) return;
-        navigated = true;
+        if (this.navigated || !this.room) return;
+        this.navigated = true;
         this.screens.go(new RoomScreen(this.screens, this.room));
       },
       onError: (msg) => this.showError(msg),
@@ -81,6 +82,7 @@ export class JoinRoomScreen implements Screen {
     this.unbindEnter?.();
     // Ownership passes to RoomScreen once navigated; only tear down if the
     // user backs out before a connection ever succeeded.
+    if (!this.navigated) this.room?.destroy();
   }
 }
 
