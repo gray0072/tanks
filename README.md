@@ -1,28 +1,58 @@
 # Tanks
 
-A browser tank battle in the spirit of *Battle City* — **5 vs 5**, blue against red, with destructible
+**Live: [gray0072.github.io/tanks](https://gray0072.github.io/tanks/)**
+
+A browser tank battle in the spirit of *Battle City* — blue against red, with destructible
 terrain, power-ups, and a flag you have to defend. Plays on desktop and on a phone, join a friend's
 match with a 6-character code, or hand a second player the arrow keys and share one keyboard.
 
 > **Status: playable prototype.** [SPEC.md](SPEC.md) is the authoritative design and project plan.
 > A full local match works today — menu, room/slot picking with live preview, PixiJS rendering, the
 > classic/crossroads/swamp maps, tanks/bullets/terrain/bonuses/flags/tickets, and bots at all three
-> difficulties. Multiplayer (PeerJS star topology) and mobile touch controls are implemented but not
+> difficulties, plus a headless test suite (`npm test`) covering movement, bot navigation and bot
+> tactics. Multiplayer (PeerJS star topology) and mobile touch controls are implemented but not
 > yet verified on two real devices over the internet or on an actual phone. See
 > [SPEC.md §13](SPEC.md#13-plan) for what's left.
 
 ## What it is
 
-- **5 vs 5 team battle.** Every slot is always filled — humans take the seats they want, bots
-  (`Easy1`…`Hard10`, named after their difficulty) hold the rest, at **Easy / Medium / Hard** — set per bot or for everyone at once.
+- **Team battle, blue vs red.** The roster is as big as the map's spawn count — five a side on every
+  shipped map — and every slot is always filled: humans take the seats they want, bots
+  (`Easy1`…`Hard10`, named after their difficulty) hold the rest, at **Easy / Medium / Hard**, set
+  per bot or for everyone at once.
 - **Destroy the enemy flag** to win, or grind the enemy team out of respawn tickets. Ten minutes,
   25 tickets, one arena.
 - **Battle City terrain** — brick, steel, forest, water, ice, sand — and eight power-ups, several of
   which affect your whole team (`SHOVEL`, `CLOCK`, `GRENADE`, `TICKET`).
-- **Five fixed-size maps**, chosen by the host in the lobby, previewed live before the match starts.
+- **Three fixed-size maps** — `classic`, `crossroads`, `swamp` — chosen by the host in the lobby and
+  previewed live, with your spawn point highlighted, before the match starts.
 - **Join by code.** Peer-to-peer over WebRTC — no server to run, no public IP, no accounts.
 - **Two players, one keyboard.** WASD and the arrow keys, same team or opposite ones.
 - **Phone-ready.** Touch controls, the whole arena on screen, 60 fps as a target on mid-range devices.
+
+## Features
+
+| Feature | What it does |
+|---|---|
+| Team deathmatch with an objective | Blue vs red. Destroy the enemy flag for an instant win, or run the enemy out of respawn tickets before the 10-minute clock expires |
+| Bots on every free slot | Difficulty per bot or for the whole roster at once — Easy / Medium / Hard, with genuinely different tactics, not just different aim |
+| Destructible terrain | Brick crumbles cell by cell, steel resists until you're upgraded, forest conceals, water stops tanks but not bullets, ice slides, sand slows |
+| Eight power-ups | `HELMET` `STAR` `SPEED` `MINE` are yours; `SHOVEL` `CLOCK` `GRENADE` `TICKET` swing the whole team |
+| Peer-to-peer multiplayer | Host's browser runs the authoritative sim; guests join with a 6-character code or an invite link. No backend |
+| Local co-op | A second player on the same keyboard, on either team |
+| Touch controls | Virtual d-pad and fire button, landscape-gated, for phones and tablets |
+| Three maps with live preview | `classic`, `crossroads`, `swamp` — the lobby previews the arena and highlights the spawn you're hovering |
+
+## How it works
+
+1. **Create a room** — pick the map, time limit, tickets and default bot difficulty. You get a
+   6-character code and an invite link.
+2. **Take a slot** — click any slot on either team; the preview shows the map, your spawn and your
+   tank. Friends join with the code, bots hold everything nobody claimed.
+3. **Start the match** — the host's browser simulates everything and streams snapshots to the
+   guests at 20 Hz.
+4. **Win** — blow up the enemy flag, or outlast them on respawn tickets. The result screen has the
+   full scoreboard and a way straight back to the room.
 
 ## Tech
 
@@ -36,9 +66,16 @@ at boot.
 |---|---|---|
 | Move | `W` `A` `S` `D` | Arrow keys |
 | Fire | `Space` | `Enter` / `Right Ctrl` |
-| Drop mine | `Q` | `Right Shift` |
+| Drop mine (needs the `MINE` bonus) | `Q` | `Right Shift` |
 | Scoreboard | hold `Tab` | |
 | Menu | `Esc` | |
+
+Hold two direction keys at once to drive diagonally. In the menus, `Enter` triggers the screen's
+primary button — create the room, join, save, start the match.
+
+`Esc` opens the in-match menu. Playing on your own, that really pauses: the simulation stops dead
+and picks up where it left off. With other players connected the match can't be frozen, so it's
+just a menu over a running game.
 
 On mobile: a virtual d-pad under the left thumb, fire under the right. Landscape only.
 
@@ -47,10 +84,11 @@ On mobile: a virtual d-pad under the left thumb, fire under the right. Landscape
 One player creates a room and gets a code like `K7QM2X` (or an invite link `?room=K7QM2X`). Everyone
 else joins with it, picks a slot on either team — the preview shows the map, your spawn point, and
 your tank before you commit — and hits ready. Any slot you don't fill is played by a bot, so the
-match is 5v5 whether there are two of you or ten.
+teams are always full whether there are two of you or ten. Clicking another slot moves you there;
+your own seat always keeps a slot, so you can't accidentally drop yourself out of the roster.
 
 The room creator hosts the match: their browser runs the authoritative simulation and all the bots.
-If someone drops, a bot takes over their tank and they have 60 seconds to reclaim it.
+If someone drops, a bot takes their tank over for the rest of the match.
 
 ## Quick start
 
@@ -61,9 +99,36 @@ npm run build      # type-check + production build into ./dist
 npm run preview    # serve the build locally
 npm run deploy     # publish ./dist to the gh-pages branch
 npm run maps:check # validate the built-in maps in src/world/maps/
+npm test           # headless suite: movement, bot navigation, bot tactics
 ```
 
-The build is a plain static site — `./dist/` can be hosted anywhere.
+`vite.config.ts` sets `base: "/tanks/"`, the repo subpath GitHub Pages serves from — which is also
+why `npm run dev` opens at <http://localhost:5173/tanks/>. Pushing to `main` deploys automatically
+via [.github/workflows/deploy.yml](.github/workflows/deploy.yml); `npm run deploy` publishes from
+your machine instead.
+
+## Project structure
+
+```
+src/
+  main.ts            # entry: debug shortcut, ?room= deep link, or the main menu
+  game/              # screens (menu, create, join, room, match, result, settings)
+    config.ts        # every tuning number: speeds, timings, bot profiles
+  world/             # the simulation — no rendering, no DOM, no network
+    sim.ts           # authoritative tick: movement, bullets, bonuses, flags
+    grid.ts bullet.ts bonus.ts flag.ts rules.ts tank.ts
+    maps/            # map sources as text + parser/validator
+  ai/                # bots: per-tank controller, pathfinder, team role planner
+  net/               # RoomHost / RoomClient behind one RoomController interface
+    peer.ts          # PeerJS plumbing; protocol.ts — wire messages
+  render/            # PixiJS: arena, procedurally generated atlas, HUD, previews
+  util/              # input, math, storage, dialog helpers
+tests/               # headless node:test suites (movement, bot navigation, bot tactics)
+scripts/             # map validation and the test runner
+```
+
+The build is a plain static site — `./dist/` can be hosted anywhere that can serve it from
+`/tanks/`.
 
 ## Roadmap
 

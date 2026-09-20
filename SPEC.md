@@ -10,6 +10,24 @@ internet by a short room code, and playable by two people on one keyboard.
 
 ---
 
+## 0. Stack
+
+| Tool | Version | Role |
+|---|---|---|
+| TypeScript | ^5.6 | The whole codebase; `npm run build` type-checks before bundling |
+| PixiJS | ^8.20 | WebGL renderer for the arena — sprites, layers, effects. No DOM in the hot path |
+| PeerJS | ^1.5 | WebRTC DataChannel wrapper: room codes map to peer ids, star topology (§9) |
+| Vite | ^5.4 | Dev server and production bundler; `base: "/tanks/"` for GitHub Pages |
+| tsx | ^4.19 | Runs the `.ts` test suites and `scripts/checkMaps.ts` under plain Node |
+| node:test | Node 20 | Test runner for `tests/` (via `scripts/runTests.mjs`, which does the globbing) |
+| gh-pages | ^6.3 | Manual publish of `dist/` to the `gh-pages` branch |
+
+No UI framework, no state library, no CSS framework, no asset pipeline: screens are hand-rolled DOM
+(§6), state lives in the `Sim` and the `RoomController`, and every texture is generated procedurally
+at boot (§7).
+
+---
+
 ## 1. Product summary
 
 | | |
@@ -890,7 +908,9 @@ tanks/
 ├─ package.json · tsconfig.json · vite.config.ts
 ├─ SPEC.md · README.md
 ├─ scripts/
-│  └─ checkMaps.ts          # `npm run maps:check` — validates every map outside the browser
+│  ├─ checkMaps.ts          # `npm run maps:check` — validates every map outside the browser
+│  └─ runTests.mjs          # `npm test` — globs and runs tests/*.test.ts under node:test
+├─ tests/                   # headless suites: movement, bot navigation, bot tactics
 └─ src/
    ├─ main.ts                  # bootstrap, ScreenManager, ?room= deep link
    ├─ style.css                # the one stylesheet for every DOM screen + HUD
@@ -929,8 +949,20 @@ tanks/
    │  ├─ preview.ts            # room-screen map & tank preview (Canvas2D)
    │  └─ hud.ts                # DOM HUD overlay
    ├─ audio/audio.ts
-   └─ util/                    # math (incl. seeded RNG), input, storage
+   └─ util/                    # math (incl. seeded RNG), input, storage, dialog (Enter binding)
 ```
+
+### Deployment — GitHub Pages
+
+The build is a static site with no backend, published to `https://gray0072.github.io/tanks/`.
+
+- `vite.config.ts` sets `base: "/tanks/"` — the repo subpath. Without it every asset URL 404s once
+  deployed, and the dev server then also serves from `/tanks/`.
+- `package.json` carries `predeploy: npm run build` and `deploy: gh-pages -d dist` for publishing
+  by hand from a working copy.
+- `.github/workflows/deploy.yml` is the normal path: every push to `main` runs `npm ci`,
+  `npm run build` and `peaceiris/actions-gh-pages@v4` with `permissions: contents: write`,
+  publishing `./dist` to the `gh-pages` branch.
 
 Two deliberate deviations from the wording above, both explained where they matter: the network
 protocol carries JSON, not packed binary (§9.3), and client-side prediction is simplified rather than

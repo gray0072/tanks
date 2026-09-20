@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "deploy": "vite build && gh-pages -d dist",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist",
     "maps:check": "tsx scripts/checkMaps.ts",
     "test": "node scripts/runTests.mjs"
   },
