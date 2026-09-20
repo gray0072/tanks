@@ -57,7 +57,7 @@ import {
   recordKill,
   recordDamage,
   checkWinByFlag,
-  checkWinByTickets,
+  checkWinByRespawns,
   checkWinByTime,
   otherTeam,
 } from "./rules";
@@ -558,8 +558,8 @@ export class Sim {
         }
         events.push({ type: "teamBonus", team: tank.team, kind });
         break;
-      case "TICKET":
-        this.rules.tickets[tank.team] += 3;
+      case "RESPAWN":
+        this.rules.respawns[tank.team] += 3;
         events.push({ type: "teamBonus", team: tank.team, kind });
         break;
     }
@@ -606,7 +606,7 @@ export class Sim {
   private stepRespawns(dt: number, _events: MatchEvent[]) {
     for (const tank of this.tanks) {
       if (tank.alive) continue;
-      if (this.rules.tickets[tank.team] <= 0) continue; // eliminated, spectating
+      if (this.rules.respawns[tank.team] <= 0) continue; // eliminated, spectating
       tank.respawnT = Math.max(0, tank.respawnT - dt);
       if (tank.respawnT > 0) continue;
       this.respawnTank(tank);
@@ -628,7 +628,7 @@ export class Sim {
     checkWinByFlag(this.rules);
     const teamHasLivingTank: Record<TeamId, boolean> = { blue: false, red: false };
     for (const tank of this.tanks) if (tank.alive) teamHasLivingTank[tank.team] = true;
-    checkWinByTickets(this.rules, teamHasLivingTank);
+    checkWinByRespawns(this.rules, teamHasLivingTank);
     if (!this.rules.ended) this.rules.timeLeft = Math.max(0, this.rules.timeLeft - dt);
     checkWinByTime(this.rules);
   }
@@ -657,7 +657,7 @@ export class Sim {
       bullets: this.bullets.map((b) => ({ id: b.id, x: b.x, y: b.y, dir: b.dir, team: b.team })),
       bonuses: this.bonuses.map((b) => ({ id: b.id, kind: b.kind, cx: b.cx, cy: b.cy })),
       mines: this.mines.map((m) => ({ id: m.id, team: m.team, cx: m.cx, cy: m.cy })),
-      tickets: { ...this.rules.tickets },
+      respawns: { ...this.rules.respawns },
       flagAlive: { ...this.rules.flagAlive },
       timeLeft: this.rules.timeLeft,
       ended: this.rules.ended,
@@ -688,7 +688,7 @@ export type Snapshot = {
   bullets: BulletSnap[];
   bonuses: BonusSnap[];
   mines: MineSnap[];
-  tickets: Record<TeamId, number>;
+  respawns: Record<TeamId, number>;
   flagAlive: Record<TeamId, boolean>;
   timeLeft: number;
   ended: boolean;

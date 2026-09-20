@@ -28,7 +28,7 @@ for (const { id, name, template } of MAP_SOURCES) {
       s.kind = "bot";
       s.owner = null;
     }
-    const sim = new Sim(map, { mapId: id, timeLimit: 600, tickets: 999, friendlyFire: false }, slots, 12345);
+    const sim = new Sim(map, { mapId: id, timeLimit: 600, respawns: 999, friendlyFire: false }, slots, 12345);
     const bots = new Map(slots.map((s) => [s.id, new BotController(s.id)]));
 
     // Distance covered per slot, summed across lives (a respawn teleport is

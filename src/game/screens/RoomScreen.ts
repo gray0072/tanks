@@ -224,7 +224,7 @@ export class RoomScreen implements Screen {
     const previewCanvas = this.el.querySelector<HTMLCanvasElement>("[data-f=preview]");
     const tankCanvas = this.el.querySelector<HTMLCanvasElement>("[data-f=tank]");
     const info = this.el.querySelector<HTMLDivElement>("[data-f=mapinfo]");
-    if (info) info.textContent = `Map: ${map.name} · ${(this.room.settings?.timeLimit ?? 0) / 60 | 0} min · ${this.room.settings?.tickets ?? "?"} tickets`;
+    if (info) info.textContent = `Map: ${map.name} · ${(this.room.settings?.timeLimit ?? 0) / 60 | 0} min · ${this.room.settings?.respawns ?? "?"} respawns`;
 
     const hovered = this.hoverSlot !== null ? this.slots.find((s) => s.id === this.hoverSlot) : undefined;
     if (previewCanvas) {

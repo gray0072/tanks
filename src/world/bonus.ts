@@ -8,18 +8,18 @@ export type BonusKind =
   | "SHOVEL"
   | "CLOCK"
   | "GRENADE"
-  | "TICKET"
+  | "RESPAWN"
   | "MINE";
 
 export const BONUS_KINDS: readonly BonusKind[] = [
-  "HELMET", "STAR", "SPEED", "SHOVEL", "CLOCK", "GRENADE", "TICKET", "MINE",
+  "HELMET", "STAR", "SPEED", "SHOVEL", "CLOCK", "GRENADE", "RESPAWN", "MINE",
 ];
 
 /** Personal buffs that replace each other (SPEC §4.3, "at most one timed
- *  personal buff"). STAR/TICKET/team-scoped bonuses stack freely. */
+ *  personal buff"). STAR/RESPAWN/team-scoped bonuses stack freely. */
 export const EXCLUSIVE_PERSONAL_BUFFS: readonly BonusKind[] = ["HELMET", "SPEED"];
 
-export const TEAM_SCOPED_BONUSES: readonly BonusKind[] = ["SHOVEL", "CLOCK", "GRENADE", "TICKET"];
+export const TEAM_SCOPED_BONUSES: readonly BonusKind[] = ["SHOVEL", "CLOCK", "GRENADE", "RESPAWN"];
 
 export type BonusEntity = {
   id: number;

@@ -93,21 +93,21 @@ export function aabbOverlap(
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 }
 
-/** The room always starts with the creator in slot 0 and bots filling the
- *  rest — SPEC §2.1: at most `2*teamSize - 1` bots can ever exist because the
- *  room creator always occupies one human slot. `teamSize` defaults to the
- *  production 5v5; a debug map (world/maps/debugMap.ts) can size it smaller,
- *  matching however many spawns it actually defines. Ids `0..teamSize-1` are
- *  blue, `teamSize..2*teamSize-1` are red. */
-/** A bot's display name — its difficulty plus its slot id, e.g. "Medium3".
- *  Recomputed whenever the slot's difficulty changes, so the lobby name
- *  always says what the bot actually plays like. */
-/** Bots are numbered from 1, matching the slot's position in its roster as a
- *  player reads it — slot id 0 is "Easy1", not "Easy0". */
+/** A bot's display name — its difficulty plus its position in the roster,
+ *  e.g. "Medium3". Numbered from 1, the way a player reads the slot list, so
+ *  slot id 0 is "Easy1", not "Easy0". Recomputed whenever the slot's
+ *  difficulty changes, so the lobby name always says what the bot plays
+ *  like. */
 export function botNickname(id: number, difficulty: BotDifficulty): string {
   return `${BOT_DIFFICULTY_LABEL[difficulty]}${id + 1}`;
 }
 
+/** The room always starts with the creator in slot 0 and bots filling the
+ *  rest — SPEC §2.1: at most `2*teamSize - 1` bots can ever exist because the
+ *  room creator always occupies one human slot. `teamSize` comes from the
+ *  loaded map's spawn count; the `TEAM_SIZE` default is only for a room built
+ *  without a map in hand. Ids `0..teamSize-1` are blue,
+ *  `teamSize..2*teamSize-1` are red. */
 export function createDefaultSlots(hostNickname: string, teamSize: number = TEAM_SIZE): Slot[] {
   const slots: Slot[] = [];
   const total = teamSize * 2;

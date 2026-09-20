@@ -8,7 +8,7 @@ match with a 6-character code, or hand a second player the arrow keys and share 
 
 > **Status: playable prototype.** [SPEC.md](SPEC.md) is the authoritative design and project plan.
 > A full local match works today — menu, room/slot picking with live preview, PixiJS rendering, the
-> classic/crossroads/swamp maps, tanks/bullets/terrain/bonuses/flags/tickets, and bots at all three
+> classic/crossroads/swamp maps, tanks/bullets/terrain/bonuses/flags/respawns, and bots at all three
 > difficulties, plus a headless test suite (`npm test`) covering movement, bot navigation and bot
 > tactics. Multiplayer (PeerJS star topology) and mobile touch controls are implemented but not
 > yet verified on two real devices over the internet or on an actual phone. See
@@ -20,12 +20,15 @@ match with a 6-character code, or hand a second player the arrow keys and share 
   shipped map — and every slot is always filled: humans take the seats they want, bots
   (`Easy1`…`Hard10`, named after their difficulty) hold the rest, at **Easy / Medium / Hard**, set
   per bot or for everyone at once.
-- **Destroy the enemy flag** to win, or grind the enemy team out of respawn tickets. Ten minutes,
-  25 tickets, one arena.
+- **Destroy the enemy flag** to win, or grind the enemy team out of respawns. Ten minutes,
+  25 respawns, one arena.
 - **Battle City terrain** — brick, steel, forest, water, ice, sand — and eight power-ups, several of
-  which affect your whole team (`SHOVEL`, `CLOCK`, `GRENADE`, `TICKET`).
-- **Three fixed-size maps** — `classic`, `crossroads`, `swamp` — chosen by the host in the lobby and
-  previewed live, with your spawn point highlighted, before the match starts.
+  which affect your whole team (`SHOVEL`, `CLOCK`, `GRENADE`, `RESPAWN`).
+- **Three maps** — `classic`, `crossroads`, `swamp` — chosen by the host in the lobby and previewed
+  live, with your spawn point highlighted, before the match starts. A map is a plain block of text
+  and carries its own size and roster, anything from 2×2 up to 128×128, so adding one is a file.
+- **Your lobby setup sticks.** Create Room reopens on the map you played last, and each map keeps
+  its own time limit, respawn pool, bot difficulty and friendly-fire toggle.
 - **Join by code.** Peer-to-peer over WebRTC — no server to run, no public IP, no accounts.
 - **Two players, one keyboard.** WASD and the arrow keys, same team or opposite ones.
 - **Phone-ready.** Touch controls, the whole arena on screen, 60 fps as a target on mid-range devices.
@@ -34,24 +37,25 @@ match with a 6-character code, or hand a second player the arrow keys and share 
 
 | Feature | What it does |
 |---|---|
-| Team deathmatch with an objective | Blue vs red. Destroy the enemy flag for an instant win, or run the enemy out of respawn tickets before the 10-minute clock expires |
+| Team deathmatch with an objective | Blue vs red. Destroy the enemy flag for an instant win, or run the enemy out of respawns before the 10-minute clock expires |
 | Bots on every free slot | Difficulty per bot or for the whole roster at once — Easy / Medium / Hard, with genuinely different tactics, not just different aim |
 | Destructible terrain | Brick crumbles cell by cell, steel resists until you're upgraded, forest conceals, water stops tanks but not bullets, ice slides, sand slows |
-| Eight power-ups | `HELMET` `STAR` `SPEED` `MINE` are yours; `SHOVEL` `CLOCK` `GRENADE` `TICKET` swing the whole team |
+| Eight power-ups | `HELMET` `STAR` `SPEED` `MINE` are yours; `SHOVEL` `CLOCK` `GRENADE` `RESPAWN` swing the whole team |
 | Peer-to-peer multiplayer | Host's browser runs the authoritative sim; guests join with a 6-character code or an invite link. No backend |
 | Local co-op | A second player on the same keyboard, on either team |
 | Touch controls | Virtual d-pad and fire button, landscape-gated, for phones and tablets |
 | Three maps with live preview | `classic`, `crossroads`, `swamp` — the lobby previews the arena and highlights the spawn you're hovering |
+| Per-map lobby memory | The map you played last reopens preselected, with the time limit, respawns, bot difficulty and friendly-fire setting you last used **on that map** |
 
 ## How it works
 
-1. **Create a room** — pick the map, time limit, tickets and default bot difficulty. You get a
+1. **Create a room** — pick the map, time limit, respawns and default bot difficulty. You get a
    6-character code and an invite link.
 2. **Take a slot** — click any slot on either team; the preview shows the map, your spawn and your
    tank. Friends join with the code, bots hold everything nobody claimed.
 3. **Start the match** — the host's browser simulates everything and streams snapshots to the
    guests at 20 Hz.
-4. **Win** — blow up the enemy flag, or outlast them on respawn tickets. The result screen has the
+4. **Win** — blow up the enemy flag, or outlast them on respawns. The result screen has the
    full scoreboard and a way straight back to the room.
 
 ## Tech
@@ -123,7 +127,7 @@ src/
     peer.ts          # PeerJS plumbing; protocol.ts — wire messages
   render/            # PixiJS: arena, procedurally generated atlas, HUD, previews
   util/              # input, math, storage, dialog helpers
-tests/               # headless node:test suites (movement, bot navigation, bot tactics)
+tests/               # headless node:test suites (movement, map format, bot navigation, bot tactics)
 scripts/             # map validation and the test runner
 ```
 

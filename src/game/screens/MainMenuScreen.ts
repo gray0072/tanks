@@ -7,7 +7,7 @@ import { bindEnter } from "../../util/dialog";
 
 const HOW_TO_PLAY = `
   <h3>Objective</h3>
-  <p>Two teams, blue and red. Destroy the enemy flag, or grind the enemy team out of respawn tickets
+  <p>Two teams, blue and red. Destroy the enemy flag, or grind the enemy team out of respawns
      before the clock runs out. Any slot you don't take is filled by a bot.</p>
   <h3>Controls</h3>
   <p><b>Player 1:</b> WASD move, Space fire.<br/>
@@ -19,7 +19,7 @@ const HOW_TO_PLAY = `
   <h3>Bonuses</h3>
   <p>HELMET shields one hit, STAR upgrades your tank, SPEED boosts you, MINE gives you proximity mines
      (drop with Q, or Right Shift for player 2), and four bonuses affect your whole team:
-     SHOVEL fortifies your flag, CLOCK freezes the enemy, GRENADE wipes every enemy tank, TICKET grants extra respawns.</p>
+     SHOVEL fortifies your flag, CLOCK freezes the enemy, GRENADE wipes every enemy tank, RESPAWN refills your team’s respawn pool.</p>
 `;
 
 export class MainMenuScreen implements Screen {

@@ -1,6 +1,6 @@
 # Tanks — Specification & Project Plan
 
-Team tank battle in the browser, 5 vs 5, in the spirit of *Battle City*: destructible terrain,
+Team tank battle in the browser, blue against red, in the spirit of *Battle City*: destructible terrain,
 power-ups, and a base flag that must be defended. Runs on desktop and mobile, joinable over the
 internet by a short room code, and playable by two people on one keyboard.
 
@@ -33,8 +33,8 @@ at boot (§7).
 | | |
 |---|---|
 | Genre | Top-down arena tank shooter, team-based |
-| Match | 5 vs 5 — **Blue** vs **Red**. Empty slots are filled by bots (`Easy1`…`Hard10`) |
-| Objective | Destroy the enemy flag, or run the enemy team out of respawn tickets |
+| Match | **Blue** vs **Red**, team size set by the loaded map. Empty slots are filled by bots (`Easy1`, `Medium2`, …) |
+| Objective | Destroy the enemy flag, or run the enemy team out of respawns |
 | Session length | 5–10 minutes |
 | Platform | Browser: desktop (keyboard) and mobile (touch). No install, no accounts |
 | Multiplayer | Peer-to-peer over WebRTC, join by a 6-character room code. No server to run |
@@ -58,8 +58,10 @@ at boot (§7).
 
 ### 2.1 Teams and slots
 
-A room has exactly **10 slots**: 5 Blue, 5 Red. Every slot is always occupied — by a human or by a
-bot — so the match is always 5v5.
+A room has **2 × teamSize slots**, half Blue and half Red, where `teamSize` is however many spawn
+markers the loaded map declares (§3.5) — 5 a side for the built-in maps, 1 a side for the debug map,
+and whatever a new map asks for. Every slot is always occupied, by a human or by a bot, so the teams
+are always full and always symmetric.
 
 - A slot is either **human** (nickname, 2–12 chars) or **bot**. A bot's name is its difficulty plus
   its 1-based slot position — `Easy1`, `Medium2`, `Hard3` — assigned the lowest free index, unique room-wide,
@@ -77,20 +79,20 @@ A match ends the moment any of these is true:
 | Condition | Winner |
 |---|---|
 | A team's **flag is destroyed** | The other team (instant) |
-| A team's **respawn tickets** hit 0 and its last tank dies | The other team |
+| A team's **respawns** hit 0 and its last tank dies | The other team |
 | **Time limit** expires | Team with more frags; tie broken by flag armor remaining; still tied → draw |
 
-Defaults: **25 tickets** per team, **10 minute** limit.
+Defaults: **25 respawns** per team, **10 minute** limit.
 
 ### 2.3 Lives, death, respawn
 
-- Every death costs the team **one ticket**. Tickets are a shared team pool, not per-player.
+- Every death costs the team **one respawn**. Respawns are a shared team pool, not per-player.
 - Respawn after **3 s** at a free spawn point in the team's spawn zone, with **3 s** of spawn
   invulnerability (blinking shield). Invulnerability breaks early if the tank fires.
-- When a team's tickets reach 0, its dead players become spectators; the round continues until the
+- When a team's respawns reach 0, its dead players become spectators; the round continues until the
   team's last living tank dies.
 - Falling into water, being crushed by a shovel-wall closing, or friendly fire (§2.5) all cost a
-  ticket the same way.
+  respawn the same way.
 
 ### 2.4 Scoring
 
@@ -155,9 +157,10 @@ steel → forest → effects → HUD.
 
 ### 3.4 Maps
 
-**Five built-in maps**, each a plain template literal (`mapFormat.ts`, §3.5) in `src/world/maps/`,
-selected by the host in the lobby. All share the 33 × 25 size; they differ in terrain mix and lane
-structure.
+**Three built-in maps today**, with two more planned for M9, each a plain template literal
+(`mapFormat.ts`, §3.5) in `src/world/maps/`, selected by the host in the lobby. The three shipped
+ones happen to share a 33 × 25 grid and a 5-a-side roster, but nothing in the format or the engine
+requires a common size — each map carries its own dimensions and its own spawn count.
 
 | Map | Character | Status |
 |---|---|---|
@@ -242,9 +245,9 @@ A leading/trailing newline (from writing the template on its own lines between t
 stripped; what's left fixes the map's width and height directly, no `size:` field needed. Row 0 is
 the **top** of the arena, which is always the **Red** side.
 
-By convention the outer ring is `@` steel, so the playable area is 31 × 23 (on the 33 × 25 built-in
-maps) and the boundary is visible while editing. The loader treats out-of-bounds as solid regardless,
-so a map that omits the border is still safe — just uglier to read.
+Out-of-bounds is solid for movement and bullets regardless of what the template says, so a border
+row is optional — the three large built-in maps draw one in `@` steel because it makes the boundary
+visible while hand-editing, the debug map doesn't bother.
 
 Every built-in map is its own `.ts` file exporting one template constant (`classic.ts`,
 `crossroads.ts`, `swamp.ts`); `mapSources.ts` lists them with an id and display name. Plain strings
@@ -260,8 +263,10 @@ itself is just a string in a `.ts` file).
 Run at load in dev and by `npm run maps:check` in CI. A failure is loud in dev and the map is
 dropped from the lobby list in production.
 
-1. Every row the same length as row 0; only known characters; width and height within
-   `MAX_MAP_W`/`MAX_MAP_H` (`config.ts`).
+1. Every row the same length as row 0; only known characters; width and height between
+   `MIN_MAP_W`/`MIN_MAP_H` and `MAX_MAP_W`/`MAX_MAP_H` (`config.ts`). The floor is **2 × 2** — the
+   smallest grid that can still hold one flag and one spawn per team; the rest of the game reads
+   its dimensions and its roster size off the map, so nothing else has to change.
 2. Exactly one `R` and one `B`.
 3. At least one `r` and one `b`; the two counts must match each other (symmetric teams — the same
    assumption `world/rules.ts` makes when it splits stats into two contiguous id ranges).
@@ -271,8 +276,8 @@ dropped from the lobby list in production.
 
 #### Debug map
 
-One specific, deliberately tiny map (`world/maps/debugMap.ts`) — same format, same parser, just 1v1
-instead of 5v5 — for fast local iteration:
+One specific, deliberately tiny map (`world/maps/debugMap.ts`) — same format, same parser, 1 v 1
+on an 8 × 5 grid — for fast local iteration:
 
 ```
 r......*
@@ -440,13 +445,13 @@ Bonuses spawn one at a time at a random point from the map's `bonusSpawns`, ever
 | `SHOVEL` | Your flag's brick walls turn to steel, then revert | **Your team** | 20 s |
 | `CLOCK` | Enemy team frozen in place (can still be shot) | **Enemy team** | 6 s |
 | `GRENADE` | Every enemy tank currently alive is destroyed | **Enemy team** | instant |
-| `TICKET` | +3 respawn tickets | **Your team** | permanent |
+| `RESPAWN` | +3 respawns | **Your team** | permanent |
 | `MINE` | Drop up to 3 proximity mines; 1-cell blast, visible only to your team | Taker | until used |
 
 A player holds **at most one** timed personal buff (`HELMET` / `SPEED`); taking a second replaces the
-first. `STAR`, `TICKET`, and the team-scoped bonuses stack freely.
+first. `STAR`, `RESPAWN`, and the team-scoped bonuses stack freely.
 
-Team-scoped bonuses (`SHOVEL`, `CLOCK`, `GRENADE`, `TICKET`) announce themselves loudly: a full-width
+Team-scoped bonuses (`SHOVEL`, `CLOCK`, `GRENADE`, `RESPAWN`) announce themselves loudly: a full-width
 banner, a distinct sound, and a HUD timer, so 10 players can tell what just happened.
 
 ---
@@ -491,7 +496,7 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
 
 1. **Main Menu** — logo, `Create room`, `Join room`, `Settings`, `How to play`.
 2. **Create room** — nickname, map picker (thumbnail + name + terrain summary), match settings
-   (time limit, ticket count, friendly fire, **default bot difficulty — `Medium`**), `Create`.
+   (time limit, respawn count, friendly fire, **default bot difficulty — `Medium`**), `Create`.
    Produces the room code.
 3. **Join room** — nickname, 6-character code field (auto-uppercase, auto-advance, paste-aware).
    A `?room=CODE` deep link skips straight here with the code filled in.
@@ -519,7 +524,7 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
 │   ▸ 1  Easy   Easy1         bot   ✔    │  │   │preview│  → you                  │  │
 │   ▸ 2  Easy   Easy3         bot   ✔    │  │   └───────┘                         │  │
 │   ▸ 3         Oleg          61ms  ✔    │  │                                     │  │
-│   ▸ 4  Easy   Easy6         bot   ✔    │  │   Map: Classic · 10 min · 25 tickets│  │
+│   ▸ 4  Easy   Easy6         bot   ✔    │  │   Map: Classic · 10 min · 25 respawns│  │
 │   ▸ 5  Easy   Easy7         bot   ✔    │  └─────────────────────────────────────┘  │
 │                                                                                    │
 │   [ Add local player 2 ]                              host: [ Start match ]        │
@@ -544,7 +549,7 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
 
 ### 6.2 HUD
 
-**Top bar is a real layout row, not an overlay** — team tickets (blue left, red right), match timer,
+**Top bar is a real layout row, not an overlay** — team respawns (blue left, red right), match timer,
 team frag counts, flag-intact indicators — and the arena fills exactly the space left below it, not
 the whole viewport (`MatchScreen`'s `.match-topbar` + `.match-arena`, a plain flex column). Everything
 else layers on top of the arena only, so nothing else needs to dodge the stats bar: bottom-left, your
@@ -598,7 +603,7 @@ effects; ≤ 400 draw calls per frame; first interactive under 2 s on a cold cac
   crosses this tick, in travel order (a 2D walk, not just an axis-aligned one, since a bullet can be
   diagonal too) and hit the first solid cell or tank hitbox. No general physics engine.
 - **Tick order:** inputs → tank movement & collisions → firing → bullet stepping & hits → terrain
-  damage → bonus pickup & timers → deaths, tickets, respawn timers → win conditions.
+  damage → bonus pickup & timers → deaths, the respawn pool, respawn timers → win conditions.
 
 ---
 
@@ -652,7 +657,7 @@ Invite links: `https://<pages-url>/?room=K7QM2X`.
 
 **Snapshot contents:** tick, per-tank `{id, x, y, dir, state, upgrade, buffFlags}`, live bullets
 `{id, x, y, dir}`, bonus entities, terrain changes since the client's last acknowledged tick, team
-tickets and scores. Delta-encoded against the last acknowledged snapshot; a full snapshot is sent
+respawns and scores. Delta-encoded against the last acknowledged snapshot; a full snapshot is sent
 every 2 s and on request. Budget: ~300 B per snapshot → **≈ 5 KB/s down** per client, ~1 KB/s up.
 Payloads are packed binary (`ArrayBuffer`), not JSON.
 
@@ -710,7 +715,7 @@ spreads over ticks) and drives toward the winner:
 | `Hunt` | An enemy is close and exposed |
 | `Evade` | A bullet is inbound (utility spike, overrides almost everything) |
 | `Collect` | A bonus is on the field and reachable before the enemy |
-| `Regroup` | Alone, low on team tickets, or heavily outnumbered locally |
+| `Regroup` | Alone, low on team respawns, or heavily outnumbered locally |
 
 Considerations are normalized 0..1 curves: distance to target, line of sight, local team advantage,
 flag threat level, bonus value and contest risk, remaining buff time, own upgrade level.
@@ -720,7 +725,7 @@ assignment (roughly 2 defenders / 3 attackers, shifting toward defense when the 
 and biases each bot's action scores toward its assigned role. It's enough to stop all 5 bots from
 suiciding into the same lane.
 
-**Pathing:** A* on the 33 × 25 grid with a cost map (brick = expensive but passable by shooting,
+**Pathing:** A* on the map’s own cell grid with a cost map (brick = expensive but passable by shooting,
 water = blocked, sand = ×2, ice = ×1.5), recomputed on terrain change and at most once per second per
 bot, cached per team.
 
@@ -910,7 +915,7 @@ tanks/
 ├─ scripts/
 │  ├─ checkMaps.ts          # `npm run maps:check` — validates every map outside the browser
 │  └─ runTests.mjs          # `npm test` — globs and runs tests/*.test.ts under node:test
-├─ tests/                   # headless suites: movement, bot navigation, bot tactics
+├─ tests/                   # headless suites: movement, map format, bot navigation, bot tactics
 └─ src/
    ├─ main.ts                  # bootstrap, ScreenManager, ?room= deep link
    ├─ style.css                # the one stylesheet for every DOM screen + HUD
@@ -930,7 +935,7 @@ tanks/
    │  │  └─ loader.ts          # registry: listMaps()/getMap() over the above
    │  ├─ tank.ts · bullet.ts · bonus.ts · flag.ts
    │  ├─ sim.ts                # fixed-step tick, deterministic, snapshot()
-   │  └─ rules.ts              # tickets, scoring, win conditions
+   │  └─ rules.ts              # respawns, scoring, win conditions
    ├─ ai/
    │  ├─ bot.ts                # utility scoring + actions + fair perception
    │  ├─ pathfinder.ts         # A* over the cost grid
@@ -980,13 +985,13 @@ Each milestone ends in something playable — no milestone is pure plumbing.
 | **M0** | **Scaffold** — Vite + TS + PixiJS, scaled world container, procedural atlas, fixed-step loop | An empty arena renders and scales correctly on desktop and phone |
 | **M1** | **Terrain** — grid, 8 surfaces, the char-grid map format + loader + validator, `classic` map | The classic map draws with correct layering; brick destruction works from a debug key |
 | **M2** | **One tank** — movement, grid collision, surface effects, firing, bullets, brick/steel damage | You can drive and shoot alone on the map, keyboard |
-| **M3** | **Match rules** — teams, flags, spawns, tickets, respawn, win conditions, HUD, result screen | A full 5v5 match against dummy tanks starts and ends correctly |
+| **M3** | **Match rules** — teams, flags, spawns, the respawn pool, respawn timing, win conditions, HUD, result screen | A full match against dummy tanks starts and ends correctly |
 | **M4** | **Bots** — utility AI, pathfinding, roles, fair perception, the three difficulty profiles | 1 human vs 9 bots is a real, winnable, losable match; an `Easy` team loses to a `Hard` team in a bot-vs-bot run |
 | **M5** | **Bonuses** — all 8, timers, team-scope banners, mines | Bonuses meaningfully swing matches; nothing crashes on `GRENADE` |
-| **M6** | **Screens & local co-op** — menu, create/join, room screen with live preview, settings, second seat | Two people play 5v5 with bots on one keyboard, picking their own slots |
+| **M6** | **Screens & local co-op** — menu, create/join, room screen with live preview, settings, second seat | Two people play with bots on one keyboard, picking their own slots |
 | **M7** | **Multiplayer** — PeerJS star, room code, protocol, host loop, client prediction, slot claiming over the wire, drop handling | Two devices on different networks play the same match by code |
 | **M8** | **Mobile** — touch controls, orientation gate, quality tiers, safe areas | A full match played on a phone at 60 fps |
-| **M9** | **Content & polish** — remaining 4 maps, audio, effects, kill feed, balance pass | Five maps, sound, and a tuned game |
+| **M9** | **Content & polish** — the two remaining maps, audio, effects, kill feed, balance pass | Five maps, sound, and a tuned game |
 | **M10** | **Ship** — GitHub Pages deploy, README, invite links, first playtest round | Anyone can open a link and play |
 
 **Cross-cutting from M0:** `config.ts` holds every tunable; the simulation stays free of rendering
@@ -1007,7 +1012,7 @@ bot-vs-bot soak (100 matches) that asserts every match terminates and no invaria
 | Public PeerJS broker has no SLA | Failures are surfaced clearly; broker host/port/key are configurable; README documents self-hosting |
 | Strict NAT blocks WebRTC | Google STUN handles most cases; TURN is out of scope, and the failure is reported honestly rather than hanging |
 | Mobile perf with 10 tanks + effects | Tilemap batching, pooled effects, quality tiers, an FPS probe that downgrades automatically |
-| 5v5 balance is hard to tune with few testers | Bot-vs-bot soak runs surface degenerate strategies; every number lives in `config.ts` |
+| Team balance is hard to tune with few testers | Bot-vs-bot soak runs surface degenerate strategies; every number lives in `config.ts` |
 | Scope creep on the room screen | Slot picking + preview is the only pre-match feature; chat, profiles and stats are out of scope |
 
 ## 15. Out of scope
@@ -1021,7 +1026,7 @@ non-participants · replays · anti-cheat beyond host validation · portrait mob
 
 - Should upgrade levels persist through death (spec says yes) or reset like Battle City? Decide after
   the M4 playtest.
-- Are 25 tickets right for 10 minutes, or should tickets scale with the number of humans?
+- Are 25 respawns right for 10 minutes, or should the pool scale with team size?
 - Does `GRENADE` wiping all 5 enemies feel great or miserable at this team size? Possible fallback:
   it only kills enemies in your half.
 - One shared bonus pool, or team-side spawns to reduce center-map snowballing?

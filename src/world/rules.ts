@@ -4,7 +4,7 @@ import type { Slot } from "./tank";
 export type MatchSettings = {
   mapId: string;
   timeLimit: number; // seconds, SPEC §2.2
-  tickets: number; // starting tickets per team
+  respawns: number; // starting respawns per team
   friendlyFire: boolean;
 };
 
@@ -22,13 +22,13 @@ export function createStats(): PlayerStats {
 
 export type MatchRules = {
   timeLeft: number;
-  tickets: Record<TeamId, number>;
+  respawns: Record<TeamId, number>;
   flagAlive: Record<TeamId, boolean>;
   stats: Record<number, PlayerStats>;
   /** last slot to damage a given slot, and when — for the 5s assist window (§2.4) */
   lastDamagedBy: Partial<Record<number, { bySlot: number; at: number }>>;
-  /** Slots per team — 5 for every production map; a debug map (§3.5) can be
-   *  smaller. Assumes symmetric teams (createDefaultSlots' invariant), so
+  /** Slots per team, as the loaded map declares it (§3.5) — 5 for the
+   *  built-ins, 1 for the debug map. Assumes symmetric teams, so
    *  teamFrags below can address a team by a contiguous id range. */
   teamSize: number;
   ended: boolean;
@@ -40,7 +40,7 @@ export function createRules(settings: MatchSettings, slots: Slot[]): MatchRules 
   for (const s of slots) stats[s.id] = createStats();
   return {
     timeLeft: settings.timeLimit,
-    tickets: { blue: settings.tickets, red: settings.tickets },
+    respawns: { blue: settings.respawns, red: settings.respawns },
     flagAlive: { blue: true, red: true },
     stats,
     lastDamagedBy: {},
@@ -56,10 +56,10 @@ export function otherTeam(t: TeamId): TeamId {
   return t === "blue" ? "red" : "blue";
 }
 
-/** Records a kill: frag to the killer, death + ticket loss to the victim's
+/** Records a kill: frag to the killer, death + respawn loss to the victim's
  *  team, and an assist to whoever last damaged the victim (if different and
  *  within the assist window). Pass killerSlot = null for environmental deaths
- *  (water, mine, shovel-crush) which cost a ticket but credit no frag. */
+ *  (water, mine, shovel-crush) which cost a respawn but credit no frag. */
 export function recordKill(
   rules: MatchRules,
   victimSlot: number,
@@ -68,7 +68,7 @@ export function recordKill(
   now: number,
 ) {
   rules.stats[victimSlot].deaths++;
-  rules.tickets[victimTeam] = Math.max(0, rules.tickets[victimTeam] - 1);
+  rules.respawns[victimTeam] = Math.max(0, rules.respawns[victimTeam] - 1);
   if (killerSlot !== null) rules.stats[killerSlot].frags++;
 
   const last = rules.lastDamagedBy[victimSlot];
@@ -94,10 +94,10 @@ export function checkWinByFlag(rules: MatchRules) {
   }
 }
 
-export function checkWinByTickets(rules: MatchRules, teamHasLivingTank: Record<TeamId, boolean>) {
+export function checkWinByRespawns(rules: MatchRules, teamHasLivingTank: Record<TeamId, boolean>) {
   if (rules.ended) return;
   for (const team of ["blue", "red"] as TeamId[]) {
-    if (rules.tickets[team] <= 0 && !teamHasLivingTank[team]) {
+    if (rules.respawns[team] <= 0 && !teamHasLivingTank[team]) {
       rules.ended = true;
       rules.winner = otherTeam(team);
       return;

@@ -13,14 +13,15 @@
 // A leading/trailing newline (from writing the template on its own lines
 // between backticks) is stripped; what's left fixes both the map's
 // dimensions and its team size — however many `r`/`b` markers it has (5 for
-// every built-in map, SPEC §2.1, but nothing here requires that). Flags are
+// every built-in map, but nothing here requires that: any size from 2x2 up
+// to MAX_MAP_W/H parses, with any matching number of spawns). Flags are
 // `R` (red) and `B` (blue), players `r`/`b`, one cell each — spawn priority
 // is assigned by scan order, top-to-bottom then left-to-right. Terrain uses
 // the glyphs in mapChars.ts.
 
 import { Grid, Tile } from "../grid";
 import type { TeamId } from "../../game/config";
-import { MAX_MAP_W, MAX_MAP_H } from "../../game/config";
+import { MIN_MAP_W, MIN_MAP_H, MAX_MAP_W, MAX_MAP_H } from "../../game/config";
 import { CHAR_TILE } from "./mapChars";
 
 export type MapDef = {
@@ -48,6 +49,9 @@ export function parseMap(id: string, name: string, template: string): MapDef {
   });
   if (width > MAX_MAP_W || height > MAX_MAP_H) {
     errors.push(`${width}x${height} exceeds the ${MAX_MAP_W}x${MAX_MAP_H} max map size`);
+  }
+  if (width > 0 && height > 0 && (width < MIN_MAP_W || height < MIN_MAP_H)) {
+    errors.push(`${width}x${height} is below the ${MIN_MAP_W}x${MIN_MAP_H} min map size`);
   }
 
   const grid = new Grid(width, height);

@@ -17,7 +17,7 @@ export class RoomClient implements RoomController {
   roomCode: string;
   slots: Slot[] = [];
   mapId = "";
-  settings: MatchSettings = { mapId: "", timeLimit: 0, tickets: 0, friendlyFire: false };
+  settings: MatchSettings = { mapId: "", timeLimit: 0, respawns: 0, friendlyFire: false };
 
   private net: ClientNetwork;
   private localInputs: [SeatInput, SeatInput] = [NO_INPUT, NO_INPUT];

@@ -90,7 +90,7 @@ const VELOCITY_SMOOTHING = 0.25;
 const BONUS_VALUE: Record<BonusKind, number> = {
   STAR: 3,
   HELMET: 2.5,
-  TICKET: 1.8,
+  RESPAWN: 1.8,
   SPEED: 1.6,
   CLOCK: 1.6,
   SHOVEL: 1.4,
@@ -389,7 +389,7 @@ export class BotController {
     const knownEnemy = this.nearestKnownEnemy(tank);
     const flagUnderThreat = this.flagThreatened(sim, tank.team);
     const losingLocally = this.localEnemyAdvantage(sim, tank) > 0;
-    const teamCrippled = sim.rules.tickets[tank.team] <= 5;
+    const teamCrippled = sim.rules.respawns[tank.team] <= 5;
 
     // Stick with the current plan for a beat. Several branches below are
     // probabilistic, and re-rolling them every rescore (6-10 times a second)

@@ -11,7 +11,7 @@ import type { TeamId } from "../game/config";
 export class Hud {
   private topRoot: HTMLDivElement;
   private overlayRoot: HTMLDivElement;
-  private ticketsEl: Record<TeamId, HTMLSpanElement>;
+  private respawnsEl: Record<TeamId, HTMLSpanElement>;
   private fragsEl: Record<TeamId, HTMLSpanElement>;
   private flagEl: Record<TeamId, HTMLSpanElement>;
   private timerEl: HTMLSpanElement;
@@ -26,9 +26,9 @@ export class Hud {
     this.topRoot = document.createElement("div");
     this.topRoot.className = "hud-top";
     this.topRoot.innerHTML = `
-      <div class="hud-team hud-blue"><span class="hud-tickets"></span> tickets · <span class="hud-frags"></span> frags <span class="hud-flag"></span></div>
+      <div class="hud-team hud-blue"><span class="hud-respawns"></span> respawns · <span class="hud-frags"></span> frags <span class="hud-flag"></span></div>
       <div class="hud-timer"></div>
-      <div class="hud-team hud-red"><span class="hud-flag"></span> <span class="hud-frags"></span> frags · <span class="hud-tickets"></span> tickets</div>
+      <div class="hud-team hud-red"><span class="hud-flag"></span> <span class="hud-frags"></span> frags · <span class="hud-respawns"></span> respawns</div>
     `;
     topMount.appendChild(this.topRoot);
 
@@ -48,7 +48,7 @@ export class Hud {
 
     const blue = this.topRoot.querySelector(".hud-blue")!;
     const red = this.topRoot.querySelector(".hud-red")!;
-    this.ticketsEl = { blue: blue.querySelector(".hud-tickets")!, red: red.querySelector(".hud-tickets")! };
+    this.respawnsEl = { blue: blue.querySelector(".hud-respawns")!, red: red.querySelector(".hud-respawns")! };
     this.fragsEl = { blue: blue.querySelector(".hud-frags")!, red: red.querySelector(".hud-frags")! };
     this.flagEl = { blue: blue.querySelector(".hud-flag")!, red: red.querySelector(".hud-flag")! };
     this.timerEl = this.topRoot.querySelector(".hud-timer")!;
@@ -62,7 +62,7 @@ export class Hud {
 
   update(snap: Snapshot, mySlot: number | null) {
     for (const team of ["blue", "red"] as TeamId[]) {
-      this.ticketsEl[team].textContent = String(snap.tickets[team]);
+      this.respawnsEl[team].textContent = String(snap.respawns[team]);
       // Plain text glyphs, not emoji (🚩/💥 render as fixed-color glyphs
       // that ignore .hud-blue/.hud-red's `color`, so both teams' flags
       // looked the same) — these inherit the team color correctly.

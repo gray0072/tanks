@@ -5,7 +5,8 @@ a user-facing doc (that's `README.md`) — this is context for *how to work on i
 
 ## What this is, current status
 
-Browser 5v5 team tank battle in the spirit of *Battle City* — destructible terrain, power-ups, a flag
+Browser team tank battle in the spirit of *Battle City* (team size comes from the loaded map — 5 a
+side on the built-ins, 1v1 on the debug map) — destructible terrain, power-ups, a flag
 each team defends. TypeScript + PixiJS (WebGL) + PeerJS (WebRTC, star topology) + Vite, no backend,
 static hosting on GitHub Pages.
 
@@ -48,6 +49,9 @@ Don't trust this paragraph's specifics for long; read the current code and git l
   against terrain/tanks/world bounds, ice sliding, and the turning/corner-assist rules. The
   headline invariant is that an **unobstructed turn never moves the tank's center on the cross
   axis** (see `Sim.cornerAssist`); regressing that makes the sprite visibly jump sideways.
+- `tests/mapFormat.test.ts` — the map format's size/roster flexibility: a 2x2 map (the `MIN_MAP_W`/
+  `MIN_MAP_H` floor) parses and plays, anything smaller or lopsided is rejected. Guards the claim in
+  SPEC §3.5 that nothing in the engine is tied to the built-ins' 33x25 / 5-a-side shape.
 - `tests/botNavigation.test.ts` — a full bot-vs-bot match on every production map, asserting no
   bot is wedged. The guard on movement changes that only show up under real pathing.
 - `tests/bots.test.ts` — bot tactics per difficulty (SPEC §10): objective play, shooting through
@@ -59,9 +63,13 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 There's still no project `/run` skill, so anything the suite doesn't cover (rendering, netcode,
 touch controls) is still verified ad hoc:
 
-- **Dev server:** `npm run dev` (Vite, port 5173). Kill any stale listener first
-  (`lsof -ti:5173 -sTCP:LISTEN | xargs -r kill`), then poll `curl -sf http://localhost:5173` until it
-  responds — don't blind-sleep.
+- **Dev server:** `npm run dev` (Vite, port 5173) — served at **`http://localhost:5173/tanks/`**, not
+  the bare root, because `vite.config.ts` sets `base: "/tanks/"` for GitHub Pages. Poll
+  `curl -sf http://localhost:5173/tanks/` until it responds — don't blind-sleep. `lsof -ti:5173 |
+  xargs kill` does **not** work here: stale Vite servers survive it, Vite silently takes 5174, 5175,
+  … and the old one on 5173 answers with `504 (Outdated Optimize Dep)` and a blank `#ui`. Find them
+  with `netstat -ano | grep LISTENING | grep :517` and kill by PID with `taskkill //PID <pid> //F`,
+  then `rm -rf node_modules/.vite` if the 504 persists.
 - **Driving it:** `chromium-cli` is not available in this Windows/Git-Bash environment. Fall back to
   Playwright: `npx playwright install chromium` (binaries were already cached under
   `~/AppData/Local/ms-playwright` last time), then a small Node script using

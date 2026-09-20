@@ -161,7 +161,7 @@ export function createAtlas(app: Application): Atlas {
     SHOVEL: { bg: 0xb08040, label: "⛏" },
     CLOCK: { bg: 0x9955ee, label: "C" },
     GRENADE: { bg: 0xdd3333, label: "G" },
-    TICKET: { bg: 0x22aaaa, label: "T" },
+    RESPAWN: { bg: 0x22aaaa, label: "+" },
     MINE: { bg: 0x555555, label: "M" },
   };
   const bonus = {} as Record<BonusKind, Texture>;

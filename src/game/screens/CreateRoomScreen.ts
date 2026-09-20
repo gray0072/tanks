@@ -6,11 +6,20 @@ import { RoomHost } from "../../net/host";
 import { RoomScreen } from "./RoomScreen";
 import { MainMenuScreen } from "./MainMenuScreen";
 import { bindEnter } from "../../util/dialog";
-import { loadUserSettings, saveUserSettings, randomGuestNickname } from "../settings";
+import {
+  loadUserSettings,
+  saveUserSettings,
+  randomGuestNickname,
+  loadLastMapId,
+  saveLastMapId,
+  loadRoomSetup,
+  saveRoomSetup,
+  type RoomSetup,
+} from "../settings";
 import {
   BOT_DIFFICULTY_LABEL,
   DEFAULT_BOT_DIFFICULTY,
-  DEFAULT_TICKETS,
+  DEFAULT_RESPAWNS,
   DEFAULT_TIME_LIMIT,
   type BotDifficulty,
 } from "../../game/config";
@@ -27,7 +36,10 @@ export class CreateRoomScreen implements Screen {
   private unbindEnter: (() => void) | null = null;
 
   constructor(private screens: ScreenManager) {
-    this.selectedMap = listMaps()[0]?.id ?? "classic";
+    // Reopen on the map you played last, unless it's gone from the build.
+    const maps = listMaps();
+    const last = loadLastMapId();
+    this.selectedMap = (last && maps.some((m) => m.id === last) ? last : maps[0]?.id) ?? "classic";
   }
 
   mount(root: HTMLElement) {
@@ -52,8 +64,8 @@ export class CreateRoomScreen implements Screen {
               <option value="900">15 min</option>
             </select>
           </label>
-          <label>Respawn tickets
-            <select data-f="tickets">
+          <label>Respawns
+            <select data-f="respawns">
               <option value="15">15</option>
               <option value="25" selected>25</option>
               <option value="40">40</option>
@@ -88,11 +100,19 @@ export class CreateRoomScreen implements Screen {
       card.innerHTML = `<canvas width="160" height="100"></canvas><b>${map.name}</b><span class="hint">${MAP_BLURB[map.id] ?? ""}</span>`;
       const canvas = card.querySelector("canvas")!;
       drawMapPreview(canvas, map);
-      card.onclick = () => { this.selectedMap = map.id; this.refreshMapSelection(); };
+      card.onclick = () => {
+        // Each map keeps its own settings, so stash the current form under
+        // the outgoing map before loading the incoming one's.
+        saveRoomSetup(this.selectedMap, this.readSetup());
+        this.selectedMap = map.id;
+        this.applySetup(loadRoomSetup(map.id));
+        this.refreshMapSelection();
+      };
       card.dataset.map = map.id;
       mapsEl.appendChild(card);
     }
     this.refreshMapSelection();
+    this.applySetup(loadRoomSetup(this.selectedMap));
 
     this.el.querySelector<HTMLButtonElement>("[data-a=back]")!.onclick = () => this.screens.go(new MainMenuScreen(this.screens));
     this.el.querySelector<HTMLButtonElement>("[data-a=create]")!.onclick = () => this.create();
@@ -105,21 +125,37 @@ export class CreateRoomScreen implements Screen {
     });
   }
 
+  /** The form's current values, as they'd be persisted for this map. */
+  private readSetup(): RoomSetup {
+    return {
+      timeLimit: Number(this.field<HTMLSelectElement>("timeLimit").value) || DEFAULT_TIME_LIMIT,
+      respawns: Number(this.field<HTMLSelectElement>("respawns").value) || DEFAULT_RESPAWNS,
+      botDifficulty: (this.field<HTMLSelectElement>("difficulty").value as BotDifficulty) || DEFAULT_BOT_DIFFICULTY,
+      friendlyFire: (this.field("friendlyFire") as HTMLInputElement).checked,
+    };
+  }
+
+  private applySetup(setup: RoomSetup) {
+    this.field<HTMLSelectElement>("timeLimit").value = String(setup.timeLimit);
+    this.field<HTMLSelectElement>("respawns").value = String(setup.respawns);
+    this.field<HTMLSelectElement>("difficulty").value = setup.botDifficulty;
+    (this.field("friendlyFire") as HTMLInputElement).checked = setup.friendlyFire;
+  }
+
   private create() {
     const nickname = this.field("nickname").value.trim().slice(0, 12) || randomGuestNickname();
     saveUserSettings({ ...loadUserSettings(), nickname });
 
-    const timeLimit = Number(this.field<HTMLSelectElement>("timeLimit").value) || DEFAULT_TIME_LIMIT;
-    const tickets = Number(this.field<HTMLSelectElement>("tickets").value) || DEFAULT_TICKETS;
-    const difficulty = this.field<HTMLSelectElement>("difficulty").value as BotDifficulty;
-    const friendlyFire = (this.field("friendlyFire") as HTMLInputElement).checked;
+    const setup = this.readSetup();
+    saveRoomSetup(this.selectedMap, setup);
+    saveLastMapId(this.selectedMap);
 
     const room = new RoomHost(nickname, true, {
       onError: (msg) => this.showError(msg),
     });
     room.setMap(this.selectedMap);
-    room.setSettings({ timeLimit, tickets, friendlyFire });
-    room.setBotDifficulty("all", difficulty || DEFAULT_BOT_DIFFICULTY);
+    room.setSettings({ timeLimit: setup.timeLimit, respawns: setup.respawns, friendlyFire: setup.friendlyFire });
+    room.setBotDifficulty("all", setup.botDifficulty);
     this.screens.go(new RoomScreen(this.screens, room));
   }
 

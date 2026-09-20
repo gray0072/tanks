@@ -17,8 +17,11 @@ export const CELL = 32;
 // big as whatever map is loaded (map.width/height * CELL, SPEC §3.1), which
 // is why every map, including the much smaller debug map, needs its own
 // world bounds rather than sharing one baked-in constant.
-// Sanity ceiling for any map (production or debug-template) — guards the
+// Floor and ceiling for any map. The floor is the smallest grid that can
+// still hold one flag and one spawn per team (2x2); the ceiling guards the
 // grid allocation and terrain-sprite count against a malformed/huge template.
+export const MIN_MAP_W = 2;
+export const MIN_MAP_H = 2;
 export const MAX_MAP_W = 128;
 export const MAX_MAP_H = 128;
 
@@ -50,8 +53,11 @@ export const BULLET_RADIUS = 3;
 export const MAX_STAR = 3;
 
 // --- Match rules (SPEC §2) ---
+// Fallback roster size only, for a room created without a map in hand. The
+// real team size is whatever the loaded map declares — one slot per `r`/`b`
+// marker in its template (SPEC §3.5) — so a map can be 1v1 or 8v8.
 export const TEAM_SIZE = 5;
-export const DEFAULT_TICKETS = 25;
+export const DEFAULT_RESPAWNS = 25;
 export const DEFAULT_TIME_LIMIT = 10 * 60; // seconds
 export const RESPAWN_DELAY = 3; // s
 export const SPAWN_INVULN = 3; // s

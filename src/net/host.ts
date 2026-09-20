@@ -20,7 +20,7 @@ import type { RoomCallbacks, RoomController } from "./room";
 import { NO_INPUT } from "./room";
 import {
   DEFAULT_BOT_DIFFICULTY,
-  DEFAULT_TICKETS,
+  DEFAULT_RESPAWNS,
   DEFAULT_TIME_LIMIT,
   TICK_DT,
   NET_SNAPSHOT_HZ,
@@ -54,13 +54,13 @@ export class RoomHost implements RoomController {
     // cb is reassigned via setCallbacks() below as screens change
     this.mapId = initialMapId ?? listMaps()[0]?.id ?? "classic";
     // Team size comes from the chosen map's own spawn count, not a hardcoded
-    // 5 — production maps are always 5v5, but a debug map (SPEC §3.5,
-    // config.DEBUG) can be smaller, so slots are sized to match it.
+    // number — the built-in maps are 5 a side, the debug map is 1v1, and any
+    // map in between or beyond sizes the roster to match its `r`/`b` markers.
     this.slots = createDefaultSlots(hostNickname, getMap(this.mapId).spawns.blue.length);
     this.settings = {
       mapId: this.mapId,
       timeLimit: DEFAULT_TIME_LIMIT,
-      tickets: DEFAULT_TICKETS,
+      respawns: DEFAULT_RESPAWNS,
       friendlyFire: false,
     };
 
