@@ -1,0 +1,7 @@
+# Tanks
+
+Browser 5v5 team tank battle (Battle City–style). See `SPEC.md` for the design (authoritative,
+kept in sync with the code) and `README.md` for the player-facing overview.
+
+**Before starting work, read `AGENTS.md`** — working notes on current status, how this project
+likes to be worked on, and how to actually launch/verify it (no committed test suite yet).
