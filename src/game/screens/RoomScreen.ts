@@ -230,8 +230,10 @@ export class RoomScreen implements Screen {
     if (previewCanvas) {
       let hoverCell: { cx: number; cy: number } | undefined;
       if (hovered) {
-        const idx = hovered.id % 5;
-        hoverCell = map.spawns[hovered.team][idx];
+        // Same indexing as Sim's tank placement, so the ring marks the spawn
+        // this slot will actually get.
+        const spawns = map.spawns[hovered.team];
+        hoverCell = spawns[hovered.id % spawns.length] ?? spawns[0];
       }
       drawMapPreview(previewCanvas, map, { hoverCell, hoverTeam: hovered?.team });
     }

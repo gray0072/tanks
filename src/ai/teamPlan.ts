@@ -1,6 +1,6 @@
 // A thin coordination layer, not a full commander (SPEC §10.1 "Team
-// coordination"): just enough to stop all 5 bots on a team from piling into
-// the same lane. Recomputed every tick; cheap enough at 10 tanks.
+// coordination"): just enough to stop a whole team's bots from piling into
+// the same lane. Recomputed every tick; cheap enough at a full roster.
 
 import type { Sim } from "../world/sim";
 import { CELL } from "../game/config";
