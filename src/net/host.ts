@@ -42,6 +42,9 @@ export class RoomHost implements RoomController {
   private localInputs: [SeatInput, SeatInput] = [NO_INPUT, NO_INPUT];
   private remoteInputs = new Map<string, Partial<Record<number, SeatInput>>>();
   private connNicknames = new Map<string, string>();
+  /** What "All bots" was last set to — the difficulty any slot falls back to
+   *  when it stops being a human's. */
+  private defaultBotDifficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY;
   private hasSeat2 = false;
   private simPaused = false;
 
@@ -96,8 +99,11 @@ export class RoomHost implements RoomController {
   }
 
   private resetSlotToBot(s: Slot) {
+    // A slot a human is vacating still carries whatever difficulty it had
+    // before they claimed it, which may be nothing like what the lobby is set
+    // to now — hand it back at the room's current default instead.
+    if (s.kind === "human") s.botDifficulty = this.defaultBotDifficulty;
     s.kind = "bot";
-    s.botDifficulty = s.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
     s.nickname = botNickname(s.id, s.botDifficulty);
     s.owner = null;
     s.ownerSeat = 0;
@@ -200,6 +206,7 @@ export class RoomHost implements RoomController {
   }
 
   private applyBotDifficulty(target: BotDifficultyTarget, difficulty: BotDifficulty) {
+    if (target === "all") this.defaultBotDifficulty = difficulty;
     for (const s of this.slots) {
       if (s.kind !== "bot") continue;
       const matches = target === "all" || target === s.team || target === s.id;
@@ -213,7 +220,42 @@ export class RoomHost implements RoomController {
   private doSetMap(mapId: string) {
     if (!listMaps().some((m) => m.id === mapId)) return;
     this.mapId = mapId;
+    this.resizeRoster(getMap(mapId).spawns.blue.length);
     this.publishRoomState();
+  }
+
+  /** A map carries its own team size (SPEC §3.5), so switching to one that
+   *  disagrees with the current roster has to rebuild it: Sim indexes spawns
+   *  by slot id and MatchRules derives teamSize from `slots.length`, so a
+   *  stale roster silently aliases tanks onto the same spawn. Humans keep
+   *  their team and relative order; anyone who no longer fits loses the slot
+   *  and can re-claim from the lobby. */
+  private resizeRoster(teamSize: number) {
+    const total = teamSize * 2;
+    if (this.slots.length === total) return;
+    const next = createDefaultSlots(this.hostNickname, teamSize);
+    for (const s of next) {
+      s.botDifficulty = this.defaultBotDifficulty;
+      this.resetSlotToBot(s);
+    }
+    for (const team of ["blue", "red"] as TeamId[]) {
+      const seats = next.filter((s) => s.team === team);
+      // Host first, so a shrinking roster never leaves them seatless —
+      // doRelease()'s "you always keep a slot" rule depends on it.
+      const humans = this.slots
+        .filter((s) => s.kind === "human" && s.team === team)
+        .sort((a, b) => Number(b.owner === "host") - Number(a.owner === "host") || a.ownerSeat - b.ownerSeat);
+      for (let i = 0; i < humans.length && i < seats.length; i++) {
+        const dst = seats[i];
+        const src = humans[i];
+        dst.kind = "human";
+        dst.owner = src.owner;
+        dst.ownerSeat = src.ownerSeat;
+        dst.nickname = src.nickname;
+        dst.ready = src.ready;
+      }
+    }
+    this.slots = next;
   }
 
   // --- RoomController --------------------------------------------------
@@ -344,7 +386,15 @@ export class RoomHost implements RoomController {
     const inputs: Record<number, SeatInput> = {};
     for (const s of sim.slots) {
       if (s.kind === "bot") {
-        inputs[s.id] = this.bots.get(s.id)!.decide(sim, roles[s.team], s.botDifficulty);
+        // A slot can turn bot mid-match (handlePeerLeave/kickSlot mutate the
+        // same array the Sim holds), so the id may be one startMatch() never
+        // built a controller for — hand the abandoned tank to a fresh bot.
+        let bot = this.bots.get(s.id);
+        if (!bot) {
+          bot = new BotController(s.id);
+          this.bots.set(s.id, bot);
+        }
+        inputs[s.id] = bot.decide(sim, roles[s.team], s.botDifficulty);
       } else if (s.owner === "host") {
         inputs[s.id] = this.localInputs[s.ownerSeat];
       } else if (s.owner) {
@@ -367,9 +417,14 @@ export class RoomHost implements RoomController {
 
     if (sim.rules.ended) {
       cancelAnimationFrame(this.raf);
-      this.cb.onMatchEnd?.(sim.rules.winner, sim.rules.stats);
-      this.net?.broadcast({ t: "matchEnd", winner: sim.rules.winner, stats: sim.rules.stats });
+      const { winner, stats } = sim.rules;
+      // Drop the Sim before announcing the end: whoever handles this mounts a
+      // screen synchronously, and setCallbacks() replays matchStart for as
+      // long as `sim` is still set — which bounced the host back into the
+      // match it had just finished.
       this.sim = null;
+      this.cb.onMatchEnd?.(winner, stats);
+      this.net?.broadcast({ t: "matchEnd", winner, stats });
     }
   }
 

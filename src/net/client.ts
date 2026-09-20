@@ -63,6 +63,10 @@ export class RoomClient implements RoomController {
         this.cb.onMatchEvents?.(msg.events);
         break;
       case "matchEnd":
+        // Must be cleared before setCallbacks() can replay it, or every screen
+        // that mounts afterwards is thrown straight back into the match that
+        // just ended.
+        this.lastMatchStart = null;
         this.cb.onMatchEnd?.(msg.winner, msg.stats);
         break;
       case "kicked":

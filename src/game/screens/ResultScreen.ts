@@ -4,6 +4,7 @@ import type { RoomController } from "../../net/room";
 import type { PlayerStats } from "../../world/rules";
 import type { TeamId } from "../../game/config";
 import { RoomScreen } from "./RoomScreen";
+import { MatchScreen } from "./MatchScreen";
 import { MainMenuScreen } from "./MainMenuScreen";
 import { bindEnter } from "../../util/dialog";
 
@@ -32,6 +33,7 @@ export class ResultScreen implements Screen {
     this.el.className = "screen";
     this.el.innerHTML = `
       <div class="result-banner ${bannerClass}">${bannerText}</div>
+      <div class="hint" data-f="banner"></div>
       ${mvp ? `<div class="hint">MVP: ${escapeHtml(mvp.slot.nickname)} — ${mvp.st.frags} frags</div>` : ""}
       <div class="panel panel-wide">
         <div class="sb-row" style="font-weight:700"><span>Player</span><span>Frags</span><span>Deaths</span><span>Assists</span></div>
@@ -49,12 +51,25 @@ export class ResultScreen implements Screen {
     `;
     root.appendChild(this.el);
 
+    // Without this the room still delivers to the unmounted MatchScreen's
+    // callbacks, so a host who starts the next match while a guest is reading
+    // the scoreboard leaves that guest behind.
+    this.room.setCallbacks({
+      onMatchStart: () => this.screens.go(new MatchScreen(this.screens, this.room)),
+      onError: (msg) => this.showBanner(msg),
+    });
+
     this.el.querySelector<HTMLButtonElement>("[data-a=menu]")!.onclick = () => {
       this.room.destroy();
       this.screens.go(new MainMenuScreen(this.screens));
     };
     this.el.querySelector<HTMLButtonElement>("[data-a=back]")!.onclick = () => this.screens.go(new RoomScreen(this.screens, this.room));
     this.unbindEnter = bindEnter(() => this.screens.go(new RoomScreen(this.screens, this.room)));
+  }
+
+  private showBanner(msg: string) {
+    const el = this.el.querySelector<HTMLDivElement>("[data-f=banner]");
+    if (el) el.textContent = msg;
   }
 
   unmount() {
