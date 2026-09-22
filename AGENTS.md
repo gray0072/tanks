@@ -47,6 +47,15 @@ can shrink it, the room's tank-preview canvas hidden while nothing is hovered, a
 opening scrolled past its first heading because `closeBtn.focus()` scrolled the Close button into
 view (now `focus({ preventScroll: true })`).
 
+**2026-09-22 (bonus art):** bonuses got a visual identity (SPEC §4.3, "Look of a bonus"). New
+`render/bonusShape.ts` is the single source: per-bonus palette, player-facing name/effect text, and
+the icon as primitive ops in a unit square, rendered through PixiJS in `atlas.ts` and Canvas2D in
+`preview.ts`. Pickups are now full-cell pictograms instead of lettered discs; a tank carrying a bonus
+wears a spinning ring of that icon (`Arena.syncAuras`, derived from the snapshot each frame, with a
+2.5 s flash for pickups that leave no per-tank state); How to Play gained a per-bonus legend of
+pickup + tank-with-aura + effect, and its overlay is now near-opaque. Verified by driving Chromium
+through a real match (bots picking bonuses up) and screenshotting the legend, not just `tsc`.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -80,6 +89,15 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 - `tests/controls.test.ts` — the input rules the touch layer and the keyboard share: mine-laying
   fires on the press edge (holding the control lays one mine, not one per tick) and the stick's
   continuous angle resolves to the right one of the 8 `Dir`s across each whole sector.
+- `tests/mapEditor.test.ts` — the level editor's document model (`world/maps/editorModel.ts`):
+  painting, the terrain-only rectangle fill, entity semantics (a flag *moves*, a spawn toggles and
+  is capped), resize with an anchor, and the rule that **one gesture is one undo step**.
+- `tests/mapValidation.test.ts` — the editor's map rules (`world/maps/validateMap.ts`). The one that
+  matters most is last: **every built-in map must produce zero errors** — a rule that rejects
+  `classic` is a wrong rule, however sensible it reads.
+- `tests/customMaps.test.ts` — the custom-map library's localStorage layer against a stubbed
+  `localStorage`: copy naming, delete, corrupt-entry tolerance, and that a *save* fails loudly on a
+  full quota (a silent one loses the player's map).
 - `tests/bots.test.ts` — bot tactics per difficulty (SPEC §10): objective play, shooting through
   brick, bonus behaviour, fair perception, rate of fire, and an integration test that plays
   full bot-vs-bot matches and asserts **Hard > Medium > Easy**. That last one is the important

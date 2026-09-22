@@ -21,7 +21,7 @@ const SECONDS = 20;
 for (const { id, name, template } of MAP_SOURCES) {
   test(`bots keep moving for ${SECONDS}s on '${id}'`, () => {
     const map = parseMap(id, name, template);
-    const slots = createDefaultSlots("host", map.spawns.blue.length);
+    const slots = createDefaultSlots("host", map.spawns.blue.length, map.spawns.red.length);
     // The default host slot is human; make the whole lobby bots so every
     // tank is actually being driven.
     for (const s of slots) {

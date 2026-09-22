@@ -3,8 +3,12 @@ import { ScreenManager } from "../ScreenManager";
 import { CreateRoomScreen } from "./CreateRoomScreen";
 import { JoinRoomScreen } from "./JoinRoomScreen";
 import { SettingsScreen } from "./SettingsScreen";
+import { MapLibraryScreen } from "./MapLibraryScreen";
 import { bindEnter } from "../../util/dialog";
 import { fullscreenSupported, isFullscreen, onFullscreenChange, toggleFullscreen } from "../../util/fullscreen";
+import { BONUS_KINDS } from "../../world/bonus";
+import { BONUS_INFO } from "../../render/bonusShape";
+import { drawBonusIcon, drawTankWithAura } from "../../render/preview";
 
 const HOW_TO_PLAY = `
   <h3>Objective</h3>
@@ -25,10 +29,17 @@ const HOW_TO_PLAY = `
   <p>Brick breaks under fire, steel doesn't (until you're upgraded), forest hides you, water blocks tanks but not bullets,
      ice makes you slide, sand slows you down.</p>
   <h3>Bonuses</h3>
-  <p>HELMET shields one hit, STAR upgrades your tank, SPEED boosts you, MINE gives you proximity mines
-     (drop with Q, or Right Shift for player 2), and four bonuses affect your whole team:
-     SHOVEL fortifies your flag, CLOCK freezes the enemy, GRENADE wipes every enemy tank, RESPAWN refills your team’s respawn pool.</p>
+  <p>Bonuses appear on the battlefield now and then; drive over one to take it. The left picture is
+     what lies on the ground, the right one is a tank carrying it — while a bonus is on you, its
+     icons spin around your tank in that bonus's colour.</p>
+  <div class="bonus-legend" data-bonus-legend></div>
 `;
+
+/** Nominal CSS size of the two illustrations in the bonus legend (matched by
+ *  `.bonus-pic-icon` / `.bonus-pic-aura` in style.css). The canvas surfaces
+ *  are allocated at this times the device pixel ratio. */
+const LEGEND_ICON_PX = 46;
+const LEGEND_AURA_PX = 80;
 
 export class MainMenuScreen implements Screen {
   private el!: HTMLElement;
@@ -51,6 +62,7 @@ export class MainMenuScreen implements Screen {
       <div class="panel">
         <button class="primary" data-a="create">Create Room</button>
         <button data-a="join">Join Room</button>
+        <button data-a="editor">Level Editor</button>
         <button data-a="settings">Settings</button>
         <button data-a="howto">How to Play</button>
         <button data-a="fs" hidden>Fullscreen</button>
@@ -65,6 +77,13 @@ export class MainMenuScreen implements Screen {
       this.screens.go(new CreateRoomScreen(this.screens));
     this.el.querySelector<HTMLButtonElement>("[data-a=join]")!.onclick = () =>
       this.screens.go(new JoinRoomScreen(this.screens));
+    this.el.querySelector<HTMLButtonElement>("[data-a=editor]")!.onclick = () =>
+      this.screens.go(
+        new MapLibraryScreen(this.screens, {
+          mode: "manage",
+          onBack: () => this.screens.go(new MainMenuScreen(this.screens)),
+        }),
+      );
     this.el.querySelector<HTMLButtonElement>("[data-a=settings]")!.onclick = () =>
       this.screens.go(new SettingsScreen(this.screens));
     this.el.querySelector<HTMLButtonElement>("[data-a=howto]")!.onclick = () => this.showHowTo();
@@ -85,6 +104,43 @@ export class MainMenuScreen implements Screen {
     this.unbindEnter = bindEnter(() => this.screens.go(new CreateRoomScreen(this.screens)));
   }
 
+  /** Draws one row per bonus into the How to Play modal: the pickup as it
+   *  looks on the ground, a tank wearing its aura, and what it does. Canvas
+   *  rather than static art — it's the same drawing code the arena uses
+   *  (render/bonusShape.ts), so the legend can't go stale. */
+  private fillBonusLegend(overlay: HTMLElement) {
+    const legend = overlay.querySelector<HTMLElement>("[data-bonus-legend]");
+    if (!legend) return;
+    const dpr = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+    for (const kind of BONUS_KINDS) {
+      const row = document.createElement("div");
+      row.className = "bonus-row";
+
+      const icon = document.createElement("canvas");
+      icon.className = "bonus-pic bonus-pic-icon";
+      // Attribute size (the drawing surface) is DPR-scaled; the displayed
+      // box is CSS-sized, so a phone media query can shrink the row without
+      // the art going soft.
+      icon.width = Math.round(LEGEND_ICON_PX * dpr);
+      icon.height = icon.width;
+      drawBonusIcon(icon, kind);
+
+      const withAura = document.createElement("canvas");
+      withAura.className = "bonus-pic bonus-pic-aura";
+      withAura.width = Math.round(LEGEND_AURA_PX * dpr);
+      withAura.height = withAura.width;
+      drawTankWithAura(withAura, kind);
+
+      const text = document.createElement("div");
+      text.className = "bonus-text";
+      const info = BONUS_INFO[kind];
+      text.innerHTML = `<b>${info.title}</b><br/>${info.text}`;
+
+      row.append(icon, withAura, text);
+      legend.appendChild(row);
+    }
+  }
+
   private showHowTo() {
     if (this.el.querySelector(".modal-center")) return;
     // The overlay takes Enter over for itself while it's up, so Enter closes
@@ -93,7 +149,15 @@ export class MainMenuScreen implements Screen {
     const overlay = document.createElement("div");
     overlay.className = "hud-scoreboard modal-center";
     overlay.style.pointerEvents = "auto";
-    overlay.innerHTML = `<div class="modal-body">${HOW_TO_PLAY}<button class="primary" data-a="close">Close</button></div>`;
+    // Close lives in a pinned footer, not at the end of the prose: on a
+    // desktop the body is several screens long, and a button that far down
+    // is effectively unreachable without scrolling to the bottom first.
+    overlay.innerHTML = `
+      <div class="modal-body modal-howto">
+        <div class="modal-scroll">${HOW_TO_PLAY}</div>
+        <div class="modal-actions"><button class="primary" data-a="close">Close</button></div>
+      </div>`;
+    this.fillBonusLegend(overlay);
     this.el.appendChild(overlay);
     const close = () => {
       overlay.remove();
@@ -104,9 +168,8 @@ export class MainMenuScreen implements Screen {
     const closeBtn = overlay.querySelector<HTMLButtonElement>("[data-a=close]")!;
     closeBtn.onclick = close;
     // Takes focus off the "How to Play" button that opened this, which would
-    // otherwise swallow Enter and re-open the overlay. `preventScroll` because
-    // Close sits at the end of a long body: a plain focus() scrolls it into
-    // view and the overlay opens partway down, past the Objective heading.
+    // otherwise swallow Enter and re-open the overlay. `preventScroll` so the
+    // body always opens at the top, at the Objective heading.
     closeBtn.focus({ preventScroll: true });
   }
 

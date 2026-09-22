@@ -11,6 +11,12 @@ import type { BotDifficulty, TeamId } from "../game/config";
 
 export type BotDifficultyTarget = number | "all" | TeamId;
 
+/** A player-made map travelling to guests as text — sent only when the room's
+ *  map id is a custom one, so built-in traffic is unchanged
+ *  (specs/level-editor.md §9). A template is ~4KB at the editor's 64x64
+ *  ceiling, which rides the existing JSON messages without chunking. */
+export type MapPayload = { id: string; name: string; template: string };
+
 export type ClientMessage =
   | { t: "hello"; nickname: string }
   | { t: "claimSlot"; slot: number; localSeat: 0 | 1 }
@@ -26,8 +32,8 @@ export type ClientMessage =
 
 export type HostMessage =
   | { t: "welcome"; connId: string }
-  | { t: "roomState"; slots: Slot[]; mapId: string; settings: MatchSettings }
-  | { t: "matchStart"; mapId: string; seed: number; settings: MatchSettings; slots: Slot[] }
+  | { t: "roomState"; slots: Slot[]; mapId: string; settings: MatchSettings; mapTemplate?: MapPayload }
+  | { t: "matchStart"; mapId: string; seed: number; settings: MatchSettings; slots: Slot[]; mapTemplate?: MapPayload }
   | { t: "snapshot"; snap: Snapshot }
   | { t: "events"; events: MatchEvent[] }
   | { t: "matchEnd"; winner: TeamId | "draw" | null; stats: Record<number, PlayerStats> }

@@ -20,14 +20,15 @@ export function makeMap(template: string, id = "test"): MapDef {
 
 export function makeSim(template: string, seed = 1): Sim {
   const map = makeMap(template);
-  const teamSize = map.spawns.blue.length;
+  const blueSize = map.spawns.blue.length;
+  const redSize = map.spawns.red.length;
   const settings: MatchSettings = {
     mapId: map.id,
     timeLimit: 600,
     respawns: 25,
     friendlyFire: false,
   };
-  const sim = new Sim(map, settings, createDefaultSlots("host", teamSize), seed);
+  const sim = new Sim(map, settings, createDefaultSlots("host", blueSize, redSize), seed);
   // Spawn invulnerability is irrelevant to movement and only adds noise to
   // any test that also looks at damage.
   for (const t of sim.tanks) t.invulnT = 0;
@@ -144,7 +145,7 @@ export function botFixture(
  *  every individual behaviour can look correct while the profiles still rank
  *  backwards in a fight. */
 export function matchFrags(map: MapDef, blue: BotDifficulty, red: BotDifficulty, seed: number, seconds = 75) {
-  const slots = createDefaultSlots("host", map.spawns.blue.length);
+  const slots = createDefaultSlots("host", map.spawns.blue.length, map.spawns.red.length);
   for (const s of slots) {
     s.kind = "bot";
     s.owner = null;

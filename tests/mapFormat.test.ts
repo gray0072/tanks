@@ -7,11 +7,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { parseMap, MapValidationError } from "../src/world/maps/mapFormat";
-import { MIN_MAP_W, MIN_MAP_H } from "../src/game/config";
+import { CELL, MIN_MAP_W, MIN_MAP_H } from "../src/game/config";
 import { DT, makeSim } from "./helpers";
 
 // One flag and one spawn per team is all a map strictly needs.
 const TINY = "Rb\nrB";
+/** 1 red against 2 blue — legal, since the teams need not match. */
+const LOPSIDED = "Rbb\n...\nr.B";
 
 test("a 2x2 map parses, with a roster sized from its spawns", () => {
   const map = parseMap("tiny", "Tiny", TINY);
@@ -37,6 +39,46 @@ test("a map below the 2x2 floor is rejected", () => {
   );
 });
 
-test("teams must be symmetric whatever the map's size", () => {
-  assert.throws(() => parseMap("lop", "Lopsided", "Rbb\n...\nr.B"), /2 blue spawns/);
+/** 16 a side — the level editor's ceiling (EDITOR_MAX_SPAWNS_PER_TEAM), and
+ *  the largest roster anything in the game can ask for. */
+const BIG = [
+  "@".repeat(34),
+  "@" + "r".repeat(16) + "..R" + ".".repeat(13) + "@",
+  ...Array.from({ length: 6 }, () => "@" + ".".repeat(32) + "@"),
+  "@" + "b".repeat(16) + "..B" + ".".repeat(13) + "@",
+  "@".repeat(34),
+].join("\n");
+
+test("a 16-a-side map parses and plays", () => {
+  const map = parseMap("big", "Big", BIG);
+  assert.equal(map.spawns.red.length, 16);
+  assert.equal(map.spawns.blue.length, 16);
+
+  const sim = makeSim(BIG);
+  assert.equal(sim.tanks.length, 32, "one tank per spawn");
+  // Every tank gets its own spawn cell — Sim indexes spawns by slot id, so a
+  // roster bigger than the spawn list would silently stack tanks.
+  const cells = new Set(sim.tanks.map((t) => `${Math.floor(t.x / CELL)},${Math.floor(t.y / CELL)}`));
+  assert.equal(cells.size, 32);
+  for (let i = 0; i < 120; i++) sim.step({}, DT);
+  assert.equal(sim.rules.ended, false);
+});
+
+test("the teams need not be the same size", () => {
+  // 1 red against 2 blue: the parser takes it, and each team's roster is
+  // sized from its own spawn count (SPEC 3.5). The level editor warns about
+  // it (tests/mapValidation.test.ts), but nothing here blocks it.
+  const map = parseMap("lop", "Lopsided", LOPSIDED);
+  assert.equal(map.spawns.red.length, 1);
+  assert.equal(map.spawns.blue.length, 2);
+
+  const sim = makeSim(LOPSIDED);
+  assert.equal(sim.tanks.length, 3, "one tank per spawn, not two equal teams");
+  assert.equal(sim.tanks.filter((t) => t.team === "blue").length, 2);
+  assert.equal(sim.tanks.filter((t) => t.team === "red").length, 1);
+  // Each team's tanks take that team's own spawns, so nobody is stacked.
+  const cells = new Set(sim.tanks.map((t) => `${Math.floor(t.x / CELL)},${Math.floor(t.y / CELL)}`));
+  assert.equal(cells.size, 3);
+  for (let i = 0; i < 60; i++) sim.step({}, DT);
+  assert.equal(sim.tanks.length, 3);
 });

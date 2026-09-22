@@ -11,11 +11,12 @@ import {
 import { Sim, type SeatInput } from "../world/sim";
 import { type MatchSettings } from "../world/rules";
 import { listMaps, getMap } from "../world/maps/loader";
+import { getCustomMap, isCustomMapId } from "../world/maps/customMaps";
 import { BotController } from "../ai/bot";
 import { computeTeamRoles, type Role } from "../ai/teamPlan";
 import { HostNetwork, type NetErrorInfo } from "./peer";
 import { generateRoomCode } from "./roomCode";
-import type { ClientMessage, BotDifficultyTarget } from "./protocol";
+import type { ClientMessage, BotDifficultyTarget, MapPayload } from "./protocol";
 import type { RoomCallbacks, RoomController } from "./room";
 import { NO_INPUT } from "./room";
 import {
@@ -59,7 +60,8 @@ export class RoomHost implements RoomController {
     // Team size comes from the chosen map's own spawn count, not a hardcoded
     // number — the built-in maps are 5 a side, the debug map is 1v1, and any
     // map in between or beyond sizes the roster to match its `r`/`b` markers.
-    this.slots = createDefaultSlots(hostNickname, getMap(this.mapId).spawns.blue.length);
+    const initial = getMap(this.mapId);
+    this.slots = createDefaultSlots(hostNickname, initial.spawns.blue.length, initial.spawns.red.length);
     this.settings = {
       mapId: this.mapId,
       timeLimit: DEFAULT_TIME_LIMIT,
@@ -82,7 +84,22 @@ export class RoomHost implements RoomController {
   private publishRoomState() {
     this.settings.mapId = this.mapId;
     this.cb.onRoomState?.(this.slots, this.mapId, this.settings);
-    this.net?.broadcast({ t: "roomState", slots: this.slots, mapId: this.mapId, settings: this.settings });
+    this.net?.broadcast({
+      t: "roomState",
+      slots: this.slots,
+      mapId: this.mapId,
+      settings: this.settings,
+      mapTemplate: this.mapPayload(),
+    });
+  }
+
+  /** A guest doesn't have our localStorage, so a player-made map has to
+   *  travel with the room state as text (specs/level-editor.md §9). Built-in
+   *  maps send nothing extra — the guest already has them. */
+  private mapPayload(): MapPayload | undefined {
+    if (!isCustomMapId(this.mapId)) return undefined;
+    const record = getCustomMap(this.mapId);
+    return record ? { id: record.id, name: record.name, template: record.template } : undefined;
   }
 
   private handlePeerLeave(connId: string) {
@@ -119,7 +136,13 @@ export class RoomHost implements RoomController {
         this.autoSeat(connId);
         // Room state is otherwise only broadcast on change, so without this
         // reply a fresh guest sits on a connected-but-silent socket forever.
-        this.net?.send(connId, { t: "roomState", slots: this.slots, mapId: this.mapId, settings: this.settings });
+        this.net?.send(connId, {
+          t: "roomState",
+          slots: this.slots,
+          mapId: this.mapId,
+          settings: this.settings,
+          mapTemplate: this.mapPayload(),
+        });
         if (this.sim) {
           this.net?.send(connId, {
             t: "matchStart",
@@ -127,6 +150,7 @@ export class RoomHost implements RoomController {
             seed: 0,
             settings: this.sim.settings,
             slots: this.slots,
+            mapTemplate: this.mapPayload(),
           });
         }
         break;
@@ -236,22 +260,36 @@ export class RoomHost implements RoomController {
   }
 
   private doSetMap(mapId: string) {
-    if (!listMaps().some((m) => m.id === mapId)) return;
+    // getMap, not listMaps() — a room may also be on one of the player's own
+    // maps (specs/level-editor.md §2.3). An id that resolves to nothing, or a
+    // custom map that has since been deleted or broken, is ignored.
+    let map;
+    try {
+      map = getMap(mapId);
+    } catch {
+      this.cb.onError?.("That map isn't available any more.");
+      return;
+    }
     this.mapId = mapId;
-    this.resizeRoster(getMap(mapId).spawns.blue.length);
+    this.resizeRoster(map.spawns.blue.length, map.spawns.red.length);
     this.publishRoomState();
   }
 
-  /** A map carries its own team size (SPEC §3.5), so switching to one that
-   *  disagrees with the current roster has to rebuild it: Sim indexes spawns
-   *  by slot id and MatchRules derives teamSize from `slots.length`, so a
-   *  stale roster silently aliases tanks onto the same spawn. Humans keep
-   *  their team and relative order; anyone who no longer fits loses the slot
-   *  and can re-claim from the lobby. */
-  private resizeRoster(teamSize: number) {
-    const total = teamSize * 2;
-    if (this.slots.length === total) return;
-    const next = createDefaultSlots(this.hostNickname, teamSize);
+  /** A map carries its own per-team sizes (SPEC §3.5, and the two need not
+   *  match), so switching to one that disagrees with the current roster has
+   *  to rebuild it: Sim hands out spawns per team in slot order, so a stale
+   *  roster silently aliases two tanks onto the same spawn. Humans keep their
+   *  team and relative order; anyone who no longer fits loses the slot and
+   *  can re-claim from the lobby. */
+  private resizeRoster(blueSize: number, redSize: number) {
+    const total = blueSize + redSize;
+    if (
+      this.slots.length === total &&
+      this.slots.filter((s) => s.team === "blue").length === blueSize
+    ) {
+      return;
+    }
+    const next = createDefaultSlots(this.hostNickname, blueSize, redSize);
     for (const s of next) {
       s.botDifficulty = this.defaultBotDifficulty;
       this.resetSlotToBot(s);
@@ -363,7 +401,14 @@ export class RoomHost implements RoomController {
     for (const s of this.slots) if (s.kind === "bot") this.bots.set(s.id, new BotController(s.id));
 
     this.cb.onMatchStart?.(map.id, seed, this.sim.settings, this.slots);
-    this.net?.broadcast({ t: "matchStart", mapId: map.id, seed, settings: this.sim.settings, slots: this.slots });
+    this.net?.broadcast({
+      t: "matchStart",
+      mapId: map.id,
+      seed,
+      settings: this.sim.settings,
+      slots: this.slots,
+      mapTemplate: this.mapPayload(),
+    });
 
     this.last = performance.now();
     this.acc = 0;

@@ -108,16 +108,25 @@ export function botNickname(id: number, difficulty: BotDifficulty): string {
 }
 
 /** The room always starts with the creator in slot 0 and bots filling the
- *  rest — SPEC §2.1: at most `2*teamSize - 1` bots can ever exist because the
- *  room creator always occupies one human slot. `teamSize` comes from the
- *  loaded map's spawn count; the `TEAM_SIZE` default is only for a room built
- *  without a map in hand. Ids `0..teamSize-1` are blue,
- *  `teamSize..2*teamSize-1` are red. */
-export function createDefaultSlots(hostNickname: string, teamSize: number = TEAM_SIZE): Slot[] {
+ *  rest — SPEC §2.1: at most `blueSize + redSize - 1` bots can ever exist,
+ *  because the room creator always occupies one human slot. The sizes come
+ *  from the loaded map's own spawn counts, one slot per `r`/`b` marker; the
+ *  `TEAM_SIZE` default is only for a room built without a map in hand.
+ *
+ *  **The teams need not be the same size** (SPEC §3.5): a map may declare 4
+ *  reds against 6 blues, so ids are `0..blueSize-1` blue and
+ *  `blueSize..blueSize+redSize-1` red — a contiguous run each, but not two
+ *  runs of equal length. Nothing may infer a team from an id's arithmetic;
+ *  read `slot.team`. */
+export function createDefaultSlots(
+  hostNickname: string,
+  blueSize: number = TEAM_SIZE,
+  redSize: number = blueSize,
+): Slot[] {
   const slots: Slot[] = [];
-  const total = teamSize * 2;
+  const total = blueSize + redSize;
   for (let id = 0; id < total; id++) {
-    const team: TeamId = id < teamSize ? "blue" : "red";
+    const team: TeamId = id < blueSize ? "blue" : "red";
     if (id === 0) {
       slots.push({
         id,

@@ -172,6 +172,13 @@ spawn count.
 | `fortress` | Heavy steel around both bases; grinding, siege-flavored | authored in M9 |
 | `iceworks` | Large ice fields; slippery approaches, hard to hold a firing line | authored in M9 |
 
+**Player-made maps.** Alongside the built-ins, a player can author maps in the in-game level
+editor (`specs/level-editor.md`). They use this exact format, go through this exact parser, live in
+`localStorage` under `tanks.customMaps`, and are addressed by a `custom-<hex>` id — so everything
+downstream (room, Sim, previews, bot navigation) treats them like any other map. Built-in maps are
+read-only in the editor: they can be copied, never overwritten. A custom map travels to guests as
+text on `roomState`/`matchStart` (§9.3).
+
 #### Design rules
 
 - A flag must be **reachable** from every spawn (enforced by the automated check in §3.5).
@@ -270,11 +277,21 @@ dropped from the lobby list in production.
    smallest grid that can still hold one flag and one spawn per team; the rest of the game reads
    its dimensions and its roster size off the map, so nothing else has to change.
 2. Exactly one `R` and one `B`.
-3. At least one `r` and one `b`; the two counts must match each other (symmetric teams — the same
-   assumption `world/rules.ts` makes when it splits stats into two contiguous id ranges).
+3. At least one `r` and one `b`. The two counts need **not** match: the roster is built per team
+   from these counts and `world/rules.ts` attributes a slot's stats via `slot.team`, so a 4-v-6 map
+   plays. The level editor warns about it (uneven fights are usually an authoring slip) but does
+   not block it.
 4. **Reachability:** flood fill over tank-passable cells (treating `BRICK` as passable, since it can
    be shot through) from a red spawn must reach both flags and every spawn. This is the check that
    catches a map where a water channel accidentally seals off a base.
+
+The level editor runs a **stricter superset** of these (`world/maps/validateMap.ts`,
+`specs/level-editor.md` §7) before it will let a map be saved as playable, reported as a list of
+individually-addressable problems rather than one thrown message: an 8 × 8 … 64 × 64 size window
+inside the engine's own 2 × 2 … 128 × 128, at most 16 spawns a team, no spawn or flag within
+Chebyshev distance 2 of an enemy spawn, and per-spawn reachability that names *which* spawn is
+walled in. It also raises non-blocking warnings, including the "no open lane to a flag" design rule
+above — which nothing checked until now.
 
 #### Debug map
 
@@ -494,6 +511,22 @@ first. `STAR`, `RESPAWN`, and the team-scoped bonuses stack freely.
 Team-scoped bonuses (`SHOVEL`, `CLOCK`, `GRENADE`, `RESPAWN`) announce themselves loudly: a full-width
 banner, a distinct sound, and a HUD timer, so 10 players can tell what just happened.
 
+**Look of a bonus.** Every bonus has one pictogram, declared once in `render/bonusShape.ts` as
+primitive ops in a unit square plus a palette (plate, symbol, aura colour). A pickup on the ground is
+drawn at a **full cell** — the same size as a tank, never a small pip — so what is lying there is
+readable at a glance without a legend.
+
+**Aura.** While a bonus is on a tank, three copies of its own icon orbit the tank inside a pulsing
+ring in that bonus's colour (`Arena.syncAuras`). The set of rings is derived from state every frame,
+not started and stopped by events: `HELMET`/`SPEED` show for as long as the snapshot reports the
+buff, `MINE` for as long as the tank still holds mines, and anything else — a team bonus, a `STAR`
+rank-up — flashes for 2.5 s from its `pickup` event. Stacked rings sit at increasing radii and spin
+in alternating directions so two buffs stay separately readable.
+
+The same op list renders through two backends — PixiJS in the arena (`render/atlas.ts`) and Canvas2D
+for the How to Play legend (`render/preview.ts`), which shows, per bonus, the pickup as it lies on
+the ground next to a tank wearing its aura. Neither can drift from the other.
+
 ---
 
 ## 5. Controls
@@ -576,6 +609,12 @@ a 916x412 landscape viewport (a Poco X6 Pro is the reference device).
   room layout, two map cards per row, capped preview thumbnails) and
   `max-height: 520px and (orientation: landscape)` (a landscape phone is ~410px tall, so the
   subtitle and the map blurbs go and every fixed vertical cost shrinks).
+- **Modal overlays wash out what is behind them** — `rgba(8,11,16,0.97)` plus a backdrop blur. How to
+  Play is a long read and the menu showing through the old 0.88 wash made it hard to focus on.
+- **How to Play takes the width it can get and pins its own footer** (`.modal-howto`): up to 880px
+  instead of the shared 560px cap, the prose scrolls inside `.modal-scroll`, and *Close* sits in a
+  `.modal-actions` bar below it — at the end of the prose it was several screens down on a desktop.
+  The bonus legend goes two-up above 780px.
 - The room screen's **tank preview canvas is hidden while nothing is hovered** — a touch device
   never hovers, so an always-present blank 300x190 canvas only pushed *Start match* off the bottom.
 
@@ -607,19 +646,25 @@ animation resizes the arena mid-fight. Fullscreen is therefore the intended way 
 
 Screens are a stack managed by `ScreenManager`; exactly one is active and rendered per frame.
 
-1. **Main Menu** — logo, `Create room`, `Join room`, `Settings`, `How to play`.
-2. **Create room** — nickname, map picker (thumbnail + name + terrain summary), match settings
-   (time limit, respawn count, friendly fire, **default bot difficulty — `Medium`**), `Create`.
-   Produces the room code.
+1. **Main Menu** — logo, `Create room`, `Join room`, `Level editor`, `Settings`, `How to play`.
+2. **Create room** — nickname, the chosen map (thumbnail + name + size/roster, with `Change…`
+   opening the map library below), match settings (time limit, respawn count, friendly fire,
+   **default bot difficulty — `Medium`**), `Create`. Produces the room code.
 3. **Join room** — nickname, 6-character code field (auto-uppercase, auto-advance, paste-aware).
    A `?room=CODE` deep link skips straight here with the code filled in.
-4. **Room / slot picker** — the heart of the pre-match flow, see §6.1.
-5. **Match** — the arena plus HUD (§6.2).
-6. **Scoreboard overlay** — held `Tab` or a HUD button; per-player stats, ping, team totals.
-7. **Result** — winner banner, final scoreboard, MVP line, `Rematch` (host) / `Back to room`.
-8. **Settings** — sound and music volume, render quality (auto/low/high), movement stick side
+4. **Map library** — one screen in two modes (`specs/level-editor.md` §5): opened from `Create
+   room` to pick a map, or from the menu's `Level editor` to manage them. Every card carries the
+   map's thumbnail, name, **size and roster (`33×25 · 5v5`)**, and its actions — clicking the card itself does the obvious one (`Edit` here, `Select` when picking a map for a room), with buttons for `Select`, `Edit`
+   (custom only), `Copy`, `Export`, `Delete` (custom only) — plus `New map` and `Import…`.
+5. **Level editor** — palette, grid, resize with an anchor, live validation, `Test play`
+   (`specs/level-editor.md` §6).
+6. **Room / slot picker** — the heart of the pre-match flow, see §6.1.
+7. **Match** — the arena plus HUD (§6.2).
+8. **Scoreboard overlay** — held `Tab` or a HUD button; per-player stats, ping, team totals.
+9. **Result** — winner banner, final scoreboard, MVP line, `Rematch` (host) / `Back to room`.
+10. **Settings** — sound and music volume, render quality (auto/low/high), movement stick side
    (§5.3), fullscreen-on-match-start (§5.4), nickname, show-ping toggle.
-9. **Disconnected overlay** — reconnect progress and a `Back to menu` escape hatch.
+11. **Disconnected overlay** — reconnect progress and a `Back to menu` escape hatch.
 
 ### 6.1 Room screen and slot preview
 
@@ -769,6 +814,7 @@ Invite links: `https://<pages-url>/?room=K7QM2X`.
 | `claimSlot` / `releaseSlot` / `setReady` | client → host | on action | reliable |
 | `setBotDifficulty` (slot or all/team) | host-only, local → broadcast | on action | reliable |
 | `matchStart` (map, seed, slot→tank mapping, difficulties, `t0`) | host → all | once | reliable |
+| `mapTemplate` (id, name, template — rides `roomState`/`matchStart`) | host → all | with those, custom maps only | reliable |
 | `input` `{seq, tick, seats:[{dir, fire, mine}]}` | client → host | 30 Hz | unreliable |
 | `snapshot` (delta-encoded world state) | host → all | 15 Hz | unreliable |
 | `events` (kill, pickup, flag hit, bonus, chat) | host → all | on event | reliable |

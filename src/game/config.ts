@@ -25,6 +25,27 @@ export const MIN_MAP_H = 2;
 export const MAX_MAP_W = 128;
 export const MAX_MAP_H = 128;
 
+// --- Level editor (specs/level-editor.md §3) ---
+// Editor-only bounds, deliberately *inside* the engine's MIN/MAX above: the
+// engine floor of 2x2 is enough to parse (and the parser test and the 8x5
+// debug map rely on it) but far too small to be a match, and the 128 ceiling
+// is more map than any phone can letterbox usefully.
+export const EDITOR_MIN_W = 8;
+export const EDITOR_MIN_H = 8;
+export const EDITOR_MAX_W = 64;
+export const EDITOR_MAX_H = 64;
+export const EDITOR_DEFAULT_W = 20;
+export const EDITOR_DEFAULT_H = 16;
+// 16 a side, i.e. up to 32 tanks in a match. Well past what the room screen's
+// two roster columns show comfortably, and past what the bot layer was tuned
+// for, but the engine has no size assumption of its own — the roster is built
+// from the map's own spawn count — so this is a deliberate ceiling, not a
+// limitation.
+export const EDITOR_MAX_SPAWNS_PER_TEAM = 16;
+// BONUS_MAX_ON_FIELD is 2, so past a handful of points this is only variety.
+export const EDITOR_MAX_BONUS_SPAWNS = 16;
+export const EDITOR_MAX_NAME = 24;
+
 export const TANK_CELLS = 1; // a tank is exactly one cell now, see above
 export const TANK_SIZE = TANK_CELLS * CELL; // 32px logical slot (spawns, flags, pathing grid)
 // The actual collision/visual body is smaller than the 32px slot so a tank
@@ -55,7 +76,7 @@ export const MAX_STAR = 3;
 // --- Match rules (SPEC §2) ---
 // Fallback roster size only, for a room created without a map in hand. The
 // real team size is whatever the loaded map declares — one slot per `r`/`b`
-// marker in its template (SPEC §3.5) — so a map can be 1v1 or 8v8.
+// marker in its template (SPEC §3.5) — so a map can be 1v1 or 16v16.
 export const TEAM_SIZE = 5;
 export const DEFAULT_RESPAWNS = 25;
 export const DEFAULT_TIME_LIMIT = 10 * 60; // seconds

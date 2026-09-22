@@ -8,11 +8,27 @@ import type { MapDef } from "../world/maps/loader";
 import { Tile } from "../world/grid";
 import type { Snapshot, MatchEvent } from "../world/sim";
 import type { Slot } from "../world/tank";
+import type { BonusKind } from "../world/bonus";
+import { BONUS_PALETTE } from "./bonusShape";
 import { DIR_ANGLE } from "../util/math";
 import { CELL, TANK_SIZE, TEAM_COLOR, NET_SNAPSHOT_HZ, type TeamId } from "../game/config";
 import { BRICK_QUARTERS } from "../world/grid";
 
 const SNAP_INTERVAL_MS = 1000 / NET_SNAPSHOT_HZ;
+
+/** How long a pickup with no lasting per-tank state spins its aura. */
+const FLASH_AURA_S = 2.5;
+
+/** One spinning ring of a bonus's own icon around a tank that carries it
+ *  (SPEC §4.3). `orbit` holds the icon sprites so they can be counter-rotated
+ *  and stay upright while the ring turns. */
+type Aura = {
+  root: Container;
+  orbit: Sprite[];
+  /** Turns per second; alternates sign per ring so stacked buffs read as
+   *  separate effects instead of one thick band. */
+  spin: number;
+};
 
 type TankVisual = {
   root: Container;
@@ -20,6 +36,12 @@ type TankVisual = {
   shield: Graphics;
   label: Text;
   stars: Container;
+  auraRoot: Container;
+  auras: Map<BonusKind, Aura>;
+  /** Bonuses whose effect isn't visible in the snapshot (team bonuses, a
+   *  STAR rank-up): the aura flashes for FLASH_AURA_S from the pickup event
+   *  and then goes away. Value is a performance.now() deadline. */
+  flash: Map<BonusKind, number>;
   // Snapshots (TankSnap) don't carry team — it never changes mid-match, so
   // it's cheaper to keep it here from the Slot the visual was built from
   // than to resend it every tick.
@@ -157,6 +179,10 @@ export class Arena {
           });
         }
       }
+      if (e.type === "pickup") {
+        const v = this.tankVisuals.get(e.slot);
+        if (v) v.flash.set(e.kind, performance.now() + FLASH_AURA_S * 1000);
+      }
       if (e.type === "flagHit") this.destroyFlag(e.team);
       if (e.type === "kill") {
         const v = this.tankVisuals.get(e.victimSlot);
@@ -193,9 +219,13 @@ export class Arena {
     label.position.set(TANK_SIZE / 2, -3);
     const stars = new Container();
     stars.position.set(0, TANK_SIZE + 1);
-    root.addChild(body, shield, label, stars);
+    // Behind the tank: an aura is a ring on the ground around it, and it must
+    // never obscure the hull or which way the barrel points.
+    const auraRoot = new Container();
+    auraRoot.position.set(TANK_SIZE / 2, TANK_SIZE / 2);
+    root.addChild(auraRoot, body, shield, label, stars);
     this.tankLayer.addChild(root);
-    return { root, body, shield, label, stars, team: slot.team };
+    return { root, body, shield, label, stars, auraRoot, auras: new Map(), flash: new Map(), team: slot.team };
   }
 
   updateSlots(slots: Slot[]) {
@@ -238,6 +268,68 @@ export class Arena {
    *  hook the shared ticker. */
   app: import("pixi.js").Application | null = null;
 
+  /** Which bonus auras a tank should be showing right now: the buffs the
+   *  snapshot still reports as active, plus any pickup still inside its
+   *  flash window. Derived from state every frame rather than started and
+   *  stopped by events alone, so a client that joins mid-match — or misses
+   *  an event — still shows the right rings. */
+  private syncAuras(v: TankVisual, tk: import("../world/sim").TankSnap) {
+    const now = performance.now();
+    const wanted: BonusKind[] = [];
+    if (tk.helmetT > 0) wanted.push("HELMET");
+    if (tk.speedT > 0) wanted.push("SPEED");
+    if (tk.mines > 0) wanted.push("MINE");
+    for (const [kind, until] of v.flash) {
+      if (until <= now) v.flash.delete(kind);
+      else if (!wanted.includes(kind)) wanted.push(kind);
+    }
+
+    for (const [kind, aura] of v.auras) {
+      if (wanted.includes(kind)) continue;
+      aura.root.destroy({ children: true });
+      v.auras.delete(kind);
+    }
+
+    wanted.forEach((kind, i) => {
+      let aura = v.auras.get(kind);
+      if (!aura) {
+        aura = this.makeAura(kind, i);
+        v.auras.set(kind, aura);
+        v.auraRoot.addChild(aura.root);
+      }
+      // Each extra ring sits a little wider, so two buffs at once stay
+      // separately readable.
+      const radius = TANK_SIZE * 0.72 + i * 6;
+      aura.root.rotation = ((now / 1000) * aura.spin * Math.PI * 2) % (Math.PI * 2);
+      aura.orbit.forEach((s, j) => {
+        const a = (j * Math.PI * 2) / aura!.orbit.length;
+        s.position.set(Math.cos(a) * radius, Math.sin(a) * radius);
+        s.rotation = -aura!.root.rotation; // stay upright while the ring turns
+      });
+      const g = aura.root.children[0] as Graphics;
+      g.clear();
+      g.circle(0, 0, radius).stroke({
+        width: 2,
+        color: BONUS_PALETTE[kind].aura,
+        alpha: 0.3 + 0.2 * Math.sin(now / 220 + i),
+      });
+    });
+  }
+
+  private makeAura(kind: BonusKind, index: number): Aura {
+    const root = new Container();
+    root.addChild(new Graphics()); // the ring itself; redrawn each frame
+    const orbit: Sprite[] = [];
+    for (let i = 0; i < 3; i++) {
+      const s = new Sprite(this.atlas.bonus[kind]);
+      s.anchor.set(0.5);
+      s.scale.set(0.36);
+      root.addChild(s);
+      orbit.push(s);
+    }
+    return { root, orbit, spin: index % 2 === 0 ? 0.35 : -0.28 };
+  }
+
   tick(myTeams: Set<TeamId>) {
     if (!this.curr) return;
     const prev = this.prev ?? this.curr;
@@ -273,6 +365,8 @@ export class Arena {
           alpha: 0.5 + 0.5 * Math.sin(performance.now() / 100),
         });
       }
+      this.syncAuras(v, tk);
+
       v.stars.removeChildren();
       for (let i = 0; i < tk.star; i++) {
         const pip = new Sprite(this.atlas.bonus.STAR);

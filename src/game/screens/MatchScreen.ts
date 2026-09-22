@@ -48,7 +48,14 @@ export class MatchScreen implements Screen {
   private scoreboardPinned = false;
   private isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
 
-  constructor(private screens: ScreenManager, private room: RoomController) {}
+  /** `exit` replaces "back to the main menu" for a match that was started
+   *  from somewhere else — the level editor's Test play hands it a way back
+   *  to the grid it came from (specs/level-editor.md §6.7). */
+  constructor(
+    private screens: ScreenManager,
+    private room: RoomController,
+    private exit?: () => void,
+  ) {}
 
   mount(root: HTMLElement) {
     this.el = document.createElement("div");
@@ -152,7 +159,7 @@ export class MatchScreen implements Screen {
     if (this.ended) return;
     this.ended = true;
     audio.matchEnd();
-    this.screens.go(new ResultScreen(this.screens, this.room, winner, stats));
+    this.screens.go(new ResultScreen(this.screens, this.room, winner, stats, this.exit));
   }
 
   private onKeyDown = () => {
@@ -193,6 +200,10 @@ export class MatchScreen implements Screen {
         (document.activeElement as HTMLElement | null)?.blur();
         overlay.querySelector<HTMLButtonElement>("[data-a=leave]")!.onclick = () => {
           this.room.setMatchPaused(false);
+          if (this.exit) {
+            this.exit();
+            return;
+          }
           this.room.destroy();
           this.screens.go(new MainMenuScreen(this.screens));
         };

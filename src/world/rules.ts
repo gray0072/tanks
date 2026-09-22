@@ -27,24 +27,35 @@ export type MatchRules = {
   stats: Record<number, PlayerStats>;
   /** last slot to damage a given slot, and when — for the 5s assist window (§2.4) */
   lastDamagedBy: Partial<Record<number, { bySlot: number; at: number }>>;
-  /** Slots per team, as the loaded map declares it (§3.5) — 5 for the
-   *  built-ins, 1 for the debug map. Assumes symmetric teams, so
-   *  teamFrags below can address a team by a contiguous id range. */
-  teamSize: number;
+  /** Slots per team, as the loaded map declares them (§3.5) — 5 and 5 for the
+   *  built-ins, 1 and 1 for the debug map, and not necessarily equal: a map
+   *  may field 4 against 6. */
+  teamSizes: Record<TeamId, number>;
+  /** Which team each slot id belongs to. The teams are no longer two equal
+   *  id ranges, so this is the only correct way to attribute a slot's stats
+   *  to a team (see teamFrags). */
+  slotTeam: Record<number, TeamId>;
   ended: boolean;
   winner: TeamId | "draw" | null;
 };
 
 export function createRules(settings: MatchSettings, slots: Slot[]): MatchRules {
   const stats: Record<number, PlayerStats> = {};
-  for (const s of slots) stats[s.id] = createStats();
+  const slotTeam: Record<number, TeamId> = {};
+  const teamSizes: Record<TeamId, number> = { blue: 0, red: 0 };
+  for (const s of slots) {
+    stats[s.id] = createStats();
+    slotTeam[s.id] = s.team;
+    teamSizes[s.team]++;
+  }
   return {
     timeLeft: settings.timeLimit,
     respawns: { blue: settings.respawns, red: settings.respawns },
     flagAlive: { blue: true, red: true },
     stats,
     lastDamagedBy: {},
-    teamSize: slots.length / 2,
+    teamSizes,
+    slotTeam,
     ended: false,
     winner: null,
   };
@@ -121,7 +132,8 @@ export function checkWinByTime(rules: MatchRules) {
 
 export function teamFrags(rules: MatchRules, team: TeamId): number {
   let sum = 0;
-  const start = team === "blue" ? 0 : rules.teamSize;
-  for (let i = 0; i < rules.teamSize; i++) sum += rules.stats[start + i].frags;
+  for (const [id, t] of Object.entries(rules.slotTeam)) {
+    if (t === team) sum += rules.stats[Number(id)].frags;
+  }
   return sum;
 }

@@ -80,3 +80,12 @@ export function saveRoomSetup(mapId: string, setup: RoomSetup) {
   all[mapId] = setup;
   saveSetting("roomSetups", all);
 }
+
+/** Drop a deleted custom map's remembered settings (specs/level-editor.md
+ *  §5.3) — otherwise the entry outlives the map it belongs to forever. */
+export function forgetRoomSetup(mapId: string) {
+  const all = loadSetting<Record<string, Partial<RoomSetup>>>("roomSetups", {});
+  if (!(mapId in all)) return;
+  delete all[mapId];
+  saveSetting("roomSetups", all);
+}

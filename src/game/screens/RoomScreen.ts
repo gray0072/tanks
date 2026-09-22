@@ -2,7 +2,9 @@ import type { Screen } from "../ScreenManager";
 import { ScreenManager } from "../ScreenManager";
 import type { RoomController } from "../../net/room";
 import type { Slot } from "../../world/tank";
-import { getMap } from "../../world/maps/loader";
+import { getMap, getTransientSource } from "../../world/maps/loader";
+import { mapSizeLabel } from "../../world/maps/mapFormat";
+import { createCustomMap, getCustomMap, isCustomMapId, MapStorageError, uniqueMapName } from "../../world/maps/customMaps";
 import { drawMapPreview, drawTankPreview } from "../../render/preview";
 import { MatchScreen } from "./MatchScreen";
 import { MainMenuScreen } from "./MainMenuScreen";
@@ -96,6 +98,7 @@ export class RoomScreen implements Screen {
           <canvas data-f="preview" width="256" height="160"></canvas>
           <canvas data-f="tank" width="300" height="190"></canvas>
           <div class="hint" data-f="mapinfo"></div>
+          <div class="row wrap" data-f="mapactions"></div>
           <div class="row wrap">
             ${this.room.hasLocalSeat2()
               ? `<button data-a="removeSeat2">Remove local player 2</button>`
@@ -224,7 +227,12 @@ export class RoomScreen implements Screen {
     const previewCanvas = this.el.querySelector<HTMLCanvasElement>("[data-f=preview]");
     const tankCanvas = this.el.querySelector<HTMLCanvasElement>("[data-f=tank]");
     const info = this.el.querySelector<HTMLDivElement>("[data-f=mapinfo]");
-    if (info) info.textContent = `Map: ${map.name} · ${(this.room.settings?.timeLimit ?? 0) / 60 | 0} min · ${this.room.settings?.respawns ?? "?"} respawns`;
+    if (info) {
+      // Size and roster sit where the decision is made, same as on a map card
+      // (specs/level-editor.md §5.2).
+      info.textContent = `Map: ${map.name} · ${mapSizeLabel(map)} · ${(this.room.settings?.timeLimit ?? 0) / 60 | 0} min · ${this.room.settings?.respawns ?? "?"} respawns`;
+    }
+    this.renderMapActions(map.id, map.name);
 
     const hovered = this.hoverSlot !== null ? this.slots.find((s) => s.id === this.hoverSlot) : undefined;
     if (previewCanvas) {
@@ -245,6 +253,33 @@ export class RoomScreen implements Screen {
       if (hovered) drawTankPreview(tankCanvas, hovered.team, hovered.nickname);
       else tankCanvas.getContext("2d")?.clearRect(0, 0, tankCanvas.width, tankCanvas.height);
     }
+  }
+
+  /** A guest is playing on the host's own map; offer to keep it. This is the
+   *  only way someone else's map enters the local library (specs/level-editor.md §9). */
+  private renderMapActions(mapId: string, mapName: string) {
+    const host = this.el.querySelector<HTMLDivElement>("[data-f=mapactions]");
+    if (!host) return;
+    const source = isCustomMapId(mapId) ? getTransientSource(mapId) : null;
+    const savable = source !== null && !getCustomMap(mapId);
+    if (!savable || !source) {
+      host.innerHTML = "";
+      return;
+    }
+    host.innerHTML = `<span class="map-tag">custom</span><button class="small" data-a="saveMap">Save to my maps</button>`;
+    host.querySelector<HTMLButtonElement>("[data-a=saveMap]")!.onclick = () => {
+      try {
+        createCustomMap({
+          name: uniqueMapName(mapName),
+          template: source.template,
+          origin: { kind: "import" },
+        });
+        this.showBanner(`"${mapName}" saved to your maps.`);
+        this.updatePreview();
+      } catch (e) {
+        this.showBanner(e instanceof MapStorageError ? e.message : "Couldn't save that map.");
+      }
+    };
   }
 
   private showBanner(msg: string) {

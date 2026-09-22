@@ -7,7 +7,8 @@ import type { Slot } from "../world/tank";
 import type { MatchSettings } from "../world/rules";
 import type { SeatInput } from "../world/sim";
 import { ClientNetwork, type NetErrorInfo } from "./peer";
-import type { HostMessage, BotDifficultyTarget } from "./protocol";
+import { clearTransientMaps, registerTransientMap } from "../world/maps/loader";
+import type { HostMessage, BotDifficultyTarget, MapPayload } from "./protocol";
 import type { RoomCallbacks, RoomController } from "./room";
 import { NO_INPUT } from "./room";
 import { NET_INPUT_HZ, type BotDifficulty } from "../game/config";
@@ -41,15 +42,32 @@ export class RoomClient implements RoomController {
     this.startInputLoop();
   }
 
+  /** A player-made map arrives with the room state as text (specs/level-editor.md
+   *  §9). It is held in memory for the length of this room only — a guest never
+   *  silently gains maps in their own library. A template we can't parse is
+   *  reported rather than joined: a desynced map is worse than no match. */
+  private acceptMap(payload: MapPayload | undefined): boolean {
+    if (!payload) return true;
+    try {
+      registerTransientMap(payload.id, payload.name, payload.template);
+      return true;
+    } catch {
+      this.cb.onError?.("The host's map couldn't be loaded.");
+      return false;
+    }
+  }
+
   private handleHostMessage(msg: HostMessage) {
     switch (msg.t) {
       case "roomState":
+        if (!this.acceptMap(msg.mapTemplate)) return;
         this.slots = msg.slots;
         this.mapId = msg.mapId;
         this.settings = msg.settings;
         this.cb.onRoomState?.(this.slots, this.mapId, this.settings);
         break;
       case "matchStart":
+        if (!this.acceptMap(msg.mapTemplate)) return;
         this.slots = msg.slots;
         this.mapId = msg.mapId;
         this.settings = msg.settings;
@@ -167,6 +185,7 @@ export class RoomClient implements RoomController {
   destroy() {
     this.stopInputLoop();
     this.net.destroy();
+    clearTransientMaps();
   }
 }
 

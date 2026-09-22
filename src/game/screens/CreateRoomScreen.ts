@@ -1,7 +1,9 @@
 import type { Screen } from "../ScreenManager";
 import { ScreenManager } from "../ScreenManager";
-import { listMaps } from "../../world/maps/loader";
+import { listMaps, listPlayableMaps } from "../../world/maps/loader";
+import { mapSizeLabel } from "../../world/maps/mapFormat";
 import { drawMapPreview } from "../../render/preview";
+import { MapLibraryScreen } from "./MapLibraryScreen";
 import { RoomHost } from "../../net/host";
 import { RoomScreen } from "./RoomScreen";
 import { MainMenuScreen } from "./MainMenuScreen";
@@ -24,23 +26,18 @@ import {
   type BotDifficulty,
 } from "../../game/config";
 
-const MAP_BLURB: Record<string, string> = {
-  classic: "Battle City homage: brick mazes, steel spine, water gate at midfield.",
-  crossroads: "Four open lanes meeting in the middle, minimal cover, fast and lethal.",
-  swamp: "Water channels and sand flats — movement is the puzzle.",
-  thicket: "Wide and horizontal, bases left and right, dense forest cover.",
-};
-
 export class CreateRoomScreen implements Screen {
   private el!: HTMLElement;
   private selectedMap: string;
   private unbindEnter: (() => void) | null = null;
 
-  constructor(private screens: ScreenManager) {
-    // Reopen on the map you played last, unless it's gone from the build.
-    const maps = listMaps();
-    const last = loadLastMapId();
-    this.selectedMap = (last && maps.some((m) => m.id === last) ? last : maps[0]?.id) ?? "classic";
+  /** `initialMapId` is what the map library (specs/level-editor.md §5) hands
+   *  back on Continue; without one, reopen on the map played last, unless it
+   *  has since been deleted or dropped from the build. */
+  constructor(private screens: ScreenManager, initialMapId?: string) {
+    const maps = listPlayableMaps();
+    const wanted = initialMapId ?? loadLastMapId();
+    this.selectedMap = (wanted && maps.some((m) => m.id === wanted) ? wanted : maps[0]?.id) ?? "classic";
   }
 
   mount(root: HTMLElement) {
@@ -55,7 +52,16 @@ export class CreateRoomScreen implements Screen {
         </label>
 
         <label>Map</label>
-        <div class="row wrap" data-f="maps"></div>
+        <div class="row between wrap map-row">
+          <div class="row">
+            <canvas class="map-row-thumb" width="120" height="76"></canvas>
+            <div>
+              <b data-f="mapName"></b>
+              <div class="map-meta" data-f="mapMeta"></div>
+            </div>
+          </div>
+          <button data-a="changeMap">Change…</button>
+        </div>
 
         <div class="row wrap">
           <label>Time limit
@@ -93,39 +99,41 @@ export class CreateRoomScreen implements Screen {
     `;
     root.appendChild(this.el);
 
-    const mapsEl = this.el.querySelector<HTMLDivElement>("[data-f=maps]")!;
-    for (const map of listMaps()) {
-      const card = document.createElement("button");
-      card.type = "button";
-      // Class, not inline styles: the phone media queries in style.css have to
-      // be able to shrink this card, and an inline width would outrank them.
-      card.className = "map-card";
-      card.innerHTML = `<canvas width="160" height="100"></canvas><b>${map.name}</b><span class="hint">${MAP_BLURB[map.id] ?? ""}</span>`;
-      const canvas = card.querySelector("canvas")!;
-      drawMapPreview(canvas, map);
-      card.onclick = () => {
-        // Each map keeps its own settings, so stash the current form under
-        // the outgoing map before loading the incoming one's.
-        saveRoomSetup(this.selectedMap, this.readSetup());
-        this.selectedMap = map.id;
-        this.applySetup(loadRoomSetup(map.id));
-        this.refreshMapSelection();
-      };
-      card.dataset.map = map.id;
-      mapsEl.appendChild(card);
-    }
-    this.refreshMapSelection();
+    this.refreshMapRow();
     this.applySetup(loadRoomSetup(this.selectedMap));
+    this.el.querySelector<HTMLButtonElement>("[data-a=changeMap]")!.onclick = () => this.openLibrary();
 
     this.el.querySelector<HTMLButtonElement>("[data-a=back]")!.onclick = () => this.screens.go(new MainMenuScreen(this.screens));
     this.el.querySelector<HTMLButtonElement>("[data-a=create]")!.onclick = () => this.create();
     this.unbindEnter = bindEnter(() => this.create());
   }
 
-  private refreshMapSelection() {
-    this.el.querySelectorAll<HTMLButtonElement>("[data-f=maps] button").forEach((b) => {
-      b.classList.toggle("selected", b.dataset.map === this.selectedMap);
-    });
+  /** The map line replaces the old inline card grid: the library screen owns
+   *  picking now, so this is just "what am I about to play" plus a way in. */
+  private refreshMapRow() {
+    const map = listPlayableMaps().find((m) => m.id === this.selectedMap) ?? listMaps()[0];
+    if (!map) return;
+    this.selectedMap = map.id;
+    this.el.querySelector<HTMLElement>("[data-f=mapName]")!.textContent = map.name;
+    this.el.querySelector<HTMLElement>("[data-f=mapMeta]")!.textContent = mapSizeLabel(map);
+    drawMapPreview(this.el.querySelector<HTMLCanvasElement>(".map-row-thumb")!, map);
+  }
+
+  private openLibrary() {
+    // Each map keeps its own settings, so stash the current form under the
+    // outgoing map before leaving for the picker.
+    saveRoomSetup(this.selectedMap, this.readSetup());
+    const nickname = this.field("nickname").value.trim().slice(0, 12);
+    if (nickname) saveUserSettings({ ...loadUserSettings(), nickname });
+    const reopen = (mapId: string) => this.screens.go(new CreateRoomScreen(this.screens, mapId));
+    this.screens.go(
+      new MapLibraryScreen(this.screens, {
+        mode: "pick",
+        selectedMapId: this.selectedMap,
+        onPick: reopen,
+        onBack: () => reopen(this.selectedMap),
+      }),
+    );
   }
 
   /** The form's current values, as they'd be persisted for this map. */

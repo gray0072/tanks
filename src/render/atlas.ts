@@ -2,10 +2,11 @@
 // ship. Every texture here can be swapped for real art later without
 // touching gameplay or arena-layout code.
 
-import { Application, Graphics, Container, Text, TextStyle, type Texture, Rectangle } from "pixi.js";
+import { Application, Graphics, Container, type Texture, Rectangle } from "pixi.js";
 import { CELL, TANK_SIZE, TEAM_COLOR, BULLET_RADIUS, type TeamId } from "../game/config";
 import type { BonusKind } from "../world/bonus";
 import { tankShapeOps } from "./tankShape";
+import { bonusIconOps, bonusSymbolOps, BONUS_PALETTE, type IconOp } from "./bonusShape";
 
 export type Atlas = {
   terrain: Record<"steel" | "forest" | "water" | "ice" | "sand", Texture> & {
@@ -37,18 +38,32 @@ function tile(app: Application, draw: (g: Graphics) => void): Texture {
   return tex;
 }
 
-function labeledDisc(app: Application, size: number, bg: number, fg: number, label: string): Texture {
-  const c = new Container();
-  const g = new Graphics().circle(size / 2, size / 2, size / 2 - 1).fill(bg);
-  c.addChild(g);
-  const style = new TextStyle({ fill: fg, fontSize: size * 0.55, fontWeight: "bold", fontFamily: "system-ui, sans-serif" });
-  const text = new Text({ text: label, style });
-  text.anchor.set(0.5);
-  text.position.set(size / 2, size / 2);
-  c.addChild(text);
-  const tex = toTexture(app, c, size);
-  c.destroy({ children: true });
-  return tex;
+/** Renders shared icon ops (bonusShape.ts) into a PixiJS Graphics — the
+ *  Canvas2D twin of this lives in preview.ts, and both consume the same op
+ *  list so the How to Play art and the in-arena pickup can't diverge. */
+export function drawIconOps(g: Graphics, ops: IconOp[]) {
+  for (const op of ops) {
+    switch (op.kind) {
+      case "rect":
+        if (op.r) g.roundRect(op.x, op.y, op.w, op.h, op.r);
+        else g.rect(op.x, op.y, op.w, op.h);
+        g.fill({ color: op.color, alpha: op.alpha ?? 1 });
+        break;
+      case "circle":
+        g.circle(op.cx, op.cy, op.r).fill({ color: op.color, alpha: op.alpha ?? 1 });
+        break;
+      case "ring":
+        g.circle(op.cx, op.cy, op.r).stroke({ width: op.width, color: op.color, alpha: op.alpha ?? 1 });
+        break;
+      case "poly":
+        g.poly(op.points).fill({ color: op.color, alpha: op.alpha ?? 1 });
+        break;
+      case "line":
+        g.moveTo(op.x1, op.y1).lineTo(op.x2, op.y2)
+          .stroke({ width: op.width, color: op.color, alpha: op.alpha ?? 1, cap: "round" });
+        break;
+    }
+  }
 }
 
 /** One brick texture per surviving-quarters count (1..4). The engine tracks
@@ -144,9 +159,11 @@ export function createAtlas(app: Application): Atlas {
   const bulletTex = toTexture(app, bulletG, bulletCanvas);
   bulletG.destroy();
 
-  const mineG = new Graphics()
-    .circle(8, 8, 6).fill(0x222222)
-    .circle(8, 8, 2).fill(0xaa2222);
+  // The dropped mine, deliberately the same spiked silhouette as the MINE
+  // bonus icon's symbol (bonusShape.ts) so picking one up and seeing one on
+  // the ground read as the same object.
+  const mineG = new Graphics();
+  drawIconOps(mineG, bonusSymbolOps("MINE", 16));
   const mineTex = toTexture(app, mineG, 16);
   mineG.destroy();
 
@@ -154,19 +171,15 @@ export function createAtlas(app: Application): Atlas {
   const sparkTex = toTexture(app, sparkG, 16);
   sparkG.destroy();
 
-  const bonusSpecs: Record<BonusKind, { bg: number; label: string }> = {
-    HELMET: { bg: 0x4d7cff, label: "H" },
-    STAR: { bg: 0xffd23d, label: "★" },
-    SPEED: { bg: 0x33cc66, label: "S" },
-    SHOVEL: { bg: 0xb08040, label: "⛏" },
-    CLOCK: { bg: 0x9955ee, label: "C" },
-    GRENADE: { bg: 0xdd3333, label: "G" },
-    RESPAWN: { bg: 0x22aaaa, label: "+" },
-    MINE: { bg: 0x555555, label: "M" },
-  };
+  // Full-cell icons (SPEC §4.3): a pickup is a tank-sized object on the
+  // ground, drawn from the shared op list rather than a lettered disc, so
+  // what the bonus does is readable without a legend.
   const bonus = {} as Record<BonusKind, Texture>;
-  for (const [kind, spec] of Object.entries(bonusSpecs) as [BonusKind, { bg: number; label: string }][]) {
-    bonus[kind] = labeledDisc(app, CELL, spec.bg, 0xffffff, spec.label);
+  for (const kind of Object.keys(BONUS_PALETTE) as BonusKind[]) {
+    const g = new Graphics();
+    drawIconOps(g, bonusIconOps(kind, CELL));
+    bonus[kind] = toTexture(app, g, CELL);
+    g.destroy();
   }
 
   return {

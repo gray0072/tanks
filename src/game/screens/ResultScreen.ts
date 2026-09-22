@@ -17,6 +17,10 @@ export class ResultScreen implements Screen {
     private room: RoomController,
     private winner: TeamId | "draw" | null,
     private stats: Record<number, PlayerStats>,
+    /** Set when the match came from somewhere other than a room — the level
+     *  editor's Test play (specs/level-editor.md §6.7). Replaces both exits,
+     *  since there's no room to go back to. */
+    private exit?: () => void,
   ) {}
 
   mount(root: HTMLElement) {
@@ -59,12 +63,18 @@ export class ResultScreen implements Screen {
       onError: (msg) => this.showBanner(msg),
     });
 
-    this.el.querySelector<HTMLButtonElement>("[data-a=menu]")!.onclick = () => {
+    const leave = () => {
+      if (this.exit) {
+        this.exit();
+        return;
+      }
       this.room.destroy();
       this.screens.go(new MainMenuScreen(this.screens));
     };
-    this.el.querySelector<HTMLButtonElement>("[data-a=back]")!.onclick = () => this.screens.go(new RoomScreen(this.screens, this.room));
-    this.unbindEnter = bindEnter(() => this.screens.go(new RoomScreen(this.screens, this.room)));
+    const toRoom = () => (this.exit ? this.exit() : this.screens.go(new RoomScreen(this.screens, this.room)));
+    this.el.querySelector<HTMLButtonElement>("[data-a=menu]")!.onclick = leave;
+    this.el.querySelector<HTMLButtonElement>("[data-a=back]")!.onclick = toRoom;
+    this.unbindEnter = bindEnter(toRoom);
   }
 
   private showBanner(msg: string) {

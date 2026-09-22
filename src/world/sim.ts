@@ -122,11 +122,14 @@ export class Sim {
     resetBonusIds();
     resetMineIds();
 
+    // Nth slot of a team takes that team's Nth spawn. Counting per team
+    // rather than indexing by slot id: ids are two contiguous runs that need
+    // not be the same length (SPEC §3.5 allows 4 reds against 6 blues), so
+    // `id % spawns.length` would hand two red tanks the same spawn.
+    const taken: Record<TeamId, number> = { blue: 0, red: 0 };
     this.tanks = slots.map((s) => {
       const spawns = map.spawns[s.team];
-      // Modulo by this team's actual spawn count, not a hardcoded 5 — a
-      // debug map (SPEC §3.5) can define a smaller team than production.
-      const p = spawns[s.id % spawns.length] ?? spawns[0];
+      const p = spawns[taken[s.team]++ % spawns.length] ?? spawns[0];
       return createTank(s.id, s.team, p.cx, p.cy);
     });
     for (const t of this.tanks) t.invulnT = SPAWN_INVULN;

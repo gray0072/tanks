@@ -14,7 +14,8 @@
 // between backticks) is stripped; what's left fixes both the map's
 // dimensions and its team size — however many `r`/`b` markers it has (5 for
 // every built-in map, but nothing here requires that: any size from 2x2 up
-// to MAX_MAP_W/H parses, with any matching number of spawns). Flags are
+// to MAX_MAP_W/H parses, with any number of spawns per team — the two teams
+// need not be the same size). Flags are
 // `R` (red) and `B` (blue), players `r`/`b`, one cell each — spawn priority
 // is assigned by scan order, top-to-bottom then left-to-right. Terrain uses
 // the glyphs in mapChars.ts.
@@ -98,9 +99,10 @@ export function parseMap(id: string, name: string, template: string): MapDef {
 
   if (redSpawns.length === 0) errors.push("no red spawns ('r')");
   if (blueSpawns.length === 0) errors.push("no blue spawns ('b')");
-  if (redSpawns.length !== blueSpawns.length) {
-    errors.push(`${redSpawns.length} red spawns vs ${blueSpawns.length} blue spawns — teams must match`);
-  }
+  // Teams need *not* match: a map may field 4 against 6 (SPEC §3.5). The
+  // roster is built per team from these counts and MatchRules attributes
+  // stats via slot.team, so nothing downstream needs them equal. The editor
+  // still warns, since an uneven fight is usually an authoring slip.
   if (!redFlag) errors.push("missing red flag 'R'");
   if (!blueFlag) errors.push("missing blue flag 'B'");
 
@@ -129,4 +131,11 @@ export function parseMap(id: string, name: string, template: string): MapDef {
     spawns: { blue: blueSpawns, red: redSpawns },
     bonusSpawns,
   };
+}
+
+/** "33×25 · 5v5" — a map's size and roster, read off the parsed map rather
+ *  than hardcoded anywhere (specs/level-editor.md §5.2). Shown on every map
+ *  card and on the room screen's map line. */
+export function mapSizeLabel(map: MapDef): string {
+  return `${map.width}×${map.height} · ${map.spawns.red.length}v${map.spawns.blue.length}`;
 }
