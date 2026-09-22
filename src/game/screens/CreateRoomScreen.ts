@@ -28,6 +28,7 @@ const MAP_BLURB: Record<string, string> = {
   classic: "Battle City homage: brick mazes, steel spine, water gate at midfield.",
   crossroads: "Four open lanes meeting in the middle, minimal cover, fast and lethal.",
   swamp: "Water channels and sand flats — movement is the puzzle.",
+  thicket: "Wide and horizontal, bases left and right, dense forest cover.",
 };
 
 export class CreateRoomScreen implements Screen {

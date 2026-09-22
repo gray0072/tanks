@@ -157,16 +157,18 @@ steel → forest → effects → HUD.
 
 ### 3.4 Maps
 
-**Three built-in maps today**, with two more planned for M9, each a plain template literal
-(`mapFormat.ts`, §3.5) in `src/world/maps/`, selected by the host in the lobby. The three shipped
-ones happen to share a 33 × 25 grid and a 5-a-side roster, but nothing in the format or the engine
-requires a common size — each map carries its own dimensions and its own spawn count.
+**Four built-in maps today**, with two more planned for M9, each a plain template literal
+(`mapFormat.ts`, §3.5) in `src/world/maps/`, selected by the host in the lobby. Three of them happen
+to share a 33 × 25 grid, `thicket` is a wider, shorter 30 × 20, and all four are 5 a side — nothing
+in the format or the engine requires a common size, each map carries its own dimensions and its own
+spawn count.
 
 | Map | Character | Status |
 |---|---|---|
 | `classic` | Battle City homage: brick mazes, steel spine, water gate at midfield | §3.6 |
 | `crossroads` | Four open lanes meeting in the middle, minimal cover, fast and lethal | §3.6 |
 | `swamp` | Water channels and sand flats; movement is the puzzle | §3.6 |
+| `thicket` | Wide and horizontal (30 × 20), bases left and right, dense forest cover | §3.6 |
 | `fortress` | Heavy steel around both bases; grinding, siege-flavored | authored in M9 |
 | `iceworks` | Large ice fields; slippery approaches, hard to hold a firing line | authored in M9 |
 
@@ -250,7 +252,7 @@ row is optional — the three large built-in maps draw one in `@` steel because 
 visible while hand-editing, the debug map doesn't bother.
 
 Every built-in map is its own `.ts` file exporting one template constant (`classic.ts`,
-`crossroads.ts`, `swamp.ts`); `mapSources.ts` lists them with an id and display name. Plain strings
+`crossroads.ts`, `swamp.ts`, `thicket.ts`); `mapSources.ts` lists them with an id and display name. Plain strings
 were chosen over JSON deliberately: a 25-row grid in JSON needs a quote pair and a comma on every
 line, which is exactly the kind of noise that makes hand-edited ASCII art go wrong. And because
 these are ordinary `.ts` modules rather than raw-text file imports, there's no Vite dev-server
@@ -295,8 +297,9 @@ filling every spawn but slot 0, all-default settings (`main.ts`). Never ship `DE
 
 ### 3.6 Example maps
 
-Three complete maps, all 33 × 25, written out in full — the format has no mirroring shorthand, so a
-mirror-symmetric layout (all three built-ins are) is simply typed out twice by hand.
+Four complete maps written out in full — the format has no mirroring shorthand, so a
+mirror-symmetric layout (all four built-ins are) is simply typed out twice by hand. The first three
+are 33 × 25 and mirror top-to-bottom; `thicket` is 30 × 20 and mirrors left-to-right.
 
 #### `classic.ts`
 
@@ -403,6 +406,39 @@ The full-width water bands leave exactly three crossings each — two flank gaps
 bridge — so every attack is committed and readable. Sand slows the approach on both flanks, and a
 single steel cell sits in each of the two sand strips framing the center forest, on the flag-to-flag
 axis, same purpose as the other two maps' midfield pillar.
+
+#### `thicket.ts`
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@...%%.....%%....%%.....%%...@
+@.r...%%%%..%%..%%..%%%%...b.@
+@.....%%%%..%%..%%..%%%%.....@
+@.%%%.......,,..,,.......%%%.@
+@.%%%..r....,,..,,....b..%%%.@
+@.#........%%%..%%%........#.@
+@.#.%%%*...%%%..%%%...*%%%.#.@
+@##.%%%................%%%.##@
+@R#......r....@@....b......#B@
+@##.%%%.......@@.......%%%.##@
+@.#.%%%....%%%..%%%....%%%.#.@
+@.#....*...%%%..%%%...*....#.@
+@.%%%..r....,,..,,....b..%%%.@
+@.%%%.......,,..,,.......%%%.@
+@.....%%%%..%%..%%..%%%%.....@
+@.r...%%%%..%%..%%..%%%%...b.@
+@...%%.....%%....%%.....%%...@
+@............................@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```
+
+The only map turned on its side: 30 × 20, mirrored left-to-right, with both flags against the side
+walls at mid-height and the fight running along the long axis. Forest is the dominant terrain —
+every lane in and out of a base runs through at least one stand of it, so concealment (§3.3, allies
+see through forest, enemies don't) is the map's main tactical currency rather than walls. Cover is
+otherwise deliberately thin: two brick columns screen each base's approach, sand patches slow the
+outer lanes, and the flag-to-flag row is broken by a 4 × 2 steel block dead center, the midfield
+pillar every map carries.
 
 ---
 
@@ -608,6 +644,9 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
 └────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+- **A guest who joins by code is seated automatically** on the first free bot slot, on whichever
+  team has fewer humans — arriving with a room code already means "I want to play", so nobody has to
+  find a bot row first. They can still click another slot to move.
 - Every slot is a button. Clicking a **bot** slot claims it, moving you there **and returning your
   previous slot to a bot** — a swap, not a second seat. Clicking your own slot releases it back to a
   bot instead. Human-held slots (someone else's) are not clickable.

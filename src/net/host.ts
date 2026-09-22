@@ -114,6 +114,9 @@ export class RoomHost implements RoomController {
     switch (msg.t) {
       case "hello":
         this.connNicknames.set(connId, msg.nickname.slice(0, 12) || "Player");
+        // Joining with a code is already a statement of intent to play, so
+        // seat the guest right away instead of making them hunt for a bot row.
+        this.autoSeat(connId);
         // Room state is otherwise only broadcast on change, so without this
         // reply a fresh guest sits on a connected-but-silent socket forever.
         this.net?.send(connId, { t: "roomState", slots: this.slots, mapId: this.mapId, settings: this.settings });
@@ -163,6 +166,21 @@ export class RoomHost implements RoomController {
         this.net?.send(connId, { t: "pong", at: msg.at });
         break;
     }
+  }
+
+  /** Put a freshly arrived guest in the first free bot slot, preferring the
+   *  team with fewer humans so a room fills up balanced. A no-op once the
+   *  match is running — mid-match slots belong to the Sim. */
+  private autoSeat(connId: string) {
+    if (this.sim) return;
+    if (this.slots.some((s) => s.owner === connId)) return;
+    const humans = (team: TeamId) =>
+      this.slots.filter((s) => s.kind === "human" && s.team === team).length;
+    const preferred: TeamId = humans("red") < humans("blue") ? "red" : "blue";
+    const free =
+      this.slots.find((s) => s.kind === "bot" && s.team === preferred) ??
+      this.slots.find((s) => s.kind === "bot");
+    if (free) this.doClaim(connId, free.id, 0);
   }
 
   private doClaim(owner: string, slot: number, localSeat: 0 | 1) {

@@ -8,7 +8,7 @@ match with a 6-character code, or hand a second player the arrow keys and share 
 
 > **Status: playable prototype.** [SPEC.md](SPEC.md) is the authoritative design and project plan.
 > A full local match works today — menu, room/slot picking with live preview, PixiJS rendering, the
-> classic/crossroads/swamp maps, tanks/bullets/terrain/bonuses/flags/respawns, and bots at all three
+> classic/crossroads/swamp/thicket maps, tanks/bullets/terrain/bonuses/flags/respawns, and bots at all three
 > difficulties, plus a headless test suite (`npm test`) covering movement, bot navigation and bot
 > tactics. Mobile touch controls and fullscreen are implemented and checked in an emulated phone
 > browser; multiplayer (PeerJS star topology) is implemented but not yet verified on two real
@@ -25,7 +25,7 @@ match with a 6-character code, or hand a second player the arrow keys and share 
   25 respawns, one arena.
 - **Battle City terrain** — brick, steel, forest, water, ice, sand — and eight power-ups, several of
   which affect your whole team (`SHOVEL`, `CLOCK`, `GRENADE`, `RESPAWN`).
-- **Three maps** — `classic`, `crossroads`, `swamp` — chosen by the host in the lobby and previewed
+- **Four maps** — `classic`, `crossroads`, `swamp`, `thicket` — chosen by the host in the lobby and previewed
   live, with your spawn point highlighted, before the match starts. A map is a plain block of text
   and carries its own size and roster, anything from 2×2 up to 128×128, so adding one is a file.
 - **Your lobby setup sticks.** Create Room reopens on the map you played last, and each map keeps
@@ -47,7 +47,7 @@ match with a 6-character code, or hand a second player the arrow keys and share 
 | Local co-op | A second player on the same keyboard, on either team |
 | Touch controls | Split-screen: floating stick under one thumb, tap-anywhere fire under the other |
 | Fullscreen | Auto on match start on touch, with landscape lock; toggle in the top bar and menu |
-| Three maps with live preview | `classic`, `crossroads`, `swamp` — the lobby previews the arena and highlights the spawn you're hovering |
+| Four maps with live preview | `classic`, `crossroads`, `swamp`, `thicket` — the lobby previews the arena and highlights the spawn you're hovering |
 | Per-map lobby memory | The map you played last reopens preselected, with the time limit, respawns, bot difficulty and friendly-fire setting you last used **on that map** |
 
 ## How it works
