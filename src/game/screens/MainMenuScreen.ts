@@ -104,8 +104,10 @@ export class MainMenuScreen implements Screen {
     const closeBtn = overlay.querySelector<HTMLButtonElement>("[data-a=close]")!;
     closeBtn.onclick = close;
     // Takes focus off the "How to Play" button that opened this, which would
-    // otherwise swallow Enter and re-open the overlay.
-    closeBtn.focus();
+    // otherwise swallow Enter and re-open the overlay. `preventScroll` because
+    // Close sits at the end of a long body: a plain focus() scrolls it into
+    // view and the overlay opens partway down, past the Objective heading.
+    closeBtn.focus({ preventScroll: true });
   }
 
   unmount() {

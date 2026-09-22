@@ -75,7 +75,7 @@ export class RoomScreen implements Screen {
       .every((s) => s.ready);
 
     this.el.innerHTML = `
-      <div class="row between" style="width:min(96vw,1100px)">
+      <div class="row between room-header">
         <div class="title" style="font-size:1.4rem">Room ${code ? `<span style="letter-spacing:.2em">${code}</span>` : "(offline)"}</div>
         <div class="row">
           ${code ? `<button data-a="copy">Copy code</button><button data-a="invite">Invite link</button>` : ""}
@@ -238,6 +238,10 @@ export class RoomScreen implements Screen {
       drawMapPreview(previewCanvas, map, { hoverCell, hoverTeam: hovered?.team });
     }
     if (tankCanvas) {
+      // Hidden, not just cleared, while nothing is hovered: a touch device
+      // never hovers, so a permanently blank 300x190 canvas would only push
+      // the Start match button off the bottom of a phone screen.
+      tankCanvas.hidden = !hovered;
       if (hovered) drawTankPreview(tankCanvas, hovered.team, hovered.nickname);
       else tankCanvas.getContext("2d")?.clearRect(0, 0, tankCanvas.width, tankCanvas.height);
     }

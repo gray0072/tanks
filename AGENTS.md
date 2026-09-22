@@ -35,6 +35,18 @@ became edge-triggered in `Sim.stepFiring` — holding the control used to lay on
 Verified by driving a real Chromium at 844x390 with `hasTouch` via Playwright (stick tracks, canvas
 changes while driving, fire/scoreboard/pause/rotate-notice/mirrored layout all behave); not yet run
 on real phone hardware.
+**2026-09-22:** mobile *menu* layout pass (SPEC §5.3, "Menu screens on a phone"), verified by
+driving Chromium at 412x916 and 916x412 with `hasTouch` (Poco X6 Pro as the reference device). The
+headline bug: `.screen` centered with plain `justify-content: center`, so any screen taller than the
+viewport overflowed in both directions and its top was unreachable — the room screen lost its header,
+room code and *Leave* button entirely. Now `safe center` (with an auto-margin `@supports not`
+fallback). Alongside it: `min(NNvw, …)` panel widths swapped for `min(100%, …)` (vw ignores the
+screen's padding and overflowed horizontally), safe-area insets on screen padding and modals, phone
+media queries, the map-picker card moved from inline styles to a `.map-card` class so those queries
+can shrink it, the room's tank-preview canvas hidden while nothing is hovered, and `How to Play`
+opening scrolled past its first heading because `closeBtn.focus()` scrolled the Close button into
+view (now `focus({ preventScroll: true })`).
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project

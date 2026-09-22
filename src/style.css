@@ -38,10 +38,26 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
+  /* `safe` matters: with plain `center`, content taller than the viewport
+     overflows equally in both directions and the part above the top edge is
+     unreachable — no amount of scrolling brings it back. That's what was
+     eating the room screen's header on a phone. */
+  justify-content: safe center;
+  /* Padding, not margins, so the scroll container's own box keeps the gap;
+     the safe-area insets keep it clear of a landscape notch (the viewport is
+     `viewport-fit=cover`). */
+  padding: 24px calc(24px + env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) calc(24px + env(safe-area-inset-left, 0px));
   gap: 16px;
   overflow: auto;
+  overscroll-behavior: contain;
+}
+/* Older engines without `safe` alignment: auto margins on the end children
+   center the content when it fits and collapse to 0 when it doesn't, which is
+   the same behaviour without the unreachable overflow. */
+@supports not (justify-content: safe center) {
+  .screen:not(.match-screen) { justify-content: flex-start; }
+  .screen:not(.match-screen) > :first-child { margin-top: auto; }
+  .screen:not(.match-screen) > :last-child { margin-bottom: auto; }
 }
 
 .title {
@@ -61,12 +77,12 @@ html, body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
-  width: min(92vw, 420px);
+  width: min(100%, 420px);
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.panel-wide { width: min(96vw, 980px); }
+.panel-wide { width: min(100%, 980px); }
 
 label { font-size: 0.85rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
 input[type="text"], select {
@@ -103,10 +119,15 @@ button.chip.active { background: var(--accent); color: #1a1a1a; border-color: va
 .row.wrap { flex-wrap: wrap; }
 
 .error { color: var(--red); font-size: 0.85rem; min-height: 1.2em; }
+
+/* Map picker card (Create Room). */
+.map-card { display: flex; flex-direction: column; gap: 6px; width: 180px; padding: 8px; align-items: stretch; text-align: left; }
+.map-card canvas { width: 100%; height: auto; image-rendering: pixelated; border-radius: 4px; }
+.map-card.selected { outline: 2px solid var(--blue); }
 .hint { color: var(--muted); font-size: 0.8rem; }
 
 /* --- Room screen --- */
-.room-layout { display: flex; gap: 20px; width: min(96vw, 1100px); align-items: flex-start; flex-wrap: wrap; }
+.room-layout { display: flex; gap: 20px; width: min(100%, 1100px); align-items: flex-start; flex-wrap: wrap; }
 .room-rosters { flex: 1 1 420px; display: flex; flex-direction: column; gap: 14px; }
 .team-block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
 .team-block h3 { margin: 0 0 8px; font-size: 0.9rem; }
@@ -125,8 +146,10 @@ button.chip.active { background: var(--accent); color: #1a1a1a; border-color: va
 .slot-row.mine { background: rgba(61,125,255,0.15); }
 .slot-row .ping { color: var(--muted); font-size: 0.75rem; }
 .slot-row .ready { color: #4caf50; }
-.preview-panel { width: min(96vw, 340px); background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.preview-panel { width: min(100%, 340px); flex: 0 1 340px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .preview-panel canvas { width: 100%; image-rendering: pixelated; border-radius: 6px; background: #000; }
+.preview-panel canvas[hidden] { display: none; }
+.room-header { width: 100%; max-width: 1100px; }
 
 /* --- HUD --- */
 /* Overrides .screen's centered/padded/gapped layout: full-bleed, stretched
@@ -172,10 +195,20 @@ button.chip.active { background: var(--accent); color: #1a1a1a; border-color: va
    viewport instead of stacking it at the top. */
 .hud-scoreboard.modal-center, .pause-overlay {
   position: fixed; inset: 0; z-index: 40; border-radius: 0;
-  display: flex; align-items: center; justify-content: center;
+  /* `safe` for the same reason as `.screen`: a modal taller than a phone's
+     viewport must not have its top centered off the top edge. */
+  display: flex; align-items: safe center; justify-content: safe center;
   background: rgba(10,14,20,0.88);
+  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  overflow: auto;
 }
-.modal-body { max-width: 560px; max-height: 86vh; overflow: auto; padding: 4px 8px; }
+/* Opaque: the overlay's own wash is translucent, and on a phone the body fills
+   nearly the whole width, so without this the screen behind reads through the
+   text. */
+.modal-body {
+  max-width: 560px; max-height: 100%; overflow: auto; padding: 12px 16px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+}
 .pause-menu { display: flex; flex-direction: column; gap: 10px; align-items: center; min-width: 220px; }
 .pause-menu button { width: 100%; }
 
@@ -245,3 +278,47 @@ button.chip.active { background: var(--accent); color: #1a1a1a; border-color: va
 .result-banner { font-size: 2rem; font-weight: 800; }
 .result-banner.blue { color: var(--blue); }
 .result-banner.red { color: var(--red); }
+
+/* --- Phone layouts (SPEC §5.3) ---
+   Two independent squeezes: a narrow viewport (portrait) mainly needs the
+   chrome to stop eating width, a short one (landscape, ~410px tall on a
+   6.7" phone) needs every fixed vertical cost cut so a screen still fits
+   without the header scrolling out of reach. */
+@media (max-width: 560px) {
+  .screen {
+    padding: 14px calc(14px + env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px));
+    gap: 12px;
+  }
+  .title { font-size: 1.7rem; }
+  .panel { padding: 14px; }
+  .room-layout { gap: 12px; }
+  /* One column, and the roster is allowed to be narrower than the 420px
+     flex-basis it asks for on a desktop. */
+  .room-rosters, .preview-panel { flex: 1 1 100%; }
+  /* A map thumbnail that fills a portrait phone's whole width is wasted
+     space; cap it so the roster and Start match stay within a scroll or two. */
+  .preview-panel canvas { max-height: 34vh; object-fit: contain; background: transparent; }
+  /* Same five columns as on a desktop — the row always renders five children,
+     so dropping a column here would wrap the ready tick onto its own line.
+     Only the fixed difficulty-chip column shrinks. */
+  .slot-row { grid-template-columns: auto 1fr auto auto auto; gap: 6px; padding: 5px 6px; }
+  /* Two cards per row on a portrait phone instead of one-and-a-bit. */
+  .map-card { width: calc(50% - 5px); }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .screen {
+    padding: 10px calc(14px + env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px));
+    gap: 8px;
+  }
+  .title { font-size: 1.4rem; }
+  .subtitle { display: none; }
+  .panel { padding: 12px; gap: 8px; }
+  button { padding: 7px 12px; }
+  .room-layout { gap: 12px; }
+  .preview-panel canvas { max-height: 30vh; object-fit: contain; background: transparent; }
+  .slot-row { grid-template-columns: auto 1fr auto auto auto; padding: 3px 8px; }
+  /* ~410px of height total: the blurb is the first thing to go. */
+  .map-card { width: 130px; }
+  .map-card .hint { display: none; }
+}

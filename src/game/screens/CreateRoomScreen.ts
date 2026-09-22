@@ -96,7 +96,9 @@ export class CreateRoomScreen implements Screen {
     for (const map of listMaps()) {
       const card = document.createElement("button");
       card.type = "button";
-      card.style.cssText = "display:flex;flex-direction:column;gap:6px;width:180px;padding:8px;align-items:stretch;";
+      // Class, not inline styles: the phone media queries in style.css have to
+      // be able to shrink this card, and an inline width would outrank them.
+      card.className = "map-card";
       card.innerHTML = `<canvas width="160" height="100"></canvas><b>${map.name}</b><span class="hint">${MAP_BLURB[map.id] ?? ""}</span>`;
       const canvas = card.querySelector("canvas")!;
       drawMapPreview(canvas, map);
@@ -121,7 +123,7 @@ export class CreateRoomScreen implements Screen {
 
   private refreshMapSelection() {
     this.el.querySelectorAll<HTMLButtonElement>("[data-f=maps] button").forEach((b) => {
-      b.style.outline = b.dataset.map === this.selectedMap ? "2px solid var(--blue)" : "none";
+      b.classList.toggle("selected", b.dataset.map === this.selectedMap);
     });
   }
 

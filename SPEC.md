@@ -522,6 +522,27 @@ build uses, for the same reason.
   so offering fullscreen there is offering the rotation.
 - Local co-op is desktop-only.
 
+#### Menu screens on a phone
+
+The match screen is landscape-only, but every menu screen has to work at both a 412x916 portrait and
+a 916x412 landscape viewport (a Poco X6 Pro is the reference device).
+
+- **Every scrolling screen centers with `justify-content: safe center`, never plain `center`.** With
+  plain `center`, content taller than the viewport overflows equally in both directions and the part
+  above the top edge cannot be scrolled back into view — on a phone that silently ate the room
+  screen's header, room code and *Leave* button. The same rule applies to the modal overlays
+  (How to Play, scoreboard, pause), which center a body that can be taller than a landscape phone.
+- **Panel widths are `min(100%, …)`, not `min(NNvw, …)`.** `vw` ignores the screen's own padding, so
+  a `92vw` panel inside a 24px-padded screen overflows horizontally on a narrow viewport.
+- **Safe-area insets on the screen padding and the modal overlays** — the viewport is
+  `viewport-fit=cover`, so a landscape notch would otherwise sit on top of the content.
+- Two media queries do the squeezing: `max-width: 560px` (portrait — tighter padding, one-column
+  room layout, two map cards per row, capped preview thumbnails) and
+  `max-height: 520px and (orientation: landscape)` (a landscape phone is ~410px tall, so the
+  subtitle and the map blurbs go and every fixed vertical cost shrinks).
+- The room screen's **tank preview canvas is hidden while nothing is hovered** — a touch device
+  never hovers, so an always-present blank 300x190 canvas only pushed *Start match* off the bottom.
+
 ### 5.4 Fullscreen
 
 Browser chrome costs a landscape phone roughly a fifth of its height, and the URL bar's show/hide
