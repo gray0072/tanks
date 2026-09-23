@@ -268,6 +268,22 @@ export class Arena {
    *  hook the shared ticker. */
   app: import("pixi.js").Application | null = null;
 
+  /** True when every cell the tank's footprint touches is forest, i.e. the
+   *  bush hides it completely — a tank straddling a forest edge is still
+   *  partly out in the open and stays drawn. */
+  private fullyInForest(x: number, y: number): boolean {
+    const cx0 = Math.floor(x / CELL);
+    const cy0 = Math.floor(y / CELL);
+    const cx1 = Math.ceil((x + TANK_SIZE) / CELL) - 1;
+    const cy1 = Math.ceil((y + TANK_SIZE) / CELL) - 1;
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        if (this.map.grid.tileAt(cx, cy) !== Tile.Forest) return false;
+      }
+    }
+    return true;
+  }
+
   /** Which bonus auras a tank should be showing right now: the buffs the
    *  snapshot still reports as active, plus any pickup still inside its
    *  flash window. Derived from state every frame rather than started and
@@ -355,6 +371,17 @@ export class Arena {
       } else {
         if (v.root.parent !== this.tankLayer) this.tankLayer.addChild(v.root);
         v.root.alpha = 1;
+      }
+
+      // The forest tile only covers the cell it sits on, so the parts of an
+      // enemy's visual that reach past its hull — the nickname above it, the
+      // rank pips below, the shield ring, the bonus auras — used to stick out
+      // of the bush and give the tank away. Everything hanging off the hull
+      // counts as part of the tank: once the whole footprint is in forest,
+      // the visual is hidden outright rather than just tucked under the tile.
+      if (!isMine && this.fullyInForest(v.root.x, v.root.y)) {
+        v.root.visible = false;
+        continue;
       }
 
       v.shield.clear();
