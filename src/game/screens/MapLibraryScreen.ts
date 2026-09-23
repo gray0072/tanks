@@ -39,6 +39,8 @@ const MAP_BLURB: Record<string, string> = {
   crossroads: "Four open lanes meeting in the middle, minimal cover, fast and lethal.",
   swamp: "Water channels and sand flats — movement is the puzzle.",
   thicket: "Wide and horizontal, bases left and right, dense forest cover.",
+  fortress: "Walled keeps in opposite corners — a siege from both directions at once.",
+  iceworks: "Broad ice floors either side of a steel spine; nothing stops where you meant it to.",
 };
 
 type Filter = "all" | "builtin" | "custom";

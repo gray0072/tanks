@@ -43,7 +43,7 @@ with no server, no install and no account.
 | ✨ **Eight power-ups** | Four are yours, four swing the whole team |
 | 🌐 **Peer-to-peer multiplayer** | Join by 6-character code or invite link over WebRTC — no server to run, no public IP, no accounts |
 | 🕹️ **Two players, one keyboard** | WASD and the arrow keys, same team or opposite ones |
-| 🗺️ **Four maps + a level editor** | Paint your own arena, validate it, play it — and it travels to your guests over the wire |
+| 🗺️ **Six maps + a level editor** | Paint your own arena, validate it, play it — and it travels to your guests over the wire |
 | 📱 **Phone-ready** | Split-screen touch controls and a real fullscreen mode, the whole arena on screen |
 
 ## Gallery
@@ -124,8 +124,10 @@ knowing, since a phone has no `Esc` to get back out with.
 
 ## Maps and the level editor
 
-Four maps ship with the game — `classic`, `crossroads`, `swamp` and `thicket` — chosen by the host
-in the lobby and previewed live, with your spawn point highlighted, before the match starts.
+Six maps ship with the game — `classic`, `crossroads`, `swamp`, `thicket`, `fortress` and
+`iceworks` — chosen by the host in the lobby and previewed live, with your spawn point highlighted,
+before the match starts. They don't all point the same way: some face the two bases top and bottom,
+`thicket` and `iceworks` put them left and right, and `fortress` buries them in opposite corners.
 
 A map is a plain block of text and carries its own size and roster, anything from 2×2 up to
 128×128, so the team size comes from the map rather than the other way round. Build your own in the

@@ -11,9 +11,9 @@ ratio, though: the arena is exactly as big as the loaded map's template (`map.wi
 
 | | |
 |---|---|
-| Terrain grid | **map.width × map.height cells** — per-map, not fixed (33 × 25 for every built-in map) |
+| Terrain grid | **map.width × map.height cells** — per-map, not fixed (33 × 25 for three of the six built-ins; the others range from 30 × 20 to 41 × 19) |
 | Cell | 32 × 32 logical px — one cell is one tank/flag slot, matching the map format's one-character-per-cell rule (§3.5): a `r`/`b`/`R`/`B` glyph *is* a full tank-sized square, not a quarter of one |
-| Arena | **map.width × map.height × 32** logical px — 1056 × 800 for the built-in maps, no fixed aspect ratio |
+| Arena | **map.width × map.height × 32** logical px — 1056 × 800 for a 33 × 25 map, no fixed aspect ratio |
 | Tank footprint | 1 cell (32 × 32 px) slot; the actual collision/visual body is a smaller 24 × 24 box centered in it — turning into a same-width corridor would otherwise need pixel-perfect alignment |
 | Movement grid | continuous, not quantized — a corner assist pulls the cross-axis position toward the nearest cell grid line, so turning into a same-width corridor doesn't need pixel-perfect alignment. It only fires while the tank is *blocked* and only when being aligned would actually clear the way: a turn with a free path ahead must never shift the tank's center sideways, and a tank driving into a solid wall must not creep along it |
 
@@ -39,7 +39,7 @@ Mirror-symmetric along the horizontal axis:
 | `EMPTY` | passes | passes | — |
 | `BRICK` | blocks | **destroys 1 quarter-cell** | Destructible in quarter-cell chunks, like Battle City. `STAR 3` bullets destroy the whole cell |
 | `STEEL` | blocks | blocks | Only `STAR 3` bullets destroy it |
-| `FOREST` | passes | passes | Drawn **above** tanks — hides tanks and bullets inside it |
+| `FOREST` | passes | passes | Drawn **above** tanks — hides tanks and bullets inside it. An enemy whose whole footprint is on forest is not drawn at all, including the parts that reach past its hull (nickname, rank pips, shield ring, bonus auras); one straddling a forest edge stays drawn and is only partly covered. Teammates stay visible through forest, faded |
 | `WATER` | blocks | passes | Impassable; animated |
 | `ICE` | passes | passes | Low friction — the tank keeps sliding ~0.4 s after the key is released and cannot turn instantly |
 | `SAND` | passes | passes | ×0.55 move speed |
@@ -50,11 +50,13 @@ steel → forest → effects → HUD.
 
 ## 3.4 Maps
 
-**Four built-in maps today**, with two more planned for M9, each a plain template literal
-(`mapFormat.ts`, §3.5) in `src/world/maps/`, selected by the host in the lobby. Three of them happen
-to share a 33 × 25 grid, `thicket` is a wider, shorter 30 × 20, and all four are 5 a side — nothing
-in the format or the engine requires a common size, each map carries its own dimensions and its own
-spawn count.
+**Six built-in maps**, each a plain template literal (`mapFormat.ts`, §3.5) in
+`src/world/maps/`, selected by the host in the lobby. Three of them happen to share a 33 × 25 grid;
+`thicket` is a wider, shorter 30 × 20, `fortress` a tall 35 × 27 and `iceworks` a wide 41 × 19. All
+six are 5 a side — nothing in the format or the engine requires a common size, each map carries its
+own dimensions and its own spawn count. The bases are deliberately not all arranged the same way:
+three maps face them top-to-bottom, `thicket` and `iceworks` left-to-right, `fortress` on a
+diagonal.
 
 | Map | Character | Status |
 |---|---|---|
@@ -62,8 +64,8 @@ spawn count.
 | `crossroads` | Four open lanes meeting in the middle, minimal cover, fast and lethal | §3.6 |
 | `swamp` | Water channels and sand flats; movement is the puzzle | §3.6 |
 | `thicket` | Wide and horizontal (30 × 20), bases left and right, dense forest cover | §3.6 |
-| `fortress` | Heavy steel around both bases; grinding, siege-flavored | authored in M9 |
-| `iceworks` | Large ice fields; slippery approaches, hard to hold a firing line | authored in M9 |
+| `fortress` | Walled keeps in opposite corners (35 × 27); grinding, siege-flavored | §3.6 |
+| `iceworks` | Wide (41 × 19), bases left and right, large ice fields and a steel spine | §3.6 |
 
 **Player-made maps.** Alongside the built-ins, a player can author maps in the in-game level
 editor (`specs/level-editor.md`). They use this exact format, go through this exact parser, live in
@@ -148,11 +150,11 @@ stripped; what's left fixes the map's width and height directly, no `size:` fiel
 the **top** of the arena, which is always the **Red** side.
 
 Out-of-bounds is solid for movement and bullets regardless of what the template says, so a border
-row is optional — the three large built-in maps draw one in `@` steel because it makes the boundary
+row is optional — every built-in map draws one in `@` steel because it makes the boundary
 visible while hand-editing, the debug map doesn't bother.
 
 Every built-in map is its own `.ts` file exporting one template constant (`classic.ts`,
-`crossroads.ts`, `swamp.ts`, `thicket.ts`); `mapSources.ts` lists them with an id and display name. Plain strings
+`crossroads.ts`, `swamp.ts`, `thicket.ts`, `fortress.ts`, `iceworks.ts`); `mapSources.ts` lists them with an id and display name. Plain strings
 were chosen over JSON deliberately: a 25-row grid in JSON needs a quote pair and a comma on every
 line, which is exactly the kind of noise that makes hand-edited ASCII art go wrong. And because
 these are ordinary `.ts` modules rather than raw-text file imports, there's no Vite dev-server
@@ -207,9 +209,11 @@ filling every spawn but slot 0, all-default settings (`main.ts`). Never ship `DE
 
 ## 3.6 Example maps
 
-Four complete maps written out in full — the format has no mirroring shorthand, so a
-mirror-symmetric layout (all four built-ins are) is simply typed out twice by hand. The first three
-are 33 × 25 and mirror top-to-bottom; `thicket` is 30 × 20 and mirrors left-to-right.
+Six complete maps written out in full — the format has no mirroring shorthand, so a
+symmetric layout (every built-in is one) is simply typed out twice by hand. The first three are
+33 × 25 and mirror top-to-bottom; `thicket` (30 × 20) and `iceworks` (41 × 19) mirror left-to-right;
+`fortress` (35 × 27) is the odd one out, symmetric under a 180° rotation rather than a reflection,
+which is what lets its two keeps sit in opposite corners.
 
 ### `classic.ts`
 
@@ -342,10 +346,84 @@ axis, same purpose as the other two maps' midfield pillar.
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 ```
 
-The only map turned on its side: 30 × 20, mirrored left-to-right, with both flags against the side
+Wide rather than tall: 30 × 20, mirrored left-to-right, with both flags against the side
 walls at mid-height and the fight running along the long axis. Forest is the dominant terrain —
 every lane in and out of a base runs through at least one stand of it, so concealment (§3.3, allies
 see through forest, enemies don't) is the map's main tactical currency rather than walls. Cover is
 otherwise deliberately thin: two brick columns screen each base's approach, sand patches slow the
 outer lanes, and the flag-to-flag row is broken by a 4 × 2 steel block dead center, the midfield
 pillar every map carries.
+
+### `fortress.ts`
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@......@.....#.......#............@
+@.R.#r.@.,r,.#.......#..%%%%..@@..@
+@..#...@.....#..%%...#..%%%%..@@..@
+@.#....#.....#..%%...#..%%%%......@
+@.r..%.@...*.#.......#......*.....@
+@.....%@........~~~~~~..-----.,,..@
+@@@@#@@@.....#..~~~~~~..-----.,,..@
+@........@@@.#..........-----.,,..@
+@.,.~~~~.r@@.#................,,..@
+@.r..........#@@@#@@@.........,,..@
+@######.#####.@.....@.#####.###...@
+@.............@.*...@.............@
+@.............#..,..#.............@
+@.............@...*.@.............@
+@...###.#####.@.....@.#####.######@
+@..,,.........@@@#@@@#..........b.@
+@..,,................#.@@b.~~~~.,.@
+@..,,.-----..........#.@@@........@
+@..,,.-----..~~~~~~..#.....@@@#@@@@
+@..,,.-----..~~~~~~........@%.....@
+@.....*......#.......#.*...@.%..b.@
+@......%%%%..#...%%..#.....#....#.@
+@..@@..%%%%..#...%%..#.....@...#..@
+@..@@..%%%%..#.......#.,b,.@.b#.B.@
+@............#.......#.....@......@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```
+
+The only built-in whose bases are not opposite each other across an axis: red's keep is in the
+top-left corner, blue's in the bottom-right, and the layout is symmetric under a 180° rotation. Each
+flag sits behind two walls — a steel keep whose only ways in are a brick gate east and another
+south, inside a brick rampart with one gap on each of its two sides — so a push has to break four
+things in sequence and can come at either wall. The two remaining corners are open ground (forest,
+sand, a pond, an ice patch) and carry the flanking routes. Dead center is a steel citadel with a
+brick door on each side and two `*` spawns inside it: the map's midfield pillar grown into a room,
+worth shooting your way into and hard to hold.
+
+### `iceworks.ts`
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@.......@....~...%%...%%...~....@.......@
+@.%%..------r~...%%.%.%%...~b------..%%.@
+@.%%..------.~.####...####.~.------..%%.@
+@.....------.~.####...####.~.------.....@
+@.....------*~......@......~*------.....@
+@###@.r.............@.............b.@###@
+@..#.~........----..#..----........~.#..@
+@.,#.~...@@@..----..@..----..@@@...~.#,.@
+@.R.,r,..@@@..--*-..@..-*--..@@@..,b,.B.@
+@.,#.~...@@@..----..@..----..@@@...~.#,.@
+@..#.~........----..#..----........~.#..@
+@###@.r.............@.............b.@###@
+@.....------*~......@......~*------.....@
+@.....------.~.####...####.~.------.....@
+@.%%..------.~.####...####.~.------..%%.@
+@.%%..------r~...%%.%.%%...~b------..%%.@
+@.......@....~...%%...%%...~....@.......@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```
+
+Wide and short (41 × 19), mirrored left-to-right like `thicket` but the opposite idea: almost no
+concealment, and traction is the scarce resource. Four large ice floors fill the corners and two
+more flank the center, so most of the map is a surface tanks overshoot on (§3.3) — chasing a kill
+across one usually means sliding past the shot. A steel spine runs down the middle with a brick
+panel top and bottom, leaving two open lanes around it and two that must be shot open; it also sits
+on the flag-to-flag row, doing the midfield pillar's job. Each flag is in a shed of brick against
+the side wall with a single doorway, water channels screen the approach to it, and the machinery
+blocks either side of midfield give the only hard cover on the route in.

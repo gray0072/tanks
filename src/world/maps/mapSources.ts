@@ -6,6 +6,8 @@
 
 import { CLASSIC_TEMPLATE } from "./classic";
 import { CROSSROADS_TEMPLATE } from "./crossroads";
+import { FORTRESS_TEMPLATE } from "./fortress";
+import { ICEWORKS_TEMPLATE } from "./iceworks";
 import { SWAMP_TEMPLATE } from "./swamp";
 import { THICKET_TEMPLATE } from "./thicket";
 
@@ -16,4 +18,6 @@ export const MAP_SOURCES: MapSource[] = [
   { id: "crossroads", name: "Crossroads", template: CROSSROADS_TEMPLATE },
   { id: "swamp", name: "Swamp", template: SWAMP_TEMPLATE },
   { id: "thicket", name: "Thicket", template: THICKET_TEMPLATE },
+  { id: "fortress", name: "Fortress", template: FORTRESS_TEMPLATE },
+  { id: "iceworks", name: "Iceworks", template: ICEWORKS_TEMPLATE },
 ];

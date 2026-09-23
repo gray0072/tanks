@@ -17,7 +17,7 @@ Each milestone ends in something playable — no milestone is pure plumbing.
 | **M6** | **Screens & local co-op** — menu, create/join, room screen with live preview, settings, second seat | Two people play with bots on one keyboard, picking their own slots |
 | **M7** | **Multiplayer** — PeerJS star, room code, protocol, host loop, client prediction, slot claiming over the wire, drop handling | Two devices on different networks play the same match by code |
 | **M8** | **Mobile** — touch controls, orientation gate, quality tiers, safe areas | A full match played on a phone at 60 fps |
-| **M9** | **Content & polish** — the two remaining maps, audio, effects, kill feed, balance pass | Five maps, sound, and a tuned game |
+| **M9** | **Content & polish** — `fortress` and `iceworks` (done), audio, effects, kill feed, balance pass | Six maps, sound, and a tuned game |
 | **M10** | **Ship** — GitHub Pages deploy, README, invite links, first playtest round | Anyone can open a link and play |
 
 **Cross-cutting from M0:** `config.ts` holds every tunable; the simulation stays free of rendering
