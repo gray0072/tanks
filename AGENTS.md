@@ -1,6 +1,7 @@
 # Agent notes — Tanks project
 
-Working notes for picking this project back up quickly. Not a design doc (that's `SPEC.md`) and not
+Working notes for picking this project back up quickly. Not a design doc (that's `SPEC.md` plus
+`specs/`) and not
 a user-facing doc (that's `README.md`) — this is context for *how to work on it* efficiently.
 
 ## What this is, current status
@@ -10,7 +11,8 @@ side on the built-ins, 1v1 on the debug map) — destructible terrain, power-ups
 each team defends. TypeScript + PixiJS (WebGL) + PeerJS (WebRTC, star topology) + Vite, no backend,
 static hosting on GitHub Pages.
 
-**`SPEC.md` is the authoritative design doc and must stay in sync with the code** — not a one-time
+**The spec — `SPEC.md` (an index) plus the section files in `specs/` — is the authoritative design
+doc and must stay in sync with the code** — not a one-time
 planning artifact. It already has explicit "As implemented" callout boxes wherever the real code
 deviates from the original design (JSON wire protocol instead of binary, full snapshots instead of
 deltas, simplified client-side interpolation instead of full prediction/reconciliation). Read those
@@ -61,7 +63,7 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 ## How to work with this project
 
 - **Full rewrites are welcome when the spec and code diverge — don't patch around a mismatch.**
-  Already granted for this project: bring the code in line with SPEC.md, up to and including
+  Already granted for this project: bring the code in line with the spec, up to and including
   deleting and rewriting whole subsystems, rather than reconciling them. Don't ask again.
 - **Verify by actually running it, not just `tsc`/build passing.** Type-checking proves the code
   compiles, not that the feature works — several reported bugs (stuck tanks, missing VFX, forest

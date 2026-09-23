@@ -6,14 +6,15 @@ A browser tank battle in the spirit of *Battle City* — blue against red, with 
 terrain, power-ups, and a flag you have to defend. Plays on desktop and on a phone, join a friend's
 match with a 6-character code, or hand a second player the arrow keys and share one keyboard.
 
-> **Status: playable prototype.** [SPEC.md](SPEC.md) is the authoritative design and project plan.
+> **Status: playable prototype.** [SPEC.md](SPEC.md) indexes the authoritative design and project
+> plan; the sections themselves live in [specs/](specs/).
 > A full local match works today — menu, room/slot picking with live preview, PixiJS rendering, the
 > classic/crossroads/swamp/thicket maps, tanks/bullets/terrain/bonuses/flags/respawns, and bots at all three
 > difficulties, plus a headless test suite (`npm test`) covering movement, bot navigation and bot
 > tactics. Mobile touch controls and fullscreen are implemented and checked in an emulated phone
 > browser; multiplayer (PeerJS star topology) is implemented but not yet verified on two real
 > devices over the internet, and nothing has been tried on actual phone hardware. See
-> [SPEC.md §13](SPEC.md#13-plan) for what's left.
+> [§13 Plan](specs/plan-and-risks.md#13-plan) for what's left.
 
 ## What it is
 
@@ -157,7 +158,7 @@ The build is a plain static site — `./dist/` can be hosted anywhere that can s
 
 ## Roadmap
 
-Milestones **M0 – M10** are laid out in [SPEC.md §13](SPEC.md#13-plan).
+Milestones **M0 – M10** are laid out in [§13 Plan](specs/plan-and-risks.md#13-plan).
 
 - [x] M0–M6 — scaffold, terrain, tanks, match rules, bots, bonuses, screens + local co-op
 - [x] M7 — multiplayer (PeerJS star topology, room code, host-authoritative sim) — *implemented,
@@ -168,7 +169,7 @@ Milestones **M0 – M10** are laid out in [SPEC.md §13](SPEC.md#13-plan).
 - [ ] M10 — GitHub Pages deploy
 
 Deliberately **not** planned: host migration, dedicated servers, accounts and ranking, matchmaking,
-a map editor, replays. See [SPEC.md §15](SPEC.md#15-out-of-scope).
+a map editor, replays. See [§15 Out of scope](specs/plan-and-risks.md#15-out-of-scope).
 
 ## License
 
