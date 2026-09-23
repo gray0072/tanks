@@ -20,6 +20,15 @@ Part of the [Tanks specification](../SPEC.md) — section numbers (§) are index
   forest, water frames, ice, sand, tank bodies per team and per upgrade level, bullets, bonuses,
   flags). No art assets to ship; the atlas can be swapped for real art later without touching
   gameplay code.
+- **Your own tank** carries a gold marker — a chevron bobbing over the hull, plus its nickname in
+  the same gold — so the tank you drive is findable among four identically coloured teammates. The
+  gold is neither team's colour, so it can't be read as a side. The chevron sits in its own layer
+  **above the wall layers**: walls draw over tanks (§3.3), so a marker parented to the tank would be
+  hidden exactly when the tank is tucked under a wall. In local co-op both seats get one.
+- **Brick damage** is drawn as a crack pattern over the *whole* cell, growing with each hit (one
+  fissure → branches → a web with chips knocked out, the face darkening as it goes), over a
+  masonry-course tile. The sim only knows how many quarters are left (§3.3), so quadrant-by-quadrant
+  crumbling pointed at corners that nothing had actually been shot in.
 - **Effects** (explosions, spawn sparkles, muzzle flashes, mine blasts) are pooled sprites with
   short frame animations, capped at a budget so a `GRENADE` detonating 5 tanks stays smooth.
 - **Quality tiers:** `high` = full effects + water animation; `low` = static water, halved particle

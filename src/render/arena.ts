@@ -16,6 +16,10 @@ import { BRICK_QUARTERS } from "../world/grid";
 
 const SNAP_INTERVAL_MS = 1000 / NET_SNAPSHOT_HZ;
 
+/** The "that one is you" gold — deliberately not either team colour, so it
+ *  can't be mistaken for a side. */
+const OWN_TANK_COLOR = 0xffd24a;
+
 /** How long a pickup with no lasting per-tank state spins its aura. */
 const FLASH_AURA_S = 2.5;
 
@@ -36,6 +40,9 @@ type TankVisual = {
   shield: Graphics;
   label: Text;
   stars: Container;
+  /** The bobbing arrow over a tank this client drives; null for everyone
+   *  else. */
+  marker: Graphics | null;
   auraRoot: Container;
   auras: Map<BonusKind, Aura>;
   /** Bonuses whose effect isn't visible in the snapshot (team bonuses, a
@@ -51,6 +58,9 @@ type TankVisual = {
 export type ArenaOptions = {
   /** Draw nicknames above tanks. On by default; off for the menu backdrop. */
   labels?: boolean;
+  /** Slot ids this client actually drives (both seats in local co-op). They
+   *  get the "this one is you" treatment — see makeTankVisual. */
+  mySlots?: Iterable<number>;
 };
 
 export class Arena {
@@ -69,6 +79,11 @@ export class Arena {
   // tank in the same bush stays in tankLayer, under the opaque forest tile,
   // and is simply not drawn (SPEC §3.3 "hides tanks").
   private friendlyOverlayLayer = new Container();
+  // The gold arrows over this client's own tanks. They live above every
+  // terrain layer on purpose: walls draw over tanks (SPEC §3.3), so a marker
+  // parented to the tank is hidden exactly when a tank is tucked under a
+  // wall — which is most of the time in a brick maze.
+  private selfLayer = new Container();
   private fxLayer = new Container();
 
   private wallSprites = new Map<number, Sprite>(); // key: cy*width+cx
@@ -101,8 +116,12 @@ export class Arena {
    *  just noise behind the menu text). */
   private labels: boolean;
 
+  /** Slot ids belonging to this client (ArenaOptions.mySlots). */
+  private mine: Set<number>;
+
   constructor(private atlas: Atlas, private map: MapDef, slots: Slot[], opts: ArenaOptions = {}) {
     this.labels = opts.labels ?? true;
+    this.mine = new Set(opts.mySlots ?? []);
     const bg = new Graphics().rect(0, 0, map.width * CELL, map.height * CELL).fill(0x2a2f22);
     this.world.addChild(bg);
     this.world.addChild(this.decalLayer);
@@ -114,6 +133,7 @@ export class Arena {
     this.world.addChild(this.wallLayer);
     this.world.addChild(this.forestLayer);
     this.world.addChild(this.friendlyOverlayLayer);
+    this.world.addChild(this.selfLayer);
     this.world.addChild(this.fxLayer);
 
     this.buildTerrain();
@@ -228,7 +248,18 @@ export class Arena {
     body.anchor.set(0.5);
     body.position.set(TANK_SIZE / 2, TANK_SIZE / 2);
     const shield = new Graphics();
-    const style = new TextStyle({ fill: 0xffffff, fontSize: 9, fontFamily: "system-ui, sans-serif" });
+    // Your own tank is otherwise identical to every ally on screen (SPEC §7):
+    // same silhouette, same team colour. It gets a gold arrow hovering over
+    // it and its name in the same gold, both inside `root` so they vanish
+    // with the tank in forest instead of advertising it.
+    const isMine = this.mine.has(slot.id);
+    const marker = isMine ? this.makeSelfMarker() : null;
+    const style = new TextStyle({
+      fill: isMine ? OWN_TANK_COLOR : 0xffffff,
+      fontSize: 9,
+      fontWeight: isMine ? "bold" : "normal",
+      fontFamily: "system-ui, sans-serif",
+    });
     const label = new Text({ text: this.labels ? slot.nickname : "", style });
     label.anchor.set(0.5, 1);
     label.position.set(TANK_SIZE / 2, -3);
@@ -239,8 +270,21 @@ export class Arena {
     const auraRoot = new Container();
     auraRoot.position.set(TANK_SIZE / 2, TANK_SIZE / 2);
     root.addChild(auraRoot, body, shield, label, stars);
+    if (marker) this.selfLayer.addChild(marker);
     this.tankLayer.addChild(root);
-    return { root, body, shield, label, stars, auraRoot, auras: new Map(), flash: new Map(), team: slot.team };
+    return { root, body, shield, label, stars, marker, auraRoot, auras: new Map(), flash: new Map(), team: slot.team };
+  }
+
+  /** A downward chevron sitting just above the hull, dark-outlined so it
+   *  stays visible over pale terrain (ice, sand) as well as over dirt. */
+  private makeSelfMarker(): Graphics {
+    const g = new Graphics();
+    const w = 11;
+    const h = 7;
+    g.poly([-w / 2, -h, w / 2, -h, 0, 0]).fill(OWN_TANK_COLOR);
+    g.poly([-w / 2, -h, w / 2, -h, 0, 0]).stroke({ width: 1, color: 0x3a2a00, alpha: 0.9 });
+    g.visible = false; // placed by tick(), which knows where the tank is
+    return g;
   }
 
   updateSlots(slots: Slot[]) {
@@ -371,9 +415,19 @@ export class Arena {
       if (!v) continue;
       const p = prevTankBySlot.get(tk.slot) ?? tk;
       v.root.visible = tk.alive;
-      if (!tk.alive) continue;
+      if (!tk.alive) {
+        if (v.marker) v.marker.visible = false;
+        continue;
+      }
       v.root.position.set(lerp(p.x, tk.x, t), lerp(p.y, tk.y, t));
       v.body.rotation = DIR_ANGLE[tk.dir];
+      if (v.marker) {
+        v.marker.visible = true;
+        v.marker.position.set(
+          v.root.x + TANK_SIZE / 2,
+          v.root.y - 14 + Math.sin(performance.now() / 320) * 1.6, // clear of the nickname
+        );
+      }
 
       const centerCx = Math.floor((v.root.x + TANK_SIZE / 2) / CELL);
       const centerCy = Math.floor((v.root.y + TANK_SIZE / 2) / CELL);

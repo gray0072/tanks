@@ -192,6 +192,22 @@ Verified in three Chromium contexts: room opened on `SERGEY`, guest joined via `
 second host asking for `SERGEY` got "already in use" instead of a silent re-code, and the first host
 reloaded and re-opened `SERGEY` with the field already filled.
 
+**2026-09-23 (telling yourself apart, and broken brick):** two rendering fixes.
+- **Your own tank** now wears a gold chevron and a gold nickname (SPEC §7, `OWN_TANK_COLOR` in
+  `render/arena.ts`); `ArenaOptions.mySlots` carries the slot ids and `Match.tsx` fills it from
+  `room.mySlots()`. The marker lives in its own `selfLayer` **above the wall layers**, not inside
+  the tank's container — the first version parented it to the tank and it was invisible half the
+  time, because brick and steel draw over tanks (SPEC §3.3) and a tank standing against a wall has
+  the cell above it covered. The menu backdrop passes no `mySlots`, so nothing there gets one.
+- **Brick** is now a masonry-course tile whose damage is a crack pattern spreading over the whole
+  cell (one fissure → branches → a web with chips), darkening per hit, instead of quadrants
+  disappearing in a fixed TR→BL→TL order. The sim only stores a quarter *count* (`grid.ts`), so the
+  old art was pointing at corners nobody had shot.
+
+Verified by driving Chromium at 1280x720 through a real match (arrow visible over the wall above my
+tank, cracked cells in the walls the bots had shot) plus a throwaway page rendering all four brick
+stages side by side; `npm test` (113), `tsc`, `npm run build`.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project

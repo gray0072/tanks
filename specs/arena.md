@@ -37,7 +37,7 @@ Mirror-symmetric along the horizontal axis:
 | Tile | Tank | Bullet | Effect |
 |---|---|---|---|
 | `EMPTY` | passes | passes | — |
-| `BRICK` | blocks | **destroys 1 quarter-cell** | Destructible in quarter-cell chunks, like Battle City. `STAR 3` bullets destroy the whole cell |
+| `BRICK` | blocks | **destroys 1 quarter-cell** | Destructible in quarter-cell chunks, like Battle City. `STAR 3` bullets destroy the whole cell. *Drawn* as cracks spreading over the whole cell, not as quarters vanishing — the sim tracks a count, not which corner was hit, so the picture must not claim one (§7) |
 | `STEEL` | blocks | blocks | Only `STAR 3` bullets destroy it |
 | `FOREST` | passes | passes | Drawn **above** tanks — hides tanks and bullets inside it. An enemy whose whole footprint is on forest is not drawn at all, including the parts that reach past its hull (nickname, rank pips, shield ring, bonus auras); one straddling a forest edge stays drawn and is only partly covered. Teammates stay visible through forest, faded |
 | `WATER` | blocks | passes | Impassable; animated |
@@ -46,7 +46,7 @@ Mirror-symmetric along the horizontal axis:
 | `FLAG` | blocks | **destroys → match ends** | 1 cell, one per team, team-colored |
 
 Render layer order: ground → water → ice/sand decals → bonuses → flags → tanks → bullets → brick &
-steel → forest → effects → HUD.
+steel → forest → friendly-in-forest overlay → own-tank markers (§7) → effects → HUD.
 
 ## 3.4 Maps
 

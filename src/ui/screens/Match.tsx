@@ -255,7 +255,7 @@ export function Match({
           host.world.removeChild(arena.current.world);
           arena.current.destroy();
         }
-        const world = new Arena(atlas, map, room.slots);
+        const world = new Arena(atlas, map, room.slots, { mySlots: room.mySlots().map((s) => s.id) });
         world.app = host.app;
         host.world.addChild(world.world);
         arena.current = world;

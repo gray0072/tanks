@@ -4,8 +4,9 @@
 
 import { Application, Graphics, Container, type Texture, Rectangle } from "pixi.js";
 import { CELL, TANK_SIZE, TEAM_COLOR, BULLET_RADIUS, type TeamId } from "../game/config";
+import { BRICK_QUARTERS } from "../world/grid";
 import type { BonusKind } from "../world/bonus";
-import { tankShapeOps } from "./tankShape";
+import { tankShapeOps, shade as shadeColor } from "./tankShape";
 import { bonusIconOps, bonusSymbolOps, BONUS_PALETTE, type IconOp } from "./bonusShape";
 
 export type Atlas = {
@@ -67,30 +68,94 @@ export function drawIconOps(g: Graphics, ops: IconOp[]) {
 }
 
 /** One brick texture per surviving-quarters count (1..4). The engine tracks
- *  only a count, not which corner was actually shot (grid.ts damageBrick),
- *  so the crumble follows a fixed corner order — TR, then BL, then TL —
- *  leaving BR as the last quarter standing before the cell goes Empty. */
+ *  only a count, not which corner was hit (grid.ts damageBrick), so damage is
+ *  drawn as cracks spreading across the *whole* cell rather than as quadrants
+ *  disappearing one by one: nothing in the picture then claims a particular
+ *  corner took the shot, and a half-broken wall still reads as one wall.
+ *  Coordinates below are in the unit square and scaled to CELL. */
+const CRACK_STAGES: number[][][] = [
+  // 3/4 left — one fissure right across the cell.
+  [
+    [0.0, 0.34, 0.26, 0.45, 0.47, 0.37, 0.73, 0.53, 1.0, 0.45],
+  ],
+  // 2/4 left — it branches to both edges.
+  [
+    [0.47, 0.37, 0.41, 0.12, 0.45, 0.0],
+    [0.47, 0.37, 0.56, 0.7, 0.43, 1.0],
+  ],
+  // 1/4 left — a web over the whole face, about to give.
+  [
+    [0.26, 0.45, 0.08, 0.72, 0.0, 0.82],
+    [0.73, 0.53, 0.88, 0.78, 1.0, 0.9],
+    [0.56, 0.7, 0.82, 0.66, 1.0, 0.72],
+    [0.0, 0.14, 0.2, 0.2, 0.3, 0.1],
+  ],
+];
+
+/** Chips knocked out of the face, appearing with the later stages. Unit
+ *  square, [x, y, w, h]. */
+const CRACK_CHIPS: number[][][] = [
+  [],
+  [[0.44, 0.32, 0.12, 0.1]],
+  [[0.2, 0.42, 0.14, 0.12], [0.62, 0.58, 0.16, 0.13], [0.46, 0.84, 0.1, 0.1]],
+];
+
 function brickTexture(app: Application, quartersRemaining: number): Texture {
   return tile(app, (g) => {
-    const half = CELL / 2;
-    const q = half - 1; // quadrant size, 1px mortar gap between them
-    g.rect(0, 0, CELL, CELL).fill(0x3a2418); // mortar/rubble showing through gaps
-    const quadrants = [
-      { x: 0, y: 0, shade: 0x9c4632, damaged: quartersRemaining <= 1 }, // TL — goes 3rd
-      { x: half + 1, y: 0, shade: 0x8a3b2b, damaged: quartersRemaining <= 3 }, // TR — goes 1st
-      { x: 0, y: half + 1, shade: 0x8a3b2b, damaged: quartersRemaining <= 2 }, // BL — goes 2nd
-      { x: half + 1, y: half + 1, shade: 0x9c4632, damaged: false }, // BR — never, until full destroy
-    ];
-    for (const qd of quadrants) {
-      if (qd.damaged) {
-        g.rect(qd.x, qd.y, q, q).fill(0x40291d);
-        g.rect(qd.x + q * 0.2, qd.y + q * 0.35, q * 0.32, q * 0.24).fill(0x2c1a12);
-        g.rect(qd.x + q * 0.5, qd.y + q * 0.12, q * 0.28, q * 0.22).fill(0x59392a);
-      } else {
-        g.rect(qd.x, qd.y, q, q).fill(qd.shade);
+    const mortar = 0x3a2418;
+    g.rect(0, 0, CELL, CELL).fill(mortar);
+
+    // Four courses of staggered bricks, so the cell reads as masonry rather
+    // than as four big blocks.
+    const rows = 4;
+    const rowH = CELL / rows;
+    const brickW = CELL / 2;
+    for (let r = 0; r < rows; r++) {
+      const y = r * rowH;
+      const offset = r % 2 === 0 ? 0 : -brickW / 2;
+      for (let x = offset; x < CELL; x += brickW) {
+        const bx = Math.max(0, x);
+        const bw = Math.min(x + brickW, CELL) - bx - 1;
+        if (bw <= 0) continue;
+        const face = (r + Math.round(x / brickW)) % 2 === 0 ? 0x9c4632 : 0x8a3b2b;
+        g.rect(bx, y, bw, rowH - 1).fill(face);
+        g.rect(bx, y, bw, 1).fill(shadeColor(face, 1.18));
       }
     }
+
+    const damage = BRICK_QUARTERS - Math.max(0, Math.min(BRICK_QUARTERS, quartersRemaining));
+    for (let stage = 0; stage < damage && stage < CRACK_STAGES.length; stage++) {
+      for (const chip of CRACK_CHIPS[stage]) {
+        g.rect(chip[0] * CELL, chip[1] * CELL, chip[2] * CELL, chip[3] * CELL).fill(0x2a160f);
+        g.rect(chip[0] * CELL, (chip[1] + chip[3]) * CELL - 1, chip[2] * CELL, 1).fill(0x7a4a34);
+      }
+      for (const path of CRACK_STAGES[stage]) {
+        drawCrack(g, path);
+      }
+    }
+
+    // Each hit leaves the face dirtier, so the damage reads even at a glance
+    // from across the arena.
+    if (damage > 0) g.rect(0, 0, CELL, CELL).fill({ color: 0x000000, alpha: damage * 0.07 });
   });
+}
+
+/** A jagged line across the cell: a dark gouge with a lit lower lip, which
+ *  is what makes it look like a split in the surface and not a scratch. */
+function drawCrack(g: Graphics, path: number[]) {
+  const pt = (i: number) => [path[i * 2] * CELL, path[i * 2 + 1] * CELL] as const;
+  const n = path.length / 2;
+  const stroke = (width: number, color: number, alpha: number, dx: number, dy: number) => {
+    const [x0, y0] = pt(0);
+    g.moveTo(x0 + dx, y0 + dy);
+    for (let i = 1; i < n; i++) {
+      const [x, y] = pt(i);
+      g.lineTo(x + dx, y + dy);
+    }
+    g.stroke({ width, color, alpha, cap: "round", join: "round" });
+  };
+  stroke(2.2, 0x23130c, 0.95, 0, 0);
+  stroke(0.8, 0xc98b66, 0.45, 0.7, 0.7);
 }
 
 export function createAtlas(app: Application): Atlas {
