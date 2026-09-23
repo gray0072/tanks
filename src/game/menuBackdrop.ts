@@ -36,8 +36,10 @@ const RESTART_DELAY_MS = 1200;
  *  already crops a landscape map down to a few cells, so it needs no help. */
 function cameraZoom(): number {
   const w = window.innerWidth;
-  if (w >= 900) return 1.9;
-  if (w >= 600) return 1.4;
+  if (w >= 900) return 1.5;
+  if (w >= 600) return 1.15;
+  // Never below 1: the fit is `cover`, so anything under it stops covering
+  // and bares the layer behind the arena at the edges.
   return 1;
 }
 /** Per-second fraction of the remaining distance the camera closes on its
@@ -51,6 +53,11 @@ const CAMERA_MAX_SPEED = 110;
 /** The camera ignores its target inside this radius, so it settles instead of
  *  jittering along with whichever two tanks are currently closest. */
 const CAMERA_DEAD_ZONE = 40;
+/** How often the camera is allowed to re-aim. Between re-aims it keeps
+ *  drifting toward the point it last picked, so the closest blue/red pair
+ *  changing (a kill, two tanks crossing on the far side of the map) can move
+ *  the camera at most once a second instead of tugging at it every frame. */
+const CAMERA_RETARGET_MS = 1000;
 
 export class MenuBackdrop {
   private layer: HTMLElement | null = null;
@@ -71,6 +78,10 @@ export class MenuBackdrop {
   /** Where the spectator camera is now, in world units; null until the first
    *  round places it. */
   private camera: { x: number; y: number } | null = null;
+  /** The point the camera is drifting toward, re-picked at most once every
+   *  CAMERA_RETARGET_MS. */
+  private cameraTarget: { x: number; y: number } | null = null;
+  private retargetedAt = 0;
   private wanted = false;
   /** Set while `start()` is awaiting the Pixi renderer, so a hide that lands
    *  mid-init doesn't get overwritten by the resolved app. */
@@ -167,6 +178,8 @@ export class MenuBackdrop {
     // Start centred; the camera drifts to the first firefight from there
     // rather than snapping to it as the round fades in.
     this.camera = { x: (map.width * CELL) / 2, y: (map.height * CELL) / 2 };
+    this.cameraTarget = null;
+    this.retargetedAt = 0;
     pixi.setFocus(this.camera, this.anchor());
     this.bots.clear();
     for (const s of this.slots) this.bots.set(s.id, new BotController(s.id));
@@ -226,7 +239,7 @@ export class MenuBackdrop {
       requestAnimationFrame(() => this.mount?.classList.add("is-on"));
     }
 
-    this.moveCamera(dt);
+    this.moveCamera(dt, now);
     // Both teams count as "mine": forest concealment exists to hide enemies
     // from a player, and there is no player here — a backdrop whose tanks
     // vanish into the bushes is a backdrop of empty scenery.
@@ -234,16 +247,43 @@ export class MenuBackdrop {
     this.raf = requestAnimationFrame(this.loop);
   };
 
-  /** Drifts toward wherever the fight is: the midpoint of the closest
-   *  blue/red pair, which is a decent stand-in for "where something is about
-   *  to happen" and costs a single pass over the roster. Falls back to the
-   *  centre of mass when one team has nobody alive. */
-  private moveCamera(dt: number) {
-    const sim = this.sim;
+  /** Drifts toward wherever the fight is, re-aiming no more than once a
+   *  second (see CAMERA_RETARGET_MS) so the picture never twitches. */
+  private moveCamera(dt: number, now: number) {
     const cam = this.camera;
-    if (!sim || !cam) return;
+    if (!this.sim || !cam) return;
+    if (!this.cameraTarget || now - this.retargetedAt >= CAMERA_RETARGET_MS) {
+      const next = this.pickCameraTarget();
+      if (next) {
+        this.cameraTarget = next;
+        this.retargetedAt = now;
+      }
+    }
+    const target = this.cameraTarget;
+    if (!target) return;
+    const dx = target.x - cam.x;
+    const dy = target.y - cam.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > CAMERA_DEAD_ZONE) {
+      // Exponential smoothing, framerate-independent (the same drift whether
+      // the tab renders at 144 Hz or limps at 30), then speed-capped.
+      const ease = dist * (1 - Math.exp(-CAMERA_FOLLOW * dt));
+      const step = Math.min(ease, CAMERA_MAX_SPEED * dt);
+      cam.x += (dx / dist) * step;
+      cam.y += (dy / dist) * step;
+    }
+    this.pixi?.setFocus(cam, this.anchor());
+  }
+
+  /** Where the fight is: the midpoint of the closest blue/red pair, which is
+   *  a decent stand-in for "where something is about to happen" and costs a
+   *  single pass over the roster. Falls back to the centre of mass when one
+   *  team has nobody alive. */
+  private pickCameraTarget(): { x: number; y: number } | null {
+    const sim = this.sim;
+    if (!sim) return null;
     const alive = sim.tanks.filter((t) => t.alive);
-    if (!alive.length) return;
+    if (!alive.length) return null;
     let best = Infinity;
     let target: { x: number; y: number } | null = null;
     for (const a of alive) {
@@ -257,27 +297,14 @@ export class MenuBackdrop {
         }
       }
     }
-    if (!target) {
-      let sx = 0;
-      let sy = 0;
-      for (const t of alive) {
-        sx += t.x;
-        sy += t.y;
-      }
-      target = { x: sx / alive.length + TANK_SIZE / 2, y: sy / alive.length + TANK_SIZE / 2 };
+    if (target) return target;
+    let sx = 0;
+    let sy = 0;
+    for (const t of alive) {
+      sx += t.x;
+      sy += t.y;
     }
-    const dx = target.x - cam.x;
-    const dy = target.y - cam.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > CAMERA_DEAD_ZONE) {
-      // Exponential smoothing, framerate-independent (the same drift whether
-      // the tab renders at 144 Hz or limps at 30), then speed-capped.
-      const ease = dist * (1 - Math.exp(-CAMERA_FOLLOW * dt));
-      const step = Math.min(ease, CAMERA_MAX_SPEED * dt);
-      cam.x += (dx / dist) * step;
-      cam.y += (dy / dist) * step;
-    }
-    this.pixi?.setFocus(cam, this.anchor());
+    return { x: sx / alive.length + TANK_SIZE / 2, y: sy / alive.length + TANK_SIZE / 2 };
   }
 
   private tick() {

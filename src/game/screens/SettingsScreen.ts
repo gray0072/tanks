@@ -1,7 +1,7 @@
 import type { Screen } from "../ScreenManager";
 import { ScreenManager } from "../ScreenManager";
 import { MainMenuScreen } from "./MainMenuScreen";
-import { loadUserSettings, prefersReducedMotion, saveUserSettings, type Quality, type TouchSide } from "../settings";
+import { loadUserSettings, saveUserSettings, type Quality, type TouchSide } from "../settings";
 import { audio } from "../../audio/audio";
 import { bindEnter } from "../../util/dialog";
 import { menuBackdrop as backdrop } from "../menuBackdrop";
@@ -43,7 +43,7 @@ export class SettingsScreen implements Screen {
         </label>
         <label style="flex-direction:row;align-items:center;gap:6px;">
           <input type="checkbox" data-f="menuBackdrop" style="width:auto" ${s.menuBackdrop ? "checked" : ""}/>
-          <span>Live battle behind the menus${reducedMotionNote()}</span>
+          <span>Live battle behind the menus</span>
         </label>
         <label style="flex-direction:row;align-items:center;gap:6px;">
           <input type="checkbox" data-f="showPing" style="width:auto" ${s.showPing ? "checked" : ""}/> Show ping
@@ -84,15 +84,6 @@ export class SettingsScreen implements Screen {
   unmount() {
     this.unbindEnter?.();
   }
-}
-
-/** The backdrop defaults to off under a system reduced-motion preference, and
- *  a switch that quietly does nothing is worse than no switch — say why. On
- *  Windows the culprit is usually Settings → Accessibility → Visual effects →
- *  Animation effects, which few people connect to a browser. */
-function reducedMotionNote(): string {
-  if (!prefersReducedMotion()) return "";
-  return ` <span style="opacity:0.7">— your system asks for reduced motion, so this is off unless you tick it</span>`;
 }
 
 function escapeAttr(s: string): string {

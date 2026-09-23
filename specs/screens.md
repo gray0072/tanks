@@ -115,8 +115,7 @@ menu in front of it.
 - **It yields.** `ScreenManager` starts and stops it per screen from `Screen.backdrop`; the match
   and the editor own the canvas themselves, so it is destroyed outright — WebGL context included —
   before either mounts, and rebuilt when the menu comes back. It also stops while the tab is hidden.
-- **Reduced motion is the default, not a veto.** `prefers-reduced-motion: reduce` only sets the
-  *initial* value of the Settings toggle; a player who ticks the box gets the backdrop anyway, and
-  the toggle then says why it started off. Windows' "Animation effects" switch alone puts a desktop
-  browser in reduced-motion, so treating the media query as an override would have meant a feature
-  that silently never appears and a switch that appears to do nothing.
+- **On by default for everyone**, `prefers-reduced-motion` included, with a one-click off switch in
+  Settings. Windows' "Animation effects" toggle alone puts a desktop browser in reduced-motion, so
+  keying the backdrop off that media query meant most Windows players never saw the feature at all
+  and a Settings switch that appeared to do nothing.

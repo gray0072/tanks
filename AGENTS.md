@@ -63,9 +63,9 @@ real bot-vs-bot match (same `Sim`, bots and `Arena`) in a canvas layer behind `#
 dimmed in CSS, with a spectator camera that drifts toward the closest blue/red pair and parks it
 beside the menu panel (SPEC §6.3). `createPixiApp` grew `fit: "cover"`, a per-frame `zoom` and
 `setFocus(point, anchor)` for it; `Screen.backdrop = false` is how MatchScreen/EditorScreen shut it
-down, and Settings has an off switch. Note `prefers-reduced-motion` only seeds that switch's
-default — on Windows it is on whenever "Animation effects" is off, which made the backdrop look
-broken until the player's own choice was allowed to win. Verified by driving Chromium at 1280x720 and 412x916 —
+down, and Settings has an off switch. It is on by default for
+everyone: gating it on `prefers-reduced-motion` made it look broken on Windows, where that query is
+true whenever "Animation effects" is off. Verified by driving Chromium at 1280x720 and 412x916 —
 including the toggle round-trip and that the backdrop's WebGL context is really gone in a match.
 
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
