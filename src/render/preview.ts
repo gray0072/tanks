@@ -209,7 +209,10 @@ export function drawBonusIcon(canvas: HTMLCanvasElement, kind: BonusKind) {
 
 /** A tank wearing the bonus — the same spinning aura the arena draws around
  *  a tank that picked it up (arena.ts syncAuras), frozen at one angle so the
- *  legend shows what to look for in a fight. */
+ *  legend shows what to look for in a fight. The orbiting icons stick out
+ *  past the ring, and the topmost one used to be clipped off the top edge
+ *  while the bottom of the canvas sat empty, so the whole drawing is fitted
+ *  and centred on its real bounding box rather than on the ring alone. */
 export function drawTankWithAura(canvas: HTMLCanvasElement, kind: BonusKind, team: TeamId = "blue") {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -217,16 +220,44 @@ export function drawTankWithAura(canvas: HTMLCanvasElement, kind: BonusKind, tea
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  const cx = w / 2;
-  const cy = h / 2;
-  const tankSize = Math.min(w, h) * 0.5;
-  const radius = tankSize * 0.72 + Math.min(w, h) * 0.06;
+  const s = Math.min(w, h);
   const aura = BONUS_PALETTE[kind].aura;
+  // Nominal geometry, relative to the tank's centre at (0, 0); scaled to fit
+  // below.
+  let tankSize = s * 0.5;
+  let radius = tankSize * 0.72 + s * 0.06;
+  let ringW = Math.max(2, s * 0.035);
+  let iconSize = s * 0.24;
+  // Three orbiting copies of the icon, upright, at the same thirds the
+  // arena's aura places them at.
+  const angles = [0, 1, 2].map((i) => (i * Math.PI * 2) / 3 - Math.PI / 2);
+
+  // Bounding box of ring + icons around the tank centre.
+  let minX = -radius - ringW / 2;
+  let maxX = -minX;
+  let minY = minX;
+  let maxY = maxX;
+  for (const a of angles) {
+    minX = Math.min(minX, Math.cos(a) * radius - iconSize / 2);
+    maxX = Math.max(maxX, Math.cos(a) * radius + iconSize / 2);
+    minY = Math.min(minY, Math.sin(a) * radius - iconSize / 2);
+    maxY = Math.max(maxY, Math.sin(a) * radius + iconSize / 2);
+  }
+  const pad = s * 0.02;
+  const scale = Math.min(1, (w - pad * 2) / (maxX - minX), (h - pad * 2) / (maxY - minY));
+  tankSize *= scale;
+  radius *= scale;
+  ringW *= scale;
+  iconSize *= scale;
+  // Centre the bounding box, not the tank: the box is taller above the tank
+  // than below it, which is exactly the asymmetry that clipped the top icon.
+  const cx = w / 2 - ((minX + maxX) / 2) * scale;
+  const cy = h / 2 - ((minY + maxY) / 2) * scale;
 
   ctx.save();
   ctx.strokeStyle = hexColor(aura);
   ctx.globalAlpha = 0.45;
-  ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.035);
+  ctx.lineWidth = ringW;
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.stroke();
@@ -239,11 +270,7 @@ export function drawTankWithAura(canvas: HTMLCanvasElement, kind: BonusKind, tea
   drawTankShape(ctx, tankSize, TEAM_COLOR[team]);
   ctx.restore();
 
-  // Three orbiting copies of the icon, upright, at the same thirds the
-  // arena's aura places them at.
-  const iconSize = Math.min(w, h) * 0.24;
-  for (let i = 0; i < 3; i++) {
-    const a = (i * Math.PI * 2) / 3 - Math.PI / 2;
+  for (const a of angles) {
     ctx.save();
     ctx.translate(cx + Math.cos(a) * radius - iconSize / 2, cy + Math.sin(a) * radius - iconSize / 2);
     drawIconOps2d(ctx, bonusIconOps(kind, iconSize));
