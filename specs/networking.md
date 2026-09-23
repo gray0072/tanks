@@ -26,12 +26,32 @@ and every client exactly 1, which is also why the host must be the one with the 
 
 ## 9.2 Room code
 
-6 characters from the 30-symbol alphabet `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no `0/O/1/I/L`), ≈ 7.3 ×
-10⁸ combinations. The code **is** the host's PeerJS peer-id (namespaced as `tanks-<CODE>`), so no
-lookup service is needed: joining is a direct `peer.connect('tanks-K7QM2X')`. On a code collision at
-creation the host regenerates.
+The code **is** the host's PeerJS peer-id (namespaced as `tanks-<CODE>`), so no lookup service is
+needed: joining is a direct `peer.connect('tanks-K7QM2X')`.
 
-Invite links: `https://<pages-url>/?room=K7QM2X`.
+**Any 3–12 characters of `A-Z0-9` is a code.** What the game *generates* is narrower: 6 characters
+from the 27-symbol alphabet `ABCDEFGHJKMNPQRSTUVWXYZ23456789` minus the look-alikes (`0/O`,
+`1/I/L`), ≈ 7.3 × 10⁸ combinations — because a generated code exists to be read out over a call,
+where `0` and `O` are the same sound. A code the **host types** is accepted with the whole
+alphabet: its point is to read like a word (`SERGEY`, `DVOR`), and refusing someone's own name over
+an `I` would be pedantry. Typed input is upper-cased and stripped of punctuation, so `sergey` and
+`k7qm-2x` both arrive as the code they obviously mean.
+
+**A chosen code is remembered** (`UserSettings.roomCode`) and pre-filled next time, which is the
+whole point of having one: the invite link stays the same across a reload, an evening or a month,
+so friends can keep the link rather than being read six fresh characters. Reloading the page frees
+the id immediately — both peers destroy themselves on `pagehide` (§9.4) — so the same host can
+re-open the same code straight away. Re-creating the room is still a deliberate act: the game does
+not open a room on load by itself, because a reloaded host cannot resume the match it was in and
+guests do not auto-reconnect.
+
+**On a collision, what happens depends on who picked the code.** A *generated* code that the broker
+reports as `unavailable-id` is simply regenerated and nobody is told. A *chosen* one is reported to
+the host instead (`onLeft`, §9.4) — quietly hosting under a different code would break the one
+thing a chosen code is for.
+
+Invite links: `https://<pages-url>/?room=SERGEY`. A link's code is validated, never truncated: a
+link carrying more than 12 characters is a link to nowhere rather than to the first twelve.
 
 ## 9.3 Messages
 

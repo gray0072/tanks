@@ -169,6 +169,29 @@ Verified in two Chromium contexts as well: kick → the guest lands on the menu 
 removed you from the room." while the host's roster shows the slot back as a bot; host closes its
 tab → the remaining guest gets "The host left — the room is gone."
 
+**2026-09-23 (room codes you can keep):** the host may now name its room — `SERGEY`, `DVOR` — and
+the choice is remembered (`UserSettings.roomCode`) and pre-filled, so one invite link keeps working
+instead of six fresh characters being dictated every time. Codes widened to **3–12 of `A-Z0-9`**
+for anything typed, while `generateRoomCode()` keeps the narrow look-alike-free alphabet: a
+generated code gets read out loud, a chosen one doesn't. Collisions now split by who chose: a
+generated `unavailable-id` is silently regenerated (which is what SPEC §9.2 always promised and
+nothing implemented), a chosen one reports through `onLeft` rather than quietly hosting under a
+different code. `RoomHost`'s constructor became an options object on the way past — it was up to
+five positional parameters.
+
+Two things worth keeping in mind here. A reload really does free the peer-id at once (the `pagehide`
+teardown from the previous entry is what makes reclaiming the same code work), so **no auto-hosting
+on load** was added on purpose: a reloaded host can't resume its match and guests don't
+auto-reconnect, so opening a room unasked would be surprising, not helpful. And a deep link's code
+is validated but **never truncated** — `normalizeRoomCode` caps typed input, `cleanRoomCode` does
+not, because silently cutting a link's code to 12 characters would send the guest to a *different*
+room. That one surfaced as a test failure when the length rule changed, which is exactly what the
+test was for.
+
+Verified in three Chromium contexts: room opened on `SERGEY`, guest joined via `?room=sergey`, a
+second host asking for `SERGEY` got "already in use" instead of a silent re-code, and the first host
+reloaded and re-opened `SERGEY` with the field already filled.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -205,6 +228,13 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 - `tests/mapEditor.test.ts` — the level editor's document model (`world/maps/editorModel.ts`):
   painting, the terrain-only rectangle fill, entity semantics (a flag *moves*, a spawn toggles and
   is capped), resize with an anchor, and the rule that **one gesture is one undo step**.
+- `tests/roomCode.test.ts` — room codes (SPEC §9.2): a generated code is short, valid and free of
+  look-alikes; a *typed* one may be a name, may contain those same look-alikes, and is cleaned up
+  for case and punctuation; length bounds; the peer-id round-trip. Then, over the loopback, the
+  collision rule — a generated code is replaced silently, a chosen one is reported. The
+  look-alike case is the one to keep: it guards against re-tightening the typed alphabet to the
+  generated one.
+- `tests/netHelpers.ts` — the loopback host/guest pair the two netcode suites share.
 - `tests/kick.test.ts` — the first test of the netcode itself (SPEC §9.4), over the loopback
   transport seam: a guest saying hello is seated, a kick *tells* the guest before hanging up (the
   bug was a silent socket close), the slot reverts to a bot, no other slot is touched, the close

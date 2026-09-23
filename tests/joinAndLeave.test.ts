@@ -18,6 +18,7 @@ import assert from "node:assert/strict";
 import { deepLinkRoute } from "../src/ui/routes";
 import { PeerWatchdog, type PeerConnState } from "../src/net/liveness";
 import { PEER_DISCONNECT_GRACE } from "../src/game/config";
+import { CODE_MAX_LEN } from "../src/net/roomCode";
 
 // --- 1. the invite link ----------------------------------------------------
 
@@ -40,12 +41,25 @@ test("a lowercase or punctuated code in a link still resolves", () => {
   assert.deepEqual(deepLinkRoute("?room=ab-c2%2034"), { k: "join", code: "ABC234" });
 });
 
-test("no code, a malformed one, or an ambiguous letter is not a deep link", () => {
-  // "ABC23" is too short, "ABC23O" uses a character the alphabet excludes on
-  // purpose (roomCode.ts drops O/0/I/1/L), so neither is a room.
-  for (const search of ["", "?x=1", "?room=", "?room=ABC23", "?room=ABC23O", "?room=TOOLONGCODE"]) {
+test("no code, or one that could never be a room, is not a deep link", () => {
+  for (const search of [
+    "",
+    "?x=1",
+    "?room=",
+    "?room=AB", // shorter than CODE_MIN_LEN
+    "?room=" + "A".repeat(CODE_MAX_LEN + 1), // longer than a code may be
+    "?room=!!!", // nothing in the alphabet survives normalising
+  ]) {
     assert.equal(deepLinkRoute(search), null, `${search} should not be a deep link`);
   }
+});
+
+test("a host's own code travels in a link like any other", () => {
+  // Codes are 3-12 characters of A-Z0-9 now (SPEC §9.2), so a link may carry
+  // a name — including the look-alike characters a *generated* code avoids.
+  assert.deepEqual(deepLinkRoute("?room=sergey"), { k: "join", code: "SERGEY" });
+  assert.deepEqual(deepLinkRoute("?room=olivia"), { k: "join", code: "OLIVIA" });
+  assert.deepEqual(deepLinkRoute("?room=dvor"), { k: "join", code: "DVOR" });
 });
 
 // --- 2. losing a peer that never said goodbye ------------------------------

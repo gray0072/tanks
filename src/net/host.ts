@@ -22,7 +22,7 @@ import { getCustomMap, isCustomMapId } from "../world/maps/customMaps";
 import { BotController } from "../ai/bot";
 import { computeTeamRoles, type Role } from "../ai/teamPlan";
 import { HostNetwork, type HostTransport, type NetErrorInfo } from "./peer";
-import { generateRoomCode } from "./roomCode";
+import { generateRoomCode, normalizeRoomCode } from "./roomCode";
 import type { ClientMessage, BotDifficultyTarget, MapPayload } from "./protocol";
 import type { RoomCallbacks, RoomController } from "./room";
 import { NO_INPUT } from "./room";
@@ -42,6 +42,22 @@ import {
 function makeHostNetwork(roomCode: string, cb: ConstructorParameters<typeof HostNetwork>[1]): HostTransport {
   return new HostNetwork(roomCode, cb);
 }
+
+export type RoomHostOptions = {
+  nickname: string;
+  /** False for a purely local room (hot-seat play, the editor's test match):
+   *  no PeerJS connection is opened at all and there is no room code. */
+  online: boolean;
+  callbacks: RoomCallbacks;
+  /** Which map to open on; defaults to the first built-in. */
+  mapId?: string;
+  /** A code the host chose (SPEC §9.2). Normalized here, so whatever the
+   *  field contained is fine. Omitted means "generate one". */
+  roomCode?: string;
+  /** Test seam (see peer.ts `HostTransport`): given one, the room talks to it
+   *  instead of opening a PeerJS connection, whatever `online` says. */
+  makeNet?: (cb: ConstructorParameters<typeof HostNetwork>[1]) => HostTransport;
+};
 
 export class RoomHost implements RoomController {
   readonly isHost = true;
@@ -78,23 +94,25 @@ export class RoomHost implements RoomController {
   private acc = 0;
   private snapshotAcc = 0;
 
-  /** `makeNet` is the test seam (see peer.ts `HostTransport`): given one, the
-   *  room talks to it instead of opening a PeerJS connection, whatever
-   *  `online` says. */
-  constructor(
-    private hostNickname: string,
-    online: boolean,
-    private cb: RoomCallbacks,
-    initialMapId?: string,
-    makeNet?: (cb: Parameters<typeof makeHostNetwork>[1]) => HostTransport,
-  ) {
+  private hostNickname: string;
+  private cb: RoomCallbacks;
+  /** The code the host asked for, or null when the game picked one. A chosen
+   *  code that turns out to be taken is reported; a generated one is simply
+   *  regenerated (SPEC §9.2). */
+  private wantedCode: string | null;
+  private openRoom: (code: string) => void = () => {};
+
+  constructor(opts: RoomHostOptions) {
     // cb is reassigned via setCallbacks() below as screens change
-    this.mapId = initialMapId ?? listMaps()[0]?.id ?? "classic";
+    this.hostNickname = opts.nickname;
+    this.cb = opts.callbacks;
+    this.wantedCode = opts.roomCode ? normalizeRoomCode(opts.roomCode) : null;
+    this.mapId = opts.mapId ?? listMaps()[0]?.id ?? "classic";
     // Team size comes from the chosen map's own spawn count, not a hardcoded
     // number — the built-in maps are 5 a side, the debug map is 1v1, and any
     // map in between or beyond sizes the roster to match its `r`/`b` markers.
     const initial = getMap(this.mapId);
-    this.slots = createDefaultSlots(hostNickname, initial.spawns.blue.length, initial.spawns.red.length);
+    this.slots = createDefaultSlots(this.hostNickname, initial.spawns.blue.length, initial.spawns.red.length);
     this.settings = {
       mapId: this.mapId,
       winsTarget: DEFAULT_WINS_TARGET,
@@ -103,17 +121,47 @@ export class RoomHost implements RoomController {
       friendlyFire: false,
     };
 
-    if (online || makeNet) {
-      this.roomCode = generateRoomCode();
-      const callbacks = {
-        onHostReady: () => this.publishRoomState(),
-        onPeerLeave: (connId: string) => this.handlePeerLeave(connId),
-        onMessage: (connId: string, msg: ClientMessage) => this.handleClientMessage(connId, msg),
-        onError: (e: NetErrorInfo) => this.cb.onError?.(describeError(e)),
+    if (opts.online || opts.makeNet) {
+      this.openRoom = (code: string) => {
+        this.roomCode = code;
+        const callbacks = {
+          onHostReady: () => this.publishRoomState(),
+          onPeerLeave: (connId: string) => this.handlePeerLeave(connId),
+          onMessage: (connId: string, msg: ClientMessage) => this.handleClientMessage(connId, msg),
+          onError: (e: NetErrorInfo) => this.onNetError(e),
+        };
+        this.net?.destroy();
+        this.net = opts.makeNet ? opts.makeNet(callbacks) : makeHostNetwork(code, callbacks);
       };
-      this.net = makeNet ? makeNet(callbacks) : makeHostNetwork(this.roomCode, callbacks);
+      this.openRoom(this.wantedCode ?? generateRoomCode());
     }
     this.publishRoomState();
+  }
+
+  /** A room that could not be opened at all is not an error banner, it is the
+   *  end of the room — the screens treat `onLeft` as "you are not in a room"
+   *  and go back to the menu with the reason (SPEC §9.4).
+   *
+   *  The one recoverable case is the code already being in use. If the game
+   *  picked it, try another — that is the collision the spec has always
+   *  promised to ride out. If the *host* picked it, say so instead: quietly
+   *  hosting under a different code than the one they typed would break the
+   *  very thing a chosen code is for, which is an invite link that keeps
+   *  working. */
+  private onNetError(e: NetErrorInfo) {
+    if (e.type !== "unavailable-id") {
+      this.cb.onError?.(describeError(e));
+      return;
+    }
+    if (!this.wantedCode) {
+      this.openRoom(generateRoomCode());
+      return;
+    }
+    const taken = this.wantedCode;
+    this.cb.onLeft?.({
+      reason: `Room code "${taken}" is already in use — pick another one.`,
+      kicked: false,
+    });
   }
 
   private publishRoomState() {

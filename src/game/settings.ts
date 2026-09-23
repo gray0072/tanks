@@ -15,6 +15,10 @@ export type TouchSide = "left" | "right";
 
 export type UserSettings = {
   nickname: string;
+  /** The room code this player likes to host on (SPEC §9.2), or "" for a
+   *  fresh random one each time. Remembered so a reload — or next week —
+   *  reproduces the same invite link without retyping it. */
+  roomCode: string;
   volume: number; // 0..1
   quality: Quality;
   touchSide: TouchSide; // which thumb gets the movement stick (SPEC §5.3)
@@ -25,6 +29,7 @@ export type UserSettings = {
 
 const DEFAULTS: UserSettings = {
   nickname: "",
+  roomCode: "",
   volume: 0.6,
   quality: "auto",
   touchSide: "left",

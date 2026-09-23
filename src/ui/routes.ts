@@ -2,7 +2,7 @@
 // is the same "single stack" the old ScreenManager enforced (SPEC §6) — only
 // now it's a value in React state instead of a mounted object.
 
-import { isValidRoomCode, normalizeRoomCode } from "../net/roomCode";
+import { cleanRoomCode, isValidRoomCode } from "../net/roomCode";
 import type { RoomController } from "../net/room";
 import type { EditorDoc } from "../world/maps/editorModel";
 import type { PlayerStats } from "../world/rules";
@@ -64,7 +64,9 @@ export type Navigate = (route: Route) => void;
  *  never saw, with no way back to change it, is what the auto-connect this
  *  replaced actually did. */
 export function deepLinkRoute(search: string): Route | null {
-  const code = normalizeRoomCode(new URLSearchParams(search).get("room") ?? "");
+  // Cleaned but never truncated: a link whose code is too long is a link to
+  // nowhere, not a link to the first twelve characters of somewhere.
+  const code = cleanRoomCode(new URLSearchParams(search).get("room") ?? "");
   return isValidRoomCode(code) ? { k: "join", code } : null;
 }
 

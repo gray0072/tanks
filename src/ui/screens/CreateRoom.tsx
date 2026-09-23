@@ -3,6 +3,7 @@ import type { Navigate } from "../routes";
 import { listMaps, listPlayableMaps } from "../../world/maps/loader";
 import { mapSizeLabel } from "../../world/maps/mapFormat";
 import { mapBlurb } from "../../world/maps/mapSources";
+import { CODE_MAX_LEN, CODE_MIN_LEN, isValidRoomCode, normalizeRoomCode } from "../../net/roomCode";
 import { drawMapPreview } from "../../render/preview";
 import { RoomHost } from "../../net/host";
 import { useEnterKey } from "../hooks/useEnterKey";
@@ -30,6 +31,9 @@ function resolveMapId(initialMapId?: string): string {
 export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: string }) {
   const [mapId] = useState(() => resolveMapId(initialMapId));
   const [nickname, setNickname] = useState(() => loadUserSettings().nickname || randomGuestNickname());
+  // A code of the host's own (SPEC §9.2). Empty means "pick one for me",
+  // which is what it was before this existed.
+  const [roomCode, setRoomCode] = useState(() => loadUserSettings().roomCode);
   // Read-only here now: the match rules are set in the room (SPEC §6.1), and
   // this screen only carries the last-used set over to it.
   const [setup] = useState<RoomSetup>(() => loadRoomSetup(mapId));
@@ -46,7 +50,7 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
 
   const persistNickname = () => {
     const nick = nickname.trim().slice(0, 12);
-    if (nick) saveUserSettings({ ...loadUserSettings(), nickname: nick });
+    if (nick) saveUserSettings({ ...loadUserSettings(), nickname: nick, roomCode });
     return nick;
   };
 
@@ -59,12 +63,21 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
   };
 
   const create = () => {
+    if (roomCode && !isValidRoomCode(roomCode)) {
+      setError(`A room code is ${CODE_MIN_LEN}-${CODE_MAX_LEN} letters or digits — or leave it empty.`);
+      return;
+    }
     const nick = persistNickname() || randomGuestNickname();
-    saveUserSettings({ ...loadUserSettings(), nickname: nick });
+    saveUserSettings({ ...loadUserSettings(), nickname: nick, roomCode });
     saveRoomSetup(mapId, setup);
     saveLastMapId(mapId);
 
-    const room = new RoomHost(nick, true, { onError: (msg) => setError(msg) });
+    const room = new RoomHost({
+      nickname: nick,
+      online: true,
+      roomCode,
+      callbacks: { onError: (msg) => setError(msg) },
+    });
     room.setMap(mapId);
     // The room opens on whatever this map was last played with (settings.ts
     // keeps a set per map); the room screen is where they are changed.
@@ -91,6 +104,24 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
           Nickname
           <input type="text" maxLength={12} value={nickname} onChange={(e) => setNickname(e.target.value)} />
         </label>
+
+        <label>
+          Room code
+          <input
+            type="text"
+            className="code-input"
+            maxLength={CODE_MAX_LEN}
+            placeholder="random"
+            value={roomCode}
+            onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
+          />
+        </label>
+        {/* Why anyone would set one: the invite link is built from it, so a
+            code of your own keeps working across reloads and evenings. */}
+        <div className="hint">
+          Leave it empty for a random code, or pick your own — friends can then reuse the same invite
+          link every time. {CODE_MIN_LEN}-{CODE_MAX_LEN} letters or digits.
+        </div>
 
         <label>Map</label>
         {/* The whole card opens the picker, not just the button: it is the

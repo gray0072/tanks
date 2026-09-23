@@ -6,116 +6,15 @@
 // part of, indefinitely.
 //
 // This drives the *real* RoomHost and RoomClient against each other over a
-// loopback transport (the `HostTransport`/`ClientTransport` seam in
-// net/peer.ts), so the whole chain is under test — kick → message → client
-// exit → roster back to a bot — without needing two browsers for PeerJS.
+// loopback transport (tests/netHelpers.ts), so the whole chain is under test —
+// kick -> message -> client exit -> roster back to a bot — without needing two
+// browsers for PeerJS.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { RoomHost } from "../src/net/host";
-import { RoomClient } from "../src/net/client";
-import type { ClientMessage, HostMessage } from "../src/net/protocol";
-import type {
-  ClientNetworkCallbacks,
-  ClientTransport,
-  HostNetworkCallbacks,
-  HostTransport,
-} from "../src/net/peer";
-import type { RoomCallbacks } from "../src/net/room";
+import { loopbackRoom as room, wait } from "./netHelpers";
 import { KICK_CLOSE_DELAY } from "../src/game/config";
-
-// The client's input loop is driven by requestAnimationFrame, which node
-// doesn't have. Stubbed to never fire: this is about membership, and a
-// running input loop would only add noise.
-const g = globalThis as { requestAnimationFrame?: unknown; cancelAnimationFrame?: unknown };
-g.requestAnimationFrame ??= () => 0;
-g.cancelAnimationFrame ??= () => {};
-
-const CONN = "guest-conn";
-
-type Exit = { reason: string; kicked: boolean };
-
-/** A host and a guest wired straight to each other, plus what each side saw. */
-function room(opts: { hostCallbacks?: RoomCallbacks } = {}) {
-  let hostCb: HostNetworkCallbacks | null = null;
-  let clientCb: ClientNetworkCallbacks | null = null;
-  const toClient: HostMessage[] = [];
-  const toHost: ClientMessage[] = [];
-  const exits: Exit[] = [];
-  const errors: string[] = [];
-  let closed = false;
-
-  const hostTransport: HostTransport = {
-    send(connId, msg) {
-      if (connId !== CONN || closed) return;
-      toClient.push(msg);
-      clientCb?.onMessage?.(msg);
-    },
-    broadcast(msg) {
-      if (closed) return;
-      toClient.push(msg);
-      clientCb?.onMessage?.(msg);
-    },
-    kick() {
-      if (closed) return;
-      closed = true;
-      // What PeerJS does to the other end: the socket simply goes.
-      clientCb?.onDisconnected?.();
-    },
-    get connectionIds() {
-      return closed ? [] : [CONN];
-    },
-    destroy() {},
-  };
-
-  const clientTransport: ClientTransport = {
-    send(msg) {
-      if (closed) return;
-      toHost.push(msg);
-      hostCb?.onMessage?.(CONN, msg);
-    },
-    get connected() {
-      return !closed;
-    },
-    myId: CONN,
-    destroy() {
-      closed = true;
-    },
-  };
-
-  const host = new RoomHost("Host", false, opts.hostCallbacks ?? {}, undefined, (cb) => {
-    hostCb = cb;
-    return hostTransport;
-  });
-  const client = new RoomClient("ABC234", "Olga", {
-    onLeft: (e) => exits.push(e),
-    onError: (msg) => errors.push(msg),
-  }, (cb) => {
-    clientCb = cb;
-    return clientTransport;
-  });
-
-  // The guest's side of "the connection opened": it says hello, and the host
-  // seats it on the first free bot slot (host.ts autoSeat).
-  clientCb!.onConnected?.();
-
-  const guestSlot = () => host.slots.find((s) => s.owner === CONN) ?? null;
-
-  return {
-    host,
-    client,
-    exits,
-    errors,
-    toClient,
-    toHost,
-    guestSlot,
-    isClosed: () => closed,
-    dropHost: () => clientCb!.onDisconnected?.(),
-  };
-}
-
-const wait = (seconds: number) => new Promise((r) => setTimeout(r, seconds * 1000));
 
 test("a guest that says hello is seated, and the host knows whose slot it is", () => {
   const r = room();

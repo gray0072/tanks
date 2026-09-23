@@ -415,7 +415,7 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
       return;
     }
     const nickname = loadUserSettings().nickname || randomGuestNickname();
-    const room = new RoomHost(nickname, false, {}, id);
+    const room = new RoomHost({ nickname, online: false, callbacks: {}, mapId: id });
     room.startMatch();
     go({
       k: "match",

@@ -42,7 +42,8 @@ with no server, no install and no account.
 | 🤖 **Bots on every free slot** | Easy / Medium / Hard, set per bot or for the whole roster — genuinely different tactics, not just better aim |
 | 🧱 **Destructible terrain** | Brick crumbles cell by cell, steel resists until you're upgraded, forest conceals, water stops tanks but not bullets, ice slides, sand slows |
 | ✨ **Eight power-ups** | Four are yours, four swing the whole team |
-| 🌐 **Peer-to-peer multiplayer** | Join by 6-character code or invite link over WebRTC — no server to run, no public IP, no accounts |
+| 🌐 **Peer-to-peer multiplayer** | Join by code or invite link over WebRTC — no server to run, no public IP, no accounts |
+| 🔖 **A room code you can keep** | Name your room (`SERGEY`, `DVOR`) instead of dictating six characters, and the same invite link works every evening |
 | 🕹️ **Two players, one keyboard** | WASD and the arrow keys, same team or opposite ones |
 | 🗺️ **Six maps + a level editor** | Paint your own arena, validate it, play it — and it travels to your guests over the wire |
 | 📱 **Phone-ready** | Split-screen touch controls and a real fullscreen mode, the whole arena on screen |
@@ -76,7 +77,8 @@ whole team.
 ## How a match goes
 
 1. **Create a room** — pick your nickname, the map and the difficulty its bots start at. You get a
-   6-character code and an invite link.
+   code and an invite link. Leave the code field empty for a random one, or type your own (3–12
+   letters or digits): it's remembered, so the link you send your friends keeps working.
 2. **Set up the match** — rounds to win, round time limit, respawns and friendly fire are all in
    the room itself, so you can retune them while people arrive; everyone sees the change.
 3. **Take a slot** — click any slot on either team; the preview marks the spawn you would get.

@@ -26,7 +26,7 @@ function initialRoute(): Route {
     // Skip the menu/room flow entirely: an offline room-of-one on the debug
     // map, bots filling every spawn but slot 0, all-default settings, match
     // started immediately (SPEC §3.5 "Debug map").
-    const room = new RoomHost("Debug", false, {}, DEBUG_MAP_ID);
+    const room = new RoomHost({ nickname: "Debug", online: false, callbacks: {}, mapId: DEBUG_MAP_ID });
     room.startMatch();
     return { k: "match", room };
   }
