@@ -12,6 +12,9 @@ import { bindEnter } from "../../util/dialog";
 import {
   BOT_DIFFICULTIES as DIFFS,
   BOT_DIFFICULTY_LABEL as DIFF_LABEL,
+  DEFAULT_RESPAWN_MULT,
+  RESPAWN_MULTIPLIERS,
+  respawnLabel,
   type BotDifficulty,
   type TeamId,
 } from "../../game/config";
@@ -75,6 +78,7 @@ export class RoomScreen implements Screen {
     const humansReady = this.slots
       .filter((s) => s.kind === "human" && s.owner !== "host")
       .every((s) => s.ready);
+    const mult = this.room.settings?.respawnMult ?? DEFAULT_RESPAWN_MULT;
 
     this.el.innerHTML = `
       <div class="row between room-header">
@@ -100,6 +104,17 @@ export class RoomScreen implements Screen {
           <div class="hint" data-f="mapinfo"></div>
           <div class="row wrap" data-f="mapactions"></div>
           <div class="row wrap">
+            ${isHost
+              ? `<label>Respawns per player
+                   <select data-a="respawns">
+                     ${RESPAWN_MULTIPLIERS.map(
+                       (m) => `<option value="${m}" ${m === mult ? "selected" : ""}>${this.respawnOptionLabel(m)}</option>`,
+                     ).join("")}
+                   </select>
+                 </label>`
+              : `<span class="hint">Respawns per player: ${this.respawnOptionLabel(mult)}</span>`}
+          </div>
+          <div class="row wrap">
             ${this.room.hasLocalSeat2()
               ? `<button data-a="removeSeat2">Remove local player 2</button>`
               : `<button data-a="addSeat2">Add local player 2</button>`}
@@ -114,6 +129,15 @@ export class RoomScreen implements Screen {
     `;
 
     this.wire();
+  }
+
+  /** Respawns read as `x10 (50)`, or `x10 (50, 100)` when the map fields
+   *  different-sized teams — the pool is per team, so one number wouldn't be
+   *  the whole story. Roster comes from the live slots, which follow the map. */
+  private respawnOptionLabel(mult: number): string {
+    const blue = this.slots.filter((s) => s.team === "blue").length;
+    const red = this.slots.filter((s) => s.team === "red").length;
+    return respawnLabel(mult, blue, red);
   }
 
   private renderTeamBlock(team: TeamId, mySlotIds: Set<number>, isHost: boolean): string {
@@ -163,6 +187,9 @@ export class RoomScreen implements Screen {
       this.room.removeLocalSeat();
       this.pendingLocalSeat = 0;
       this.render();
+    });
+    this.el.querySelector<HTMLSelectElement>("[data-a=respawns]")?.addEventListener("change", (ev) => {
+      this.room.setSettings({ respawnMult: Number((ev.target as HTMLSelectElement).value) });
     });
     this.el.querySelector<HTMLButtonElement>("[data-a=ready]")?.addEventListener("click", () => {
       const myReady = this.room.mySlots()[0]?.ready ?? false;
@@ -230,7 +257,8 @@ export class RoomScreen implements Screen {
     if (info) {
       // Size and roster sit where the decision is made, same as on a map card
       // (specs/level-editor.md §5.2).
-      info.textContent = `Map: ${map.name} · ${mapSizeLabel(map)} · ${(this.room.settings?.timeLimit ?? 0) / 60 | 0} min · ${this.room.settings?.respawns ?? "?"} respawns`;
+      const mult = this.room.settings?.respawnMult ?? DEFAULT_RESPAWN_MULT;
+      info.textContent = `Map: ${map.name} · ${mapSizeLabel(map)} · ${(this.room.settings?.timeLimit ?? 0) / 60 | 0} min · ${this.respawnOptionLabel(mult)} respawns`;
     }
     this.renderMapActions(map.id, map.name);
 

@@ -111,7 +111,9 @@ export class Sim {
 
   constructor(map: MapDef, settings: MatchSettings, slots: Slot[], seed: number) {
     this.map = map;
-    this.grid = map.grid;
+    // The match owns its terrain: `map` is the shared, cached MapDef, so
+    // damage has to land on a copy or the next match on this map inherits it.
+    this.grid = map.grid.clone();
     this.worldW = map.width * CELL;
     this.worldH = map.height * CELL;
     this.settings = settings;

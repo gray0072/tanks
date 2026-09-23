@@ -30,6 +30,16 @@ export class Grid {
     this.brickQuarters = new Uint8Array(width * height).fill(BRICK_QUARTERS);
   }
 
+  /** A detached copy. The Sim shoots holes in its grid for a whole match,
+   *  while the MapDef it was built from is cached and handed out again for
+   *  the next one (loader.listMaps) — without a copy, a rematch would start
+   *  on the wreckage of the last round. */
+  clone(): Grid {
+    const g = new Grid(this.width, this.height, this.tiles.slice());
+    g.brickQuarters = this.brickQuarters.slice();
+    return g;
+  }
+
   private idx(cx: number, cy: number): number {
     return cy * this.width + cx;
   }

@@ -4,7 +4,7 @@ import type { Slot } from "./tank";
 export type MatchSettings = {
   mapId: string;
   timeLimit: number; // seconds, SPEC §2.2
-  respawns: number; // starting respawns per team
+  respawnMult: number; // starting respawns per team member (§2.2)
   friendlyFire: boolean;
 };
 
@@ -50,7 +50,12 @@ export function createRules(settings: MatchSettings, slots: Slot[]): MatchRules 
   }
   return {
     timeLeft: settings.timeLimit,
-    respawns: { blue: settings.respawns, red: settings.respawns },
+    // Per team, so a 4-vs-6 map still gives both sides the same number of
+    // lives each (see RESPAWN_MULTIPLIERS).
+    respawns: {
+      blue: settings.respawnMult * teamSizes.blue,
+      red: settings.respawnMult * teamSizes.red,
+    },
     flagAlive: { blue: true, red: true },
     stats,
     lastDamagedBy: {},

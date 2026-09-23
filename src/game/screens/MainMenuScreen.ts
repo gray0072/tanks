@@ -15,14 +15,14 @@ const HOW_TO_PLAY = `
   <p>Two teams, blue and red. Destroy the enemy flag, or grind the enemy team out of respawns
      before the clock runs out. Any slot you don't take is filled by a bot.</p>
   <h3>Controls — keyboard</h3>
-  <p><b>Player 1:</b> WASD move, Space fire.<br/>
-     <b>Player 2 (same keyboard):</b> Arrow keys move, Enter fire.<br/>
+  <p><b>Player 1:</b> WASD move, Left Shift fire, Q mine.<br/>
+     <b>Player 2 (same keyboard):</b> Arrow keys move, Right Shift fire, M mine.<br/>
      Hold two direction keys to drive diagonally. Hold Tab for the scoreboard, Esc pauses.</p>
   <h3>Controls — touch</h3>
   <p>Put a thumb down anywhere on the <b>left half</b> of the battlefield and drag: a stick appears
      under your thumb and the tank drives that way, in any of 8 directions. Lift to stop.<br/>
      <b>Tap anywhere on the right half</b> to fire; hold it down to keep firing. The MINE button in
-     the bottom corner drops a mine.<br/>
+     the top corner drops a mine.<br/>
      Left-handed? Settings → Movement stick side swaps the two halves. The buttons in the top bar
      are the scoreboard, fullscreen and the pause menu.</p>
   <h3>Terrain</h3>

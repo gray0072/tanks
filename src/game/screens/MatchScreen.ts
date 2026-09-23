@@ -194,9 +194,9 @@ export class MatchScreen implements Screen {
         `;
         this.el.appendChild(overlay);
         overlay.querySelector<HTMLButtonElement>("[data-a=resume]")!.onclick = () => this.togglePause();
-        // Deliberately not focusing Resume: Input (util/input.ts) swallows
-        // Enter's default action during a match, so a focused button would
-        // never be activated by it — the bindEnter below is what resumes.
+        // Deliberately not focusing Resume: the bindEnter below already
+        // resumes on Enter, and a focused button would toggle the pause a
+        // second time off the same press.
         (document.activeElement as HTMLElement | null)?.blur();
         overlay.querySelector<HTMLButtonElement>("[data-a=leave]")!.onclick = () => {
           this.room.setMatchPaused(false);
@@ -208,8 +208,7 @@ export class MatchScreen implements Screen {
           this.screens.go(new MainMenuScreen(this.screens));
         };
       }
-      // Enter resumes while paused; it's player 2's fire key the rest of the
-      // time, which is why it's only bound for as long as the menu is up.
+      // Enter resumes while paused; only bound for as long as the menu is up.
       this.unbindEnter = bindEnter(() => this.togglePause());
     } else {
       this.room.setMatchPaused(false);

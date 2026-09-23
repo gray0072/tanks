@@ -19,13 +19,18 @@ export function makeMap(template: string, id = "test"): MapDef {
 }
 
 export function makeSim(template: string, seed = 1): Sim {
-  const map = makeMap(template);
+  return makeSimFromMap(makeMap(template), seed);
+}
+
+/** Same as makeSim, but on a MapDef the caller holds — the only way to build
+ *  two matches from one map, as a rematch does. */
+export function makeSimFromMap(map: MapDef, seed = 1): Sim {
   const blueSize = map.spawns.blue.length;
   const redSize = map.spawns.red.length;
   const settings: MatchSettings = {
     mapId: map.id,
     timeLimit: 600,
-    respawns: 25,
+    respawnMult: 5,
     friendlyFire: false,
   };
   const sim = new Sim(map, settings, createDefaultSlots("host", blueSize, redSize), seed);
@@ -151,7 +156,7 @@ export function matchFrags(map: MapDef, blue: BotDifficulty, red: BotDifficulty,
     s.owner = null;
     s.botDifficulty = s.team === "blue" ? blue : red;
   }
-  const settings: MatchSettings = { mapId: map.id, timeLimit: 3600, respawns: 9999, friendlyFire: false };
+  const settings: MatchSettings = { mapId: map.id, timeLimit: 3600, respawnMult: 999, friendlyFire: false };
   const sim = new Sim(map, settings, slots, seed);
   const bots = new Map(slots.map((s) => [s.id, new BotController(s.id)]));
   const frags: Record<TeamId, number> = { blue: 0, red: 0 };

@@ -177,7 +177,7 @@ Every card — built-in and custom alike — shows, under the existing `drawMapP
 4. A **source tag**: `built-in` or `custom`, plus `⚠ N problems` when validation failed (§7).
 
 The same size/roster line is added to the room screen's map line (`Map: Classic · 33×25 · 5v5 ·
-10 min · 25 respawns`), so the information is where the decision is made.
+10 min · ×10 (50) respawns`), so the information is where the decision is made.
 
 ### 5.3 Actions
 

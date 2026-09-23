@@ -40,7 +40,7 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
 │   ▸ 1  Easy   Easy1         bot   ✔    │  │   │preview│  → you                  │  │
 │   ▸ 2  Easy   Easy3         bot   ✔    │  │   └───────┘                         │  │
 │   ▸ 3         Oleg          61ms  ✔    │  │                                     │  │
-│   ▸ 4  Easy   Easy6         bot   ✔    │  │   Map: Classic · 10 min · 25 respawns│  │
+│   ▸ 4  Easy   Easy6         bot   ✔    │  │   Map: Classic · 10 min · ×10 (50) respawns│  │
 │   ▸ 5  Easy   Easy7         bot   ✔    │  └─────────────────────────────────────┘  │
 │                                                                                    │
 │   [ Add local player 2 ]                              host: [ Start match ]        │
@@ -52,7 +52,9 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
   find a bot row first. They can still click another slot to move.
 - Every slot is a button. Clicking a **bot** slot claims it, moving you there **and returning your
   previous slot to a bot** — a swap, not a second seat. Clicking your own slot releases it back to a
-  bot instead. Human-held slots (someone else's) are not clickable.
+  bot instead; releasing player 2's slot drops the second seat entirely, so the button goes back to
+  `Add local player 2`. Your last primary slot can't be released — you would vanish from the roster.
+  Human-held slots (someone else's) are not clickable.
 - **The preview updates on hover/focus**, before you commit: a live PixiJS thumbnail of the selected
   map with the hovered slot's spawn point pulsing, both flags marked, and a rendered preview of the
   tank you would drive in that team's colors with your nickname above it.
@@ -62,6 +64,9 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
 - Every bot slot shows its **difficulty (`Easy` / `Medium` / `Hard`)** as a button right before the
   bot's name — the host's per-bot difficulty control (§10.4), tap to cycle; `All bots:` sets every
   bot slot at once, or one team's at a time.
+- **Respawns per player** is a host-only dropdown here, live for everyone (§2.2): the roster can
+  change after the room was created — a new map resizes the teams — so the pool is retunable
+  without leaving the lobby. Guests see the same value as text.
 - The host may kick a player — their slot reverts to a bot at the slot's configured difficulty.
 - The host never needs to press `Ready` — their own seat(s) don't count toward the gate, and
   `Start match` is available to them as soon as every *other* human slot is `Ready`.

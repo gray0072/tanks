@@ -5,8 +5,8 @@
 // wherever the thumb lands (the Minecraft pattern) — and the whole other half
 // is the fire button, so shooting is a tap anywhere on that side instead of a
 // 76px target you have to find without looking. One small MINE button is the
-// only thing with a fixed position, parked in the outer bottom corner of the
-// fire side where a resting thumb doesn't sit.
+// only thing with a fixed position, parked in the outer top corner of the
+// fire side — above the low arc a thumb sweeps while shooting.
 //
 // Pointer Events, not Touch Events: the old touch-event version read
 // `e.touches[0]`, so the moment a second finger went down on the fire side

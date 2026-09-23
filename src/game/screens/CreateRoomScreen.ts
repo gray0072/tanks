@@ -21,8 +21,10 @@ import {
 import {
   BOT_DIFFICULTY_LABEL,
   DEFAULT_BOT_DIFFICULTY,
-  DEFAULT_RESPAWNS,
+  DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
+  RESPAWN_MULTIPLIERS,
+  respawnLabel,
   type BotDifficulty,
 } from "../../game/config";
 
@@ -71,12 +73,8 @@ export class CreateRoomScreen implements Screen {
               <option value="900">15 min</option>
             </select>
           </label>
-          <label>Respawns
-            <select data-f="respawns">
-              <option value="15">15</option>
-              <option value="25" selected>25</option>
-              <option value="40">40</option>
-            </select>
+          <label>Respawns per player
+            <select data-f="respawns"></select>
           </label>
           <label>Default bot difficulty
             <select data-f="difficulty">
@@ -116,6 +114,14 @@ export class CreateRoomScreen implements Screen {
     this.selectedMap = map.id;
     this.el.querySelector<HTMLElement>("[data-f=mapName]")!.textContent = map.name;
     this.el.querySelector<HTMLElement>("[data-f=mapMeta]")!.textContent = mapSizeLabel(map);
+    // The pool each multiplier works out to depends on this map's roster, so
+    // the options are rebuilt whenever the map does.
+    const select = this.field<HTMLSelectElement>("respawns");
+    const keep = select.value || String(DEFAULT_RESPAWN_MULT);
+    select.innerHTML = RESPAWN_MULTIPLIERS.map(
+      (m) => `<option value="${m}">${respawnLabel(m, map.spawns.blue.length, map.spawns.red.length)}</option>`,
+    ).join("");
+    select.value = keep;
     drawMapPreview(this.el.querySelector<HTMLCanvasElement>(".map-row-thumb")!, map);
   }
 
@@ -140,7 +146,7 @@ export class CreateRoomScreen implements Screen {
   private readSetup(): RoomSetup {
     return {
       timeLimit: Number(this.field<HTMLSelectElement>("timeLimit").value) || DEFAULT_TIME_LIMIT,
-      respawns: Number(this.field<HTMLSelectElement>("respawns").value) || DEFAULT_RESPAWNS,
+      respawnMult: Number(this.field<HTMLSelectElement>("respawns").value ?? DEFAULT_RESPAWN_MULT),
       botDifficulty: (this.field<HTMLSelectElement>("difficulty").value as BotDifficulty) || DEFAULT_BOT_DIFFICULTY,
       friendlyFire: (this.field("friendlyFire") as HTMLInputElement).checked,
     };
@@ -148,7 +154,7 @@ export class CreateRoomScreen implements Screen {
 
   private applySetup(setup: RoomSetup) {
     this.field<HTMLSelectElement>("timeLimit").value = String(setup.timeLimit);
-    this.field<HTMLSelectElement>("respawns").value = String(setup.respawns);
+    this.field<HTMLSelectElement>("respawns").value = String(setup.respawnMult);
     this.field<HTMLSelectElement>("difficulty").value = setup.botDifficulty;
     (this.field("friendlyFire") as HTMLInputElement).checked = setup.friendlyFire;
   }
@@ -165,7 +171,7 @@ export class CreateRoomScreen implements Screen {
       onError: (msg) => this.showError(msg),
     });
     room.setMap(this.selectedMap);
-    room.setSettings({ timeLimit: setup.timeLimit, respawns: setup.respawns, friendlyFire: setup.friendlyFire });
+    room.setSettings({ timeLimit: setup.timeLimit, respawnMult: setup.respawnMult, friendlyFire: setup.friendlyFire });
     room.setBotDifficulty("all", setup.botDifficulty);
     this.screens.go(new RoomScreen(this.screens, room));
   }

@@ -18,7 +18,7 @@ export class RoomClient implements RoomController {
   roomCode: string;
   slots: Slot[] = [];
   mapId = "";
-  settings: MatchSettings = { mapId: "", timeLimit: 0, respawns: 0, friendlyFire: false };
+  settings: MatchSettings = { mapId: "", timeLimit: 0, respawnMult: 0, friendlyFire: false };
 
   private net: ClientNetwork;
   private localInputs: [SeatInput, SeatInput] = [NO_INPUT, NO_INPUT];
@@ -102,6 +102,9 @@ export class RoomClient implements RoomController {
     this.net.send({ t: "claimSlot", slot, localSeat });
   }
   releaseSlot(slot: number) {
+    // Giving up seat 1's slot drops P2 out entirely (same rule as the host
+    // applies in doRelease), so clear the local flag the lobby button reads.
+    if (this.mySlots().find((s) => s.id === slot)?.ownerSeat === 1) this.hasSeat2 = false;
     this.net.send({ t: "releaseSlot", slot });
   }
   setReady(ready: boolean) {

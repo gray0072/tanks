@@ -78,7 +78,21 @@ export const MAX_STAR = 3;
 // real team size is whatever the loaded map declares — one slot per `r`/`b`
 // marker in its template (SPEC §3.5) — so a map can be 1v1 or 16v16.
 export const TEAM_SIZE = 5;
-export const DEFAULT_RESPAWNS = 25;
+// Respawns are a *multiplier on team size*, not a flat pool: a 1v1 map and a
+// 16v16 one want wildly different pools, and the roster is whatever the map
+// declares. Each team starts with mult x (its own slot count), so lopsided
+// maps (4 vs 6) give each side the same respawns per player.
+export const RESPAWN_MULTIPLIERS = [0, 1, 2, 3, 5, 10, 20, 50, 100];
+export const DEFAULT_RESPAWN_MULT = 10;
+
+/** How a multiplier reads in the lobby: `x10 (50)` when both teams field the
+ *  same roster, `x10 (50, 100)` — blue, red — when the map is lopsided. The
+ *  multiplier alone never says how many lives that actually is. */
+export function respawnLabel(mult: number, blueSize: number, redSize: number): string {
+  const blue = mult * blueSize;
+  const red = mult * redSize;
+  return `×${mult} (${blue === red ? blue : `${blue}, ${red}`})`;
+}
 export const DEFAULT_TIME_LIMIT = 10 * 60; // seconds
 export const RESPAWN_DELAY = 3; // s
 export const SPAWN_INVULN = 3; // s

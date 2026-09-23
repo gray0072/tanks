@@ -13,7 +13,13 @@ type SeatBindings = {
   mine: string[];
 };
 
-// SPEC §5.1 — Player 1: WASD / Space / Q. Player 2 (local co-op): Arrows / Enter / RShift.
+// SPEC §5.1 — Player 1: WASD / LShift / Q. Player 2 (local co-op): Arrows / RShift / M.
+//
+// Everything below is a `KeyboardEvent.code` — a *physical* key, not the
+// character it produces — so the bindings are identical on a Russian (or any
+// other) layout: `keyq` is the key labelled Й, `keyw` the one labelled Ц.
+// Ctrl is deliberately not bound: `Ctrl`+`W` closes the tab and no page can
+// stop it outside fullscreen.
 const BINDINGS: [SeatBindings, SeatBindings] = [
   {
     dirs: {
@@ -22,7 +28,7 @@ const BINDINGS: [SeatBindings, SeatBindings] = [
       [Dir.Down]: ["keys"],
       [Dir.Left]: ["keya"],
     },
-    fire: ["space"],
+    fire: ["shiftleft"],
     mine: ["keyq"],
   },
   {
@@ -32,8 +38,8 @@ const BINDINGS: [SeatBindings, SeatBindings] = [
       [Dir.Down]: ["arrowdown"],
       [Dir.Left]: ["arrowleft"],
     },
-    fire: ["enter", "controlright"],
-    mine: ["shiftright"],
+    fire: ["shiftright"],
+    mine: ["keym"],
   },
 ];
 
@@ -47,9 +53,9 @@ const DIAGONAL: Partial<Record<CardinalDir, Partial<Record<CardinalDir, Dir>>>> 
 };
 
 const PREVENT_DEFAULT = new Set([
-  "keyw", "keya", "keys", "keyd", "keyq", "space",
+  "keyw", "keya", "keys", "keyd", "keyq", "shiftleft",
   "arrowup", "arrowdown", "arrowleft", "arrowright",
-  "enter", "controlright", "shiftright", "tab", "escape",
+  "keym", "shiftright", "tab", "escape",
 ]);
 
 export class Input {

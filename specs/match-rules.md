@@ -28,7 +28,16 @@ A match ends the moment any of these is true:
 | A team's **respawns** hit 0 and its last tank dies | The other team |
 | **Time limit** expires | Team with more frags; tie broken by flag armor remaining; still tied → draw |
 
-Defaults: **25 respawns** per team, **10 minute** limit.
+Respawns are set as a **multiplier on team size**, not a flat pool: `×0 ×1 ×2 ×3 ×5 ×10 ×20 ×50
+×100`, default **×10**. Each team's starting pool is `multiplier × its own slot count`, so a lopsided
+map (4 vs 6) still gives both sides the same number of lives *per player*. The lobby shows what the
+multiplier works out to — `×10 (50)`, or `×10 (50, 100)` (blue, red) when the teams differ in size.
+
+Defaults: **×10 respawns** per player, **10 minute** limit.
+
+**Every match starts on pristine terrain.** A `MapDef` is parsed once and cached (`maps/loader.ts`),
+so the `Sim` takes a **copy** of its grid — shot-out bricks and `SHOVEL` walls belong to the match,
+not to the map. Without the copy a rematch would begin on the last round's wreckage.
 
 ## 2.3 Lives, death, respawn
 

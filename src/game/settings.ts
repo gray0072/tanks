@@ -4,7 +4,7 @@
 import { loadSetting, saveSetting } from "../util/storage";
 import {
   DEFAULT_BOT_DIFFICULTY,
-  DEFAULT_RESPAWNS,
+  DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
   type BotDifficulty,
 } from "./config";
@@ -50,14 +50,14 @@ export function randomGuestNickname(): string {
 
 export type RoomSetup = {
   timeLimit: number; // seconds
-  respawns: number;
+  respawnMult: number; // respawns per team member
   botDifficulty: BotDifficulty;
   friendlyFire: boolean;
 };
 
 export const DEFAULT_ROOM_SETUP: RoomSetup = {
   timeLimit: DEFAULT_TIME_LIMIT,
-  respawns: DEFAULT_RESPAWNS,
+  respawnMult: DEFAULT_RESPAWN_MULT,
   botDifficulty: DEFAULT_BOT_DIFFICULTY,
   friendlyFire: false,
 };

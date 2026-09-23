@@ -21,7 +21,7 @@ import type { RoomCallbacks, RoomController } from "./room";
 import { NO_INPUT } from "./room";
 import {
   DEFAULT_BOT_DIFFICULTY,
-  DEFAULT_RESPAWNS,
+  DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
   TICK_DT,
   NET_SNAPSHOT_HZ,
@@ -65,7 +65,7 @@ export class RoomHost implements RoomController {
     this.settings = {
       mapId: this.mapId,
       timeLimit: DEFAULT_TIME_LIMIT,
-      respawns: DEFAULT_RESPAWNS,
+      respawnMult: DEFAULT_RESPAWN_MULT,
       friendlyFire: false,
     };
 
@@ -235,6 +235,10 @@ export class RoomHost implements RoomController {
     const isOnlyPrimarySlot =
       s.ownerSeat === 0 && !this.slots.some((p) => p !== s && p.owner === owner && p.ownerSeat === 0);
     if (isOnlyPrimarySlot) return;
+    // Releasing seat 1's slot *is* dropping P2, so the local-co-op flag goes
+    // with it — otherwise the lobby keeps offering "Remove local player 2"
+    // for a player who is no longer in the roster.
+    if (owner === "host" && s.ownerSeat === 1) this.hasSeat2 = false;
     this.resetSlotToBot(s);
     this.publishRoomState();
   }

@@ -7,10 +7,19 @@ Part of the [Tanks specification](../SPEC.md) — section numbers (§) are index
 | Action | Player 1 | Player 2 (local co-op) |
 |---|---|---|
 | Move | `W` `A` `S` `D` | Arrow keys |
-| Fire | `Space` | `Enter` (or `Right Ctrl`) |
-| Drop mine | `Q` | `Right Shift` |
+| Fire | `Left Shift` | `Right Shift` |
+| Drop mine | `Q` | `M` |
 | Scoreboard | hold `Tab` | — |
 | Menu / pause overlay | `Esc` | — |
+
+**Bindings are physical keys** (`KeyboardEvent.code`), never the character produced, so they are
+the same on a Russian or any other layout: `Q` is whatever key sits where `Q` sits (Й), `M` likewise.
+
+**`Ctrl` is deliberately unbound.** It is the natural fire key next to `WASD`, but `Ctrl`+`W` closes
+the tab and `Ctrl`+`Tab` switches it, and a page cannot stop either: browser-reserved chords are
+never delivered cancellable. Keyboard Lock would intercept them, but only while fullscreen and only
+on Chromium — not a base a control scheme can stand on. `Shift` carries no such chords with `WASD`
+or the arrows, so fire lives there instead.
 
 Holding two adjacent direction keys (e.g. `W`+`D`) drives/faces diagonally between them. Holding an
 opposing pair on one axis (e.g. `W`+`S`) resolves last-pressed-wins, same as a single direction always
@@ -32,7 +41,7 @@ whole of each zone is the control:
 |---|---|
 | **Movement half** (left by default) | A **floating stick**: it has no home position — it appears wherever the thumb lands and follows the drag, giving any of the 8 `Dir` values. Lift to stop. |
 | **Fire half** (right by default) | **Tap anywhere to fire, hold to keep firing.** No aiming — the tank shoots where it faces, so the whole half can be one button. |
-| `MINE` button | The one fixed widget, in the outer bottom corner of the fire half, inside the safe area. |
+| `MINE` button | The one fixed widget, in the outer top corner of the fire half, inside the safe area — clear of the low arc the firing thumb sweeps. |
 
 Why a floating stick rather than a d-pad in a corner: a phone held in landscape gives the thumbs a
 small, *unpredictable* arc, and a fixed pad means looking away from the fight to find it. Putting the

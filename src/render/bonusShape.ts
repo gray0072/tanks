@@ -41,7 +41,7 @@ export const BONUS_INFO: Record<BonusKind, { title: string; text: string }> = {
   CLOCK: { title: "Clock", text: "Team bonus — every enemy tank is frozen in place for a few seconds." },
   GRENADE: { title: "Grenade", text: "Team bonus — destroys every enemy tank on the field at once." },
   RESPAWN: { title: "Respawn", text: "Team bonus — refills your team's pool of remaining respawns." },
-  MINE: { title: "Mines", text: "Hands you proximity mines to drop behind you (Q, or Right Shift for player 2); only your team can see them." },
+  MINE: { title: "Mines", text: "Hands you proximity mines to drop behind you (Q, or M for player 2); only your team can see them." },
 };
 
 function starPoints(cx: number, cy: number, outer: number, inner: number, points: number): number[] {
