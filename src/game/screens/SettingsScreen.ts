@@ -4,6 +4,7 @@ import { MainMenuScreen } from "./MainMenuScreen";
 import { loadUserSettings, saveUserSettings, type Quality, type TouchSide } from "../settings";
 import { audio } from "../../audio/audio";
 import { bindEnter } from "../../util/dialog";
+import { menuBackdrop as backdrop } from "../menuBackdrop";
 
 export class SettingsScreen implements Screen {
   private el!: HTMLElement;
@@ -41,6 +42,9 @@ export class SettingsScreen implements Screen {
           <input type="checkbox" data-f="autoFullscreen" style="width:auto" ${s.autoFullscreen ? "checked" : ""}/> Fullscreen on match start (touch)
         </label>
         <label style="flex-direction:row;align-items:center;gap:6px;">
+          <input type="checkbox" data-f="menuBackdrop" style="width:auto" ${s.menuBackdrop ? "checked" : ""}/> Live battle behind the menus
+        </label>
+        <label style="flex-direction:row;align-items:center;gap:6px;">
           <input type="checkbox" data-f="showPing" style="width:auto" ${s.showPing ? "checked" : ""}/> Show ping
         </label>
         <div class="row between">
@@ -62,8 +66,13 @@ export class SettingsScreen implements Screen {
     const touchSide = this.field<HTMLSelectElement>("touchSide").value as TouchSide;
     const autoFullscreen = (this.field("autoFullscreen") as HTMLInputElement).checked;
     const showPing = (this.field("showPing") as HTMLInputElement).checked;
-    saveUserSettings({ nickname, volume, quality, touchSide, autoFullscreen, showPing });
+    const menuBackdrop = (this.field("menuBackdrop") as HTMLInputElement).checked;
+    saveUserSettings({ nickname, volume, quality, touchSide, autoFullscreen, showPing, menuBackdrop });
     audio.setVolume(volume);
+    // The backdrop reads the setting when it starts, so a toggle only takes
+    // effect on the next start — force one either way as we leave.
+    backdrop.setVisible(false);
+    backdrop.setVisible(true);
     this.screens.go(new MainMenuScreen(this.screens));
   }
 

@@ -19,6 +19,7 @@ tanks/
    │  ├─ config.ts             # all tunables from this spec
    │  ├─ settings.ts           # persisted per-viewer settings (volume, quality, ...)
    │  ├─ touchControls.ts      # the mobile two-zone overlay (§5.3): floating stick + fire half
+   │  ├─ menuBackdrop.ts       # the live bot match behind the menus (§6.3)
    │  ├─ ScreenManager.ts
    │  └─ screens/              # MainMenu, CreateRoom, JoinRoom, Room, Match, Result, Settings
    ├─ world/

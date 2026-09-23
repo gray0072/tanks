@@ -4,7 +4,8 @@ Part of the [Tanks specification](../SPEC.md) — section numbers (§) are index
 
 Screens are a stack managed by `ScreenManager`; exactly one is active and rendered per frame.
 
-1. **Main Menu** — logo, `Create room`, `Join room`, `Level editor`, `Settings`, `How to play`.
+1. **Main Menu** — logo, `Create room`, `Join room`, `Level editor`, `Settings`, `How to play`,
+   over the live backdrop (§6.3).
 2. **Create room** — nickname, the chosen map (thumbnail + name + size/roster, with `Change…`
    opening the map library below), match settings (time limit, respawn count, friendly fire,
    **default bot difficulty — `Medium`**), `Create`. Produces the room code.
@@ -21,7 +22,8 @@ Screens are a stack managed by `ScreenManager`; exactly one is active and render
 8. **Scoreboard overlay** — held `Tab` or a HUD button; per-player stats, ping, team totals.
 9. **Result** — winner banner, final scoreboard, MVP line, `Rematch` (host) / `Back to room`.
 10. **Settings** — sound and music volume, render quality (auto/low/high), movement stick side
-   (§5.3), fullscreen-on-match-start (§5.4), nickname, show-ping toggle.
+   (§5.3), fullscreen-on-match-start (§5.4), **live battle behind the menus** (§6.3), nickname,
+   show-ping toggle.
 11. **Disconnected overlay** — reconnect progress and a `Back to menu` escape hatch.
 
 ## 6.1 Room screen and slot preview
@@ -85,3 +87,32 @@ sound and an arrow pointing at the base. The top bar also carries the three HUD 
 browser's own fullscreen control and `Esc`; they are bound unconditionally, since a mouse user has no
 reason to be denied them. On touch the personal-state line moves from the bottom-left of the arena to
 the top-left, out from under the `MINE` button.
+
+## 6.3 Live menu backdrop
+
+Every menu screen is drawn over a **real bot-vs-bot match**, not a static image: `MenuBackdrop`
+(`src/game/menuBackdrop.ts`) runs the same `Sim`, the same `BotController`s and the same `Arena`
+renderer a match uses, into its own canvas layer behind `#ui`. Nothing else about it is like a
+match — it is the menu's wallpaper, and every rule below exists to keep it from competing with the
+menu in front of it.
+
+- **It is scenery, not a match.** All slots are bots at `hard` (a livelier fight), there is no HUD,
+  no nicknames over the tanks and **no audio at all** — a menu that fires cannons at someone who
+  hasn't started anything is a bug, not atmosphere. The layer has `pointer-events: none`, so every
+  click belongs to the menu.
+- **It reads as texture.** CSS does the work: a light blur, reduced saturation, and a scrim that is
+  heaviest in the middle of the screen — exactly where the title and the menu panel sit. The panels
+  themselves stay fully opaque, so the only text ever over live pixels is the title, subtitle and
+  the GitHub link, which carry a shadow.
+- **A spectator camera** frames the fight instead of showing the whole map: the view is scaled to
+  *cover* the viewport (letterbox bars behind a menu would look like a bug), zoomed in by viewport
+  width, and drifts toward the midpoint of the closest blue/red pair — speed-capped and with a dead
+  zone, so it drifts rather than chases. On a wide screen it holds that point at ~¼ of the width,
+  in the space the centred menu panel doesn't use. Forest concealment is off: it hides enemies from
+  a *player*, and a backdrop whose tanks disappear into the bushes is a backdrop of empty scenery.
+- **Rounds are short** (2½ minutes, generous respawns) and each one picks a different built-in map,
+  so a long menu session doesn't settle into one picture. Custom maps are excluded.
+- **It yields.** `ScreenManager` starts and stops it per screen from `Screen.backdrop`; the match
+  and the editor own the canvas themselves, so it is destroyed outright — WebGL context included —
+  before either mounts, and rebuilt when the menu comes back. It also stops while the tab is hidden,
+  is off under `prefers-reduced-motion`, and can be turned off in Settings.

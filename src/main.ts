@@ -1,5 +1,6 @@
 import "./style.css";
 import { ScreenManager } from "./game/ScreenManager";
+import { menuBackdrop } from "./game/menuBackdrop";
 import { MainMenuScreen } from "./game/screens/MainMenuScreen";
 import { JoinRoomScreen } from "./game/screens/JoinRoomScreen";
 import { MatchScreen } from "./game/screens/MatchScreen";
@@ -10,6 +11,14 @@ import { DEBUG_MAP_ID } from "./world/maps/debugMap";
 
 const root = document.getElementById("ui");
 if (!root) throw new Error("#ui not found");
+
+// The menu backdrop's canvas layer sits behind #ui (see style.css) and is
+// started/stopped by the ScreenManager per screen — SPEC §6.3.
+const backdropLayer = document.createElement("div");
+backdropLayer.className = "menu-backdrop";
+backdropLayer.setAttribute("aria-hidden", "true");
+document.body.insertBefore(backdropLayer, root);
+menuBackdrop.attach(backdropLayer);
 
 const screens = new ScreenManager(root);
 

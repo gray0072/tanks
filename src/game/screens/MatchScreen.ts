@@ -28,6 +28,10 @@ import { bindEnter } from "../../util/dialog";
 type LiveStat = { frags: number; deaths: number };
 
 export class MatchScreen implements Screen {
+  /** This screen draws its own arena; the menu backdrop shuts down while
+   *  it's up (ScreenManager). */
+  readonly backdrop = false;
+
   private el!: HTMLElement;
   private topbarHost!: HTMLElement;
   private arenaHost!: HTMLElement;

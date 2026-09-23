@@ -48,6 +48,11 @@ type TankVisual = {
   team: TeamId;
 };
 
+export type ArenaOptions = {
+  /** Draw nicknames above tanks. On by default; off for the menu backdrop. */
+  labels?: boolean;
+};
+
 export class Arena {
   readonly world = new Container();
 
@@ -74,6 +79,10 @@ export class Arena {
   private flagSprites: Record<TeamId, Sprite>;
   private flagDestroyed: Record<TeamId, boolean> = { blue: false, red: false };
 
+  /** In-flight explosion sprites, keyed by the ticker callback driving them
+   *  (see spawnBurst/destroy). */
+  private bursts = new Map<() => void, Sprite>();
+
   private prev: Snapshot | null = null;
   private curr: Snapshot | null = null;
   private currAt = 0;
@@ -87,7 +96,13 @@ export class Arena {
   // right at a direction change, since prev/curr suddenly disagree on facing.
   private snapInterval = SNAP_INTERVAL_MS;
 
-  constructor(private atlas: Atlas, private map: MapDef, slots: Slot[]) {
+  /** Set from `ArenaOptions.labels`; when false no tank gets a nickname
+   *  above it (the menu backdrop, SPEC §6.3 — names nobody can act on are
+   *  just noise behind the menu text). */
+  private labels: boolean;
+
+  constructor(private atlas: Atlas, private map: MapDef, slots: Slot[], opts: ArenaOptions = {}) {
+    this.labels = opts.labels ?? true;
     const bg = new Graphics().rect(0, 0, map.width * CELL, map.height * CELL).fill(0x2a2f22);
     this.world.addChild(bg);
     this.world.addChild(this.decalLayer);
@@ -214,7 +229,7 @@ export class Arena {
     body.position.set(TANK_SIZE / 2, TANK_SIZE / 2);
     const shield = new Graphics();
     const style = new TextStyle({ fill: 0xffffff, fontSize: 9, fontFamily: "system-ui, sans-serif" });
-    const label = new Text({ text: slot.nickname, style });
+    const label = new Text({ text: this.labels ? slot.nickname : "", style });
     label.anchor.set(0.5, 1);
     label.position.set(TANK_SIZE / 2, -3);
     const stars = new Container();
@@ -229,6 +244,7 @@ export class Arena {
   }
 
   updateSlots(slots: Slot[]) {
+    if (!this.labels) return;
     for (const slot of slots) {
       const v = this.tankVisuals.get(slot.id);
       if (v) v.label.text = slot.nickname;
@@ -256,11 +272,9 @@ export class Arena {
       const t = Math.min(1, age / opts.life);
       s.scale.set(0.4 + t * opts.maxScale);
       s.alpha = Math.max(0, 1 - t);
-      if (t >= 1) {
-        s.destroy();
-        this.app?.ticker.remove(anim);
-      }
+      if (t >= 1) this.endBurst(s, anim);
     };
+    this.bursts.set(anim, s);
     this.app?.ticker.add(anim);
   }
 
@@ -430,7 +444,18 @@ export class Arena {
     });
   }
 
+  private endBurst(s: Sprite, anim: () => void) {
+    this.bursts.delete(anim);
+    this.app?.ticker.remove(anim);
+    if (!s.destroyed) s.destroy();
+  }
+
   destroy() {
+    // Bursts animate off the shared ticker, which outlives this Arena when
+    // the Application doesn't (the menu backdrop rebuilds the scene between
+    // rounds). Left running, they'd keep scaling sprites this destroy() has
+    // just torn out from under them.
+    for (const [anim, sprite] of this.bursts) this.endBurst(sprite, anim);
     this.world.destroy({ children: true });
   }
 }

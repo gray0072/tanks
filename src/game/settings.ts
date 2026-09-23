@@ -19,6 +19,7 @@ export type UserSettings = {
   touchSide: TouchSide; // which thumb gets the movement stick (SPEC §5.3)
   autoFullscreen: boolean; // go fullscreen + landscape when a match starts, touch devices only
   showPing: boolean;
+  menuBackdrop: boolean; // run the live bot match behind the menus (SPEC §6.3)
 };
 
 const DEFAULTS: UserSettings = {
@@ -28,6 +29,7 @@ const DEFAULTS: UserSettings = {
   touchSide: "left",
   autoFullscreen: true,
   showPing: true,
+  menuBackdrop: true,
 };
 
 export function loadUserSettings(): UserSettings {

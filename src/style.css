@@ -31,7 +31,47 @@ html, body {
   inset: 0;
   display: flex;
   flex-direction: column;
+  /* Above .menu-backdrop, which is a sibling inserted before it. */
+  z-index: 1;
 }
+
+/* --- Live menu backdrop (SPEC §6.3) ---------------------------------------
+   A real bot match renders into this layer behind every menu screen. It must
+   read as texture, not as content: blurred and desaturated so no individual
+   tank pulls the eye, darkened so white text keeps its contrast, and covered
+   by a scrim that is heaviest in the middle, which is exactly where the menu
+   panel and title sit. Never interactive — pointer-events are off on the
+   whole layer, so clicks land on the menu as if it weren't there. */
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+}
+.menu-backdrop-mount {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 800ms ease;
+  filter: blur(2px) saturate(0.85) brightness(0.9);
+  /* The blur samples past the canvas edge and would otherwise leave a pale
+     halo around the viewport; overscanning hides it. */
+  transform: scale(1.05);
+}
+.menu-backdrop-mount.is-on { opacity: 1; }
+.menu-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 65% at 50% 50%,
+      rgba(11, 15, 20, 0.82) 0%, rgba(11, 15, 20, 0.62) 50%, rgba(11, 15, 20, 0.34) 100%),
+    linear-gradient(to bottom, rgba(11, 15, 20, 0.5), rgba(11, 15, 20, 0.15) 45%, rgba(11, 15, 20, 0.6));
+}
+/* The menu's un-panelled text — everything else sits on an opaque panel. */
+.title, .subtitle, .repo-link { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75); }
 
 .screen {
   flex: 1;

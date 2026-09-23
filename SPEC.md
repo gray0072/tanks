@@ -23,7 +23,7 @@ and are cited throughout the code and the docs — use the table below to find t
 | 3 | The arena — dimensions, layout, surfaces, maps, map file format, example maps | [specs/arena.md](specs/arena.md) |
 | 4 | Tanks, weapons and bonuses | [specs/tanks-and-bonuses.md](specs/tanks-and-bonuses.md) |
 | 5 | Controls — desktop, local co-op, mobile, fullscreen | [specs/controls.md](specs/controls.md) |
-| 6 | Screens — menu, room screen, HUD | [specs/screens.md](specs/screens.md) |
+| 6 | Screens — menu, room screen, HUD, live menu backdrop | [specs/screens.md](specs/screens.md) |
 | 7 | Rendering (PixiJS) | [specs/rendering-and-simulation.md](specs/rendering-and-simulation.md#7-rendering-pixijs) |
 | 8 | Simulation | [specs/rendering-and-simulation.md](specs/rendering-and-simulation.md#8-simulation) |
 | 9 | Networking — topology, room code, messages, failure handling | [specs/networking.md](specs/networking.md) |

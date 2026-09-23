@@ -58,6 +58,14 @@ wears a spinning ring of that icon (`Arena.syncAuras`, derived from the snapshot
 pickup + tank-with-aura + effect, and its overlay is now near-opaque. Verified by driving Chromium
 through a real match (bots picking bonuses up) and screenshotting the legend, not just `tsc`.
 
+**2026-09-23 (menu backdrop):** the menus no longer sit on black — `src/game/menuBackdrop.ts` runs a
+real bot-vs-bot match (same `Sim`, bots and `Arena`) in a canvas layer behind `#ui`, blurred and
+dimmed in CSS, with a spectator camera that drifts toward the closest blue/red pair and parks it
+beside the menu panel (SPEC §6.3). `createPixiApp` grew `fit: "cover"`, a per-frame `zoom` and
+`setFocus(point, anchor)` for it; `Screen.backdrop = false` is how MatchScreen/EditorScreen shut it
+down, and Settings has an off switch. Verified by driving Chromium at 1280x720 and 412x916 —
+including the toggle round-trip and that the backdrop's WebGL context is really gone in a match.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project

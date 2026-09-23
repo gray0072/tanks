@@ -73,6 +73,10 @@ const MAX_CELL_PX = 32;
 const TEST_MAP_ID = "custom-editor-test";
 
 export class EditorScreen implements Screen {
+  /** This screen draws its own arena; the menu backdrop shuts down while
+   *  it's up (ScreenManager). */
+  readonly backdrop = false;
+
   private el!: HTMLElement;
   private canvas!: HTMLCanvasElement;
   private doc: EditorDoc;
