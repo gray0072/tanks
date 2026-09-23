@@ -18,7 +18,7 @@ export class RoomClient implements RoomController {
   roomCode: string;
   slots: Slot[] = [];
   mapId = "";
-  settings: MatchSettings = { mapId: "", timeLimit: 0, respawnMult: 0, friendlyFire: false };
+  settings: MatchSettings = { mapId: "", winsTarget: 0, timeLimit: 0, respawnMult: 0, friendlyFire: false };
 
   private net: ClientNetwork;
   private localInputs: [SeatInput, SeatInput] = [NO_INPUT, NO_INPUT];
@@ -80,12 +80,23 @@ export class RoomClient implements RoomController {
       case "events":
         this.cb.onMatchEvents?.(msg.events);
         break;
+      case "roundEnd":
+        this.cb.onRoundEnd?.({
+          winner: msg.winner,
+          wins: msg.wins,
+          round: msg.round,
+          nextRoundIn: msg.nextRoundIn,
+        });
+        break;
+      case "roundStart":
+        this.cb.onRoundStart?.({ round: msg.round, wins: msg.wins });
+        break;
       case "matchEnd":
         // Must be cleared before setCallbacks() can replay it, or every screen
         // that mounts afterwards is thrown straight back into the match that
         // just ended.
         this.lastMatchStart = null;
-        this.cb.onMatchEnd?.(msg.winner, msg.stats);
+        this.cb.onMatchEnd?.(msg.winner, msg.stats, msg.wins);
         break;
       case "kicked":
         this.cb.onKicked?.();

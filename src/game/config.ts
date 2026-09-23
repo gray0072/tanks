@@ -93,7 +93,29 @@ export function respawnLabel(mult: number, blueSize: number, redSize: number): s
   const red = mult * redSize;
   return `×${mult} (${blue === red ? blue : `${blue}, ${red}`})`;
 }
-export const DEFAULT_TIME_LIMIT = 10 * 60; // seconds
+// Selectable round lengths, 1..10 minutes. A round is one fight, not the
+// whole match (see MAP_WINS_* below), so these are deliberately shorter than
+// a match: the clock only decides a round nobody won outright.
+export const TIME_LIMIT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((m) => m * 60);
+export const DEFAULT_TIME_LIMIT = 5 * 60; // seconds
+
+// --- Rounds and the match series (SPEC §2.2) ---
+// A match is a series of rounds on one map; the first team to win
+// `winsTarget` rounds takes the match. It is a room setting, chosen when the
+// room is created alongside the round length, and like the rest of
+// MatchSettings it is the host's to set and rides the wire to every guest.
+export const WINS_TARGET_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+export const DEFAULT_WINS_TARGET = 5;
+
+/** "first to 5" — how long a match runs, in rounds won. The lobby states it
+ *  wherever it states the round length. */
+export function winsTargetLabel(winsTarget: number): string {
+  return `first to ${winsTarget}`;
+}
+// Breather between rounds: the score goes up, the countdown runs, and the
+// next round starts on rebuilt terrain when it hits 0.
+export const ROUND_INTERMISSION = 3; // s
+
 export const RESPAWN_DELAY = 3; // s
 export const SPAWN_INVULN = 3; // s
 

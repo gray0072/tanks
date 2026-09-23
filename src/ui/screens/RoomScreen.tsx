@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Navigate } from "../routes";
 import type { RoomController } from "../../net/room";
+import type { MatchSettings } from "../../world/rules";
 import type { MapDef } from "../../world/maps/loader";
 import type { Slot } from "../../world/tank";
 import { getMap, getTransientSource } from "../../world/maps/loader";
@@ -12,16 +13,22 @@ import {
   MapStorageError,
   uniqueMapName,
 } from "../../world/maps/customMaps";
-import { drawMapPreview, drawTankPreview } from "../../render/preview";
+import { drawMapPreview } from "../../render/preview";
 import { useEnterKey } from "../hooks/useEnterKey";
 import {
   BOT_DIFFICULTIES as DIFFS,
   BOT_DIFFICULTY_LABEL as DIFF_LABEL,
   DEFAULT_RESPAWN_MULT,
+  DEFAULT_TIME_LIMIT,
+  DEFAULT_WINS_TARGET,
   RESPAWN_MULTIPLIERS,
+  TIME_LIMIT_OPTIONS,
+  WINS_TARGET_OPTIONS,
   respawnLabel,
+  winsTargetLabel,
   type TeamId,
 } from "../../game/config";
+import { loadRoomSetup, saveRoomSetup } from "../../game/settings";
 
 export function RoomScreen({ go, room }: { go: Navigate; room: RoomController }) {
   const [slots, setSlots] = useState<Slot[]>(room.slots);
@@ -58,6 +65,26 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
   // be Ready — only other humans block Start match.
   const humansReady = slots.filter((s) => s.kind === "human" && s.owner !== "host").every((s) => s.ready);
   const mult = room.settings?.respawnMult ?? DEFAULT_RESPAWN_MULT;
+  const winsTarget = room.settings?.winsTarget ?? DEFAULT_WINS_TARGET;
+  const timeLimit = room.settings?.timeLimit ?? DEFAULT_TIME_LIMIT;
+  const friendlyFire = room.settings?.friendlyFire ?? false;
+
+  /** Host-only: push a rule change to the room and remember it for this map,
+   *  so the next room on it opens the way this one was left (settings.ts
+   *  keeps a set per map). `setSettings` doesn't come back as room state for
+   *  the host itself, hence the explicit re-render. */
+  const patchSettings = (patch: Partial<MatchSettings>) => {
+    room.setSettings(patch);
+    const next = { ...room.settings };
+    saveRoomSetup(room.mapId, {
+      ...loadRoomSetup(room.mapId),
+      winsTarget: next.winsTarget,
+      timeLimit: next.timeLimit,
+      respawnMult: next.respawnMult,
+      friendlyFire: next.friendlyFire,
+    });
+    forceRender((n) => n + 1);
+  };
 
   /** Respawns read as `x10 (50)`, or `x10 (50, 100)` when the map fields
    *  different-sized teams — the pool is per team, so one number wouldn't be
@@ -167,22 +194,9 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
         </div>
         <div className="preview-panel">
           <MapPreview map={map} hovered={hovered} />
-          <TankPreview hovered={hovered} />
           {/* Size and roster sit where the decision is made, same as on a map
               card (specs/level-editor.md §5.2). */}
-          <div className="hint">
-            {map
-              ? "Map: " +
-                map.name +
-                " · " +
-                mapSizeLabel(map) +
-                " · " +
-                (((room.settings?.timeLimit ?? 0) / 60) | 0) +
-                " min · " +
-                respawnOptionLabel(mult) +
-                " respawns"
-              : ""}
-          </div>
+          <div className="hint">{map ? "Map: " + map.name + " · " + mapSizeLabel(map) : ""}</div>
           <div className="row wrap">
             {map ? (
               <SaveMapAction
@@ -195,26 +209,57 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
               />
             ) : null}
           </div>
-          <div className="row wrap">
+          {/* The match rules live here, not on Create Room: they are the
+              room's own state (MatchSettings), the host may change them right
+              up to Start match, and every guest sees the change arrive. */}
+          <div className="row wrap room-settings">
             {isHost ? (
-              <label>
-                Respawns per player
-                <select
-                  value={mult}
-                  onChange={(e) => {
-                    room.setSettings({ respawnMult: Number(e.target.value) });
-                    forceRender((n) => n + 1);
-                  }}
-                >
-                  {RESPAWN_MULTIPLIERS.map((m) => (
-                    <option key={m} value={m}>
-                      {respawnOptionLabel(m)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <>
+                <label>
+                  Rounds to win
+                  <select value={winsTarget} onChange={(e) => patchSettings({ winsTarget: Number(e.target.value) })}>
+                    {WINS_TARGET_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Round time limit
+                  <select value={timeLimit} onChange={(e) => patchSettings({ timeLimit: Number(e.target.value) })}>
+                    {TIME_LIMIT_OPTIONS.map((secs) => (
+                      <option key={secs} value={secs}>
+                        {secs / 60} min
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Respawns per player
+                  <select value={mult} onChange={(e) => patchSettings({ respawnMult: Number(e.target.value) })}>
+                    {RESPAWN_MULTIPLIERS.map((m) => (
+                      <option key={m} value={m}>
+                        {respawnOptionLabel(m)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="row-label">
+                  <input
+                    type="checkbox"
+                    style={{ width: "auto" }}
+                    checked={friendlyFire}
+                    onChange={(e) => patchSettings({ friendlyFire: e.target.checked })}
+                  />{" "}
+                  Friendly fire
+                </label>
+              </>
             ) : (
-              <span className="hint">Respawns per player: {respawnOptionLabel(mult)}</span>
+              <span className="hint">
+                {winsTargetLabel(winsTarget)} · {(timeLimit / 60) | 0} min/round · {respawnOptionLabel(mult)} respawns
+                {friendlyFire ? " · friendly fire" : ""}
+              </span>
             )}
           </div>
           <div className="row wrap">
@@ -329,17 +374,6 @@ function MapPreview({ map, hovered }: { map: MapDef | null; hovered: Slot | unde
   return <canvas ref={canvas} width={256} height={160} />;
 }
 
-/** Hidden, not just cleared, while nothing is hovered: a touch device never
- *  hovers, so a permanently blank 300x190 canvas would only push the Start
- *  match button off the bottom of a phone screen. */
-function TankPreview({ hovered }: { hovered: Slot | undefined }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (!canvas.current || !hovered) return;
-    drawTankPreview(canvas.current, hovered.team, hovered.nickname);
-  }, [hovered]);
-  return <canvas ref={canvas} width={300} height={190} hidden={!hovered} />;
-}
 
 /** A guest is playing on the host's own map; offer to keep it. This is the
  *  only way someone else's map enters the local library

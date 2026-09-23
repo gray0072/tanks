@@ -14,7 +14,22 @@ export type RoomCallbacks = {
   onMatchStart?: (mapId: string, seed: number, settings: MatchSettings, slots: Slot[]) => void;
   onSnapshot?: (snap: Snapshot) => void;
   onMatchEvents?: (events: MatchEvent[]) => void;
-  onMatchEnd?: (winner: TeamId | "draw" | null, stats: Record<number, PlayerStats>) => void;
+  /** One round of the series ended; the score moved and the next round is
+   *  `nextRoundIn` seconds away (SPEC §2.2). */
+  onRoundEnd?: (e: {
+    winner: TeamId;
+    wins: Record<TeamId, number>;
+    round: number;
+    nextRoundIn: number;
+  }) => void;
+  /** The next round of the series is running — the match screen rebuilds its
+   *  scene for the restored terrain. */
+  onRoundStart?: (e: { round: number; wins: Record<TeamId, number> }) => void;
+  onMatchEnd?: (
+    winner: TeamId | null,
+    stats: Record<number, PlayerStats>,
+    wins: Record<TeamId, number>,
+  ) => void;
   onError?: (message: string) => void;
   onKicked?: () => void;
 };

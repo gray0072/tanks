@@ -24,6 +24,8 @@ export type HudHandle = {
 export function HudTop({
   snap,
   frags,
+  wins,
+  winsTarget,
   scoreboardPinned,
   fullscreenAvailable,
   fullscreenActive,
@@ -31,6 +33,11 @@ export function HudTop({
 }: {
   snap: Snapshot | null;
   frags: Record<TeamId, number>;
+  /** Rounds won so far, and how many take the match (SPEC §2.2). The frag
+   *  counts either side of it are per-match too, but the rounds are what
+   *  actually decides it, so they sit in the middle with the clock. */
+  wins: Record<TeamId, number>;
+  winsTarget: number;
   scoreboardPinned: boolean;
   fullscreenAvailable: boolean;
   fullscreenActive: boolean;
@@ -50,7 +57,21 @@ export function HudTop({
         <span className="hud-respawns">{respawns("blue")}</span> respawns ·{" "}
         <span className="hud-frags">{frags.blue}</span> frags <span className="hud-flag">{flag("blue")}</span>
       </div>
-      <div className="hud-timer">{minutes + ":" + String(seconds).padStart(2, "0")}</div>
+      <div className="hud-center">
+        <div className="hud-rounds" title={`Rounds won — first to ${winsTarget}`}>
+          <span className="hud-blue">{wins.blue}</span>
+          <span className="hud-rounds-sep">:</span>
+          <span className="hud-red">{wins.red}</span>
+          <span className="hud-rounds-target">/{winsTarget}</span>
+        </div>
+        {/* A round that ran out level keeps playing (SPEC §2.2), so say so
+            rather than leaving a stopped 0:00 looking like a hung match. */}
+        {snap?.suddenDeath ? (
+          <div className="hud-timer hud-sudden-death">SUDDEN DEATH</div>
+        ) : (
+          <div className="hud-timer">{minutes + ":" + String(seconds).padStart(2, "0")}</div>
+        )}
+      </div>
       <div className="hud-team hud-red">
         <span className="hud-flag">{flag("red")}</span> <span className="hud-frags">{frags.red}</span> frags ·{" "}
         <span className="hud-respawns">{respawns("red")}</span>

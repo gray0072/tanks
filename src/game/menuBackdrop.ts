@@ -170,6 +170,9 @@ export class MenuBackdrop {
     }
     const settings: MatchSettings = {
       mapId: map.id,
+      // One round per map: the backdrop rotates maps between rounds of its
+      // own (pickMap), so a series on one map would be the wrong shape here.
+      winsTarget: 1,
       timeLimit: ROUND_SECONDS,
       respawnMult: ROUND_RESPAWN_MULT,
       friendlyFire: false,

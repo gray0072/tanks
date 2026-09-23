@@ -3,7 +3,10 @@ import type { Slot } from "./tank";
 
 export type MatchSettings = {
   mapId: string;
-  timeLimit: number; // seconds, SPEC §2.2
+  /** Rounds a team must win to take the match (§2.2). A round is one fight;
+   *  the match is the series. */
+  winsTarget: number;
+  timeLimit: number; // seconds, one round (§2.2)
   respawnMult: number; // starting respawns per team member (§2.2)
   friendlyFire: boolean;
 };
@@ -36,7 +39,13 @@ export type MatchRules = {
    *  to a team (see teamFrags). */
   slotTeam: Record<number, TeamId>;
   ended: boolean;
-  winner: TeamId | "draw" | null;
+  /** Who took the round. Null only while it is still being played: a round
+   *  always ends with a winner (SPEC §2.2 — there are no drawn rounds). */
+  winner: TeamId | null;
+  /** The clock ran out with the two teams level on every tie-break, so the
+   *  round is running on past it and the next thing that separates them ends
+   *  it (SPEC §2.2 "Sudden death"). */
+  suddenDeath: boolean;
 };
 
 export function createRules(settings: MatchSettings, slots: Slot[]): MatchRules {
@@ -63,6 +72,7 @@ export function createRules(settings: MatchSettings, slots: Slot[]): MatchRules 
     slotTeam,
     ended: false,
     winner: null,
+    suddenDeath: false,
   };
 }
 
@@ -121,18 +131,40 @@ export function checkWinByRespawns(rules: MatchRules, teamHasLivingTank: Record<
   }
 }
 
-export function checkWinByTime(rules: MatchRules) {
+/** The clock ran out, so the round is decided on **respawns left** first
+ *  (SPEC §2.2): the pool is what a team spends to stay in the fight, so the
+ *  side that spent less of it was ahead — and unlike a frag count it also
+ *  charges the deaths nobody was credited for (water, mines, friendly fire).
+ *
+ *  Level on respawns, it goes to whichever team got **closest to the enemy
+ *  flag**: with the lives even, the side further into the other's base was
+ *  the one making the running. `flagDistance` is per team, in pixels, from
+ *  its nearest living tank to the flag it is attacking (sim.ts computes it —
+ *  rules.ts has neither the board nor the tanks).
+ *
+ *  **A round never ends level.** If the two teams tie on both, the clock is
+ *  simply over-run: `suddenDeath` goes on and this keeps being called every
+ *  tick until something separates them, which a tank moving is enough to do.
+ *  Two evenly matched bot teams on a mirrored map tie on the first rung
+ *  surprisingly often, so this is a routine path, not a theoretical one. */
+export function checkWinByTime(
+  rules: MatchRules,
+  flagDistance: Record<TeamId, number>,
+) {
   if (rules.ended) return;
   if (rules.timeLeft > 0) return;
-  const blueFrags = teamFrags(rules, "blue");
-  const redFrags = teamFrags(rules, "red");
-  rules.ended = true;
-  if (blueFrags === redFrags) {
-    // tie-break: flag armor remaining (both intact here) -> draw for MVP
-    rules.winner = "draw";
-  } else {
-    rules.winner = blueFrags > redFrags ? "blue" : "red";
+  // Each rung is [blue's figure, red's figure, who a bigger figure favours].
+  const ladder: [number, number, 1 | -1][] = [
+    [rules.respawns.blue, rules.respawns.red, 1],
+    [flagDistance.blue, flagDistance.red, -1],
+  ];
+  for (const [blue, red, bigWins] of ladder) {
+    if (blue === red) continue;
+    rules.ended = true;
+    rules.winner = (blue > red ? bigWins === 1 : bigWins === -1) ? "blue" : "red";
+    return;
   }
+  rules.suddenDeath = true;
 }
 
 export function teamFrags(rules: MatchRules, team: TeamId): number {

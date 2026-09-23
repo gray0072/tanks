@@ -67,48 +67,6 @@ export function drawMapPreview(
   }
 }
 
-/** Same tank silhouette as the in-match sprite (SPEC §6.1) — drawn on
- *  Canvas2D rather than pulled from the PixiJS atlas, since this thumbnail
- *  doesn't warrant a second WebGL context (see file header). Faces the
- *  team's actual spawn direction (blue up, red down — world/tank.ts). */
-export function drawTankPreview(canvas: HTMLCanvasElement, team: TeamId, nickname: string) {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const w = canvas.width;
-  const h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = "#14181f";
-  ctx.fillRect(0, 0, w, h);
-
-  // The nickname gets its own band at the bottom; the tank is centered in
-  // what's left. Sizing the art against `h` and then writing the label below
-  // it is what used to push the text off the canvas (SPEC §6.1).
-  const labelBand = Math.round(h * 0.22);
-  const artH = h - labelBand;
-  const size = Math.min(w, artH) * 0.75;
-  const cx = w / 2;
-  const cy = artH / 2;
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(DIR_ANGLE[team === "blue" ? Dir.Up : Dir.Down]);
-  ctx.translate(-size / 2, -size / 2);
-  drawTankShape(ctx, size, TEAM_COLOR[team]);
-  ctx.restore();
-
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  // Shrink to fit rather than overflow — a 12-character nickname (SPEC §2.1)
-  // is wider than the thumbnail at the nominal size.
-  let fontPx = Math.max(10, Math.round(labelBand * 0.55));
-  const maxTextW = w - 12;
-  do {
-    ctx.font = `${fontPx}px system-ui, sans-serif`;
-    fontPx--;
-  } while (fontPx >= 8 && ctx.measureText(nickname).width > maxTextW);
-  ctx.fillText(nickname, cx, h - Math.round(labelBand * 0.28));
-}
 
 /** The shared tank silhouette (tankShape.ts) painted on Canvas2D, baked
  *  facing +X into a `size`-square at the context's current origin. */

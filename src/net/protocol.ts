@@ -36,6 +36,28 @@ export type HostMessage =
   | { t: "matchStart"; mapId: string; seed: number; settings: MatchSettings; slots: Slot[]; mapTemplate?: MapPayload }
   | { t: "snapshot"; snap: Snapshot }
   | { t: "events"; events: MatchEvent[] }
-  | { t: "matchEnd"; winner: TeamId | "draw" | null; stats: Record<number, PlayerStats> }
+  /** A round of the series finished and nobody has taken the match yet
+   *  (SPEC §2.2). The next round starts on its own after `nextRoundIn`
+   *  seconds — the countdown runs client-side, so it costs one message, not
+   *  one per second. */
+  | {
+      t: "roundEnd";
+      /** Always a team: a round can't end level (SPEC §2.2). */
+      winner: TeamId;
+      wins: Record<TeamId, number>;
+      round: number;
+      nextRoundIn: number;
+    }
+  /** The next round is live: same map, rebuilt terrain, clock back to full. */
+  | { t: "roundStart"; round: number; wins: Record<TeamId, number> }
+  | {
+      t: "matchEnd";
+      /** The team that took the series; null only for a match abandoned
+       *  before anyone could. */
+      winner: TeamId | null;
+      stats: Record<number, PlayerStats>;
+      /** Rounds won per team — the series score the result screen states. */
+      wins: Record<TeamId, number>;
+    }
   | { t: "pong"; at: number }
   | { t: "kicked" };

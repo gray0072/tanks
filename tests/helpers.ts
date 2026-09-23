@@ -29,6 +29,7 @@ export function makeSimFromMap(map: MapDef, seed = 1): Sim {
   const redSize = map.spawns.red.length;
   const settings: MatchSettings = {
     mapId: map.id,
+    winsTarget: 1,
     timeLimit: 600,
     respawnMult: 5,
     friendlyFire: false,
@@ -156,7 +157,7 @@ export function matchFrags(map: MapDef, blue: BotDifficulty, red: BotDifficulty,
     s.owner = null;
     s.botDifficulty = s.team === "blue" ? blue : red;
   }
-  const settings: MatchSettings = { mapId: map.id, timeLimit: 3600, respawnMult: 999, friendlyFire: false };
+  const settings: MatchSettings = { mapId: map.id, winsTarget: 1, timeLimit: 3600, respawnMult: 999, friendlyFire: false };
   const sim = new Sim(map, settings, slots, seed);
   const bots = new Map(slots.map((s) => [s.id, new BotController(s.id)]));
   const frags: Record<TeamId, number> = { blue: 0, red: 0 };

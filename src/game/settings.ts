@@ -6,6 +6,7 @@ import {
   DEFAULT_BOT_DIFFICULTY,
   DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
+  DEFAULT_WINS_TARGET,
   type BotDifficulty,
 } from "./config";
 
@@ -55,13 +56,15 @@ export function randomGuestNickname(): string {
 // defaults would be wrong for half the maps.
 
 export type RoomSetup = {
-  timeLimit: number; // seconds
+  winsTarget: number; // rounds a team must win to take the match (§2.2)
+  timeLimit: number; // seconds, one round
   respawnMult: number; // respawns per team member
   botDifficulty: BotDifficulty;
   friendlyFire: boolean;
 };
 
 export const DEFAULT_ROOM_SETUP: RoomSetup = {
+  winsTarget: DEFAULT_WINS_TARGET,
   timeLimit: DEFAULT_TIME_LIMIT,
   respawnMult: DEFAULT_RESPAWN_MULT,
   botDifficulty: DEFAULT_BOT_DIFFICULTY,

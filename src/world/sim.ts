@@ -636,11 +636,27 @@ export class Sim {
 
   private stepWinConditions(dt: number) {
     checkWinByFlag(this.rules);
-    const teamHasLivingTank: Record<TeamId, boolean> = { blue: false, red: false };
-    for (const tank of this.tanks) if (tank.alive) teamHasLivingTank[tank.team] = true;
-    checkWinByRespawns(this.rules, teamHasLivingTank);
+    const aliveByTeam: Record<TeamId, number> = { blue: 0, red: 0 };
+    for (const tank of this.tanks) if (tank.alive) aliveByTeam[tank.team]++;
+    checkWinByRespawns(this.rules, { blue: aliveByTeam.blue > 0, red: aliveByTeam.red > 0 });
     if (!this.rules.ended) this.rules.timeLeft = Math.max(0, this.rules.timeLeft - dt);
-    checkWinByTime(this.rules);
+    checkWinByTime(this.rules, this.flagDistances());
+  }
+
+  /** Per team, how close its nearest living tank is to the flag it is
+   *  attacking, in pixels — the tie-break for a round the clock ran out on
+   *  (SPEC §2.2). A team with nothing alive is infinitely far away. */
+  private flagDistances(): Record<TeamId, number> {
+    const out: Record<TeamId, number> = { blue: Infinity, red: Infinity };
+    for (const tank of this.tanks) {
+      if (!tank.alive) continue;
+      const flag = this.map.flags[otherTeam(tank.team)];
+      const dx = tank.x + TANK_SIZE / 2 - (flag.cx * CELL + CELL / 2);
+      const dy = tank.y + TANK_SIZE / 2 - (flag.cy * CELL + CELL / 2);
+      const d = Math.hypot(dx, dy);
+      if (d < out[tank.team]) out[tank.team] = d;
+    }
+    return out;
   }
 
   // --- networking (SPEC §9.3) ---------------------------------------------
@@ -671,6 +687,7 @@ export class Sim {
       flagAlive: { ...this.rules.flagAlive },
       timeLeft: this.rules.timeLeft,
       ended: this.rules.ended,
+      suddenDeath: this.rules.suddenDeath,
       winner: this.rules.winner,
     };
   }
@@ -702,7 +719,10 @@ export type Snapshot = {
   flagAlive: Record<TeamId, boolean>;
   timeLeft: number;
   ended: boolean;
-  winner: TeamId | "draw" | null;
+  winner: TeamId | null;
+  /** Round running past its clock because the teams are dead level
+   *  (SPEC §2.2) — the HUD says so instead of showing 0:00. */
+  suddenDeath: boolean;
 };
 
 function clampNum(v: number, lo: number, hi: number): number {

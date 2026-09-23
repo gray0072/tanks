@@ -43,8 +43,10 @@ export type Route =
   | {
       k: "result";
       room: RoomController;
-      winner: TeamId | "draw" | null;
+      winner: TeamId | null;
       stats: Record<number, PlayerStats>;
+      /** Rounds won per team — the series score, e.g. 5:2 (SPEC §2.2). */
+      wins: Record<TeamId, number>;
       returnTo?: EditorRoute;
     };
 

@@ -52,6 +52,7 @@ export function App({ initial }: { initial: Route }) {
           room={route.room}
           winner={route.winner}
           stats={route.stats}
+          wins={route.wins}
           returnTo={route.returnTo}
         />
       );

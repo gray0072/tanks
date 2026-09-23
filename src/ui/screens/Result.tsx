@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { EditorRoute, Navigate } from "../routes";
 import type { RoomController } from "../../net/room";
 import type { PlayerStats } from "../../world/rules";
+import { seriesScoreLabel } from "../../world/series";
 import type { TeamId } from "../../game/config";
 import { useEnterKey } from "../hooks/useEnterKey";
 
@@ -10,12 +11,16 @@ export function Result({
   room,
   winner,
   stats,
+  wins,
   returnTo,
 }: {
   go: Navigate;
   room: RoomController;
-  winner: TeamId | "draw" | null;
+  winner: TeamId | null;
   stats: Record<number, PlayerStats>;
+  /** Rounds won per team over the whole series (SPEC §2.2) — the match was
+   *  decided by these, not by frags, so they lead the banner. */
+  wins: Record<TeamId, number>;
   /** Set when the match came from somewhere other than a room — the level
    *  editor's Test play (specs/level-editor.md §6.7). Replaces both exits,
    *  since there's no room to go back to. */
@@ -23,8 +28,11 @@ export function Result({
 }) {
   const [banner, setBanner] = useState("");
 
-  const bannerText = winner === "draw" || winner === null ? "DRAW" : `${winner.toUpperCase()} TEAM WINS`;
-  const bannerClass = winner === "blue" || winner === "red" ? winner : "";
+  const score = seriesScoreLabel(wins, winner);
+  // Every round has a winner and the series ends when one team reaches the
+  // target, so the only way here without a winner is a match abandoned.
+  const bannerText = winner ? `${winner.toUpperCase()} WINS ${score}` : `MATCH ENDED ${score}`;
+  const bannerClass = winner ?? "";
 
   const rows = room.slots
     .map((s) => ({ slot: s, st: stats[s.id] }))
@@ -38,6 +46,10 @@ export function Result({
     // the scoreboard leaves that guest behind.
     room.setCallbacks({
       onMatchStart: () => go({ k: "match", room, returnTo }),
+      // A fresh series' first round arrives as matchStart; a later round
+      // can't reach this screen, but hooking it keeps a guest from being
+      // stranded here if one ever does.
+      onRoundStart: () => go({ k: "match", room, returnTo }),
       onError: (msg) => setBanner(msg),
     });
   }, [room, go, returnTo]);
@@ -66,6 +78,11 @@ export function Result({
   return (
     <div className="screen">
       <div className={`result-banner ${bannerClass}`}>{bannerText}</div>
+      {/* The series score again, spelled out — the banner reads "BLUE WINS
+          5:2", which is terse enough to be worth stating once in full. */}
+      <div className="hint">
+        Rounds won — Blue {wins.blue}, Red {wins.red}
+      </div>
       <div className="hint">{banner}</div>
       {mvp ? (
         <div className="hint">

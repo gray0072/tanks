@@ -38,7 +38,8 @@ tanks/
    │  │  └─ loader.ts          # registry: listMaps()/getMap() over the above
    │  ├─ tank.ts · bullet.ts · bonus.ts · flag.ts
    │  ├─ sim.ts                # fixed-step tick, deterministic, snapshot()
-   │  └─ rules.ts              # respawns, scoring, win conditions
+   │  ├─ rules.ts              # one round: respawns, scoring, how a round is won (§2.2)
+   │  └─ series.ts             # the round series: rounds won, match target, totals (§2.2)
    ├─ ai/
    │  ├─ bot.ts                # utility scoring + actions + fair perception
    │  ├─ pathfinder.ts         # A* over the cost grid

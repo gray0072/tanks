@@ -85,6 +85,34 @@ leave; editor paint/undo/test-play round trip; library export/delete modals) and
 916x412 with `hasTouch` (stick, fire zone, MINE, rotate notice, auto-fullscreen), plus `npm test`
 (113 pass), `tsc` and `npm run build`.
 
+**2026-09-23 (rounds):** a match is now a **series of rounds** (SPEC §2.2), not one fight, and
+**the match rules moved into the room screen**. `MatchSettings` gained `winsTarget` (1–10, default
+5) and it, the round time limit (now 1–10 min, default 5, was 5/10/15 default 10), the respawn
+multiplier and friendly fire are host-only dropdowns in the room, live for every guest; Create Room
+keeps only what must exist before a room does (nickname, map, starting bot difficulty), and
+`settings.ts` still remembers a set per map. The room screen lost its tank preview (and
+`render/preview.ts` its `drawTankPreview`) — same silhouette whatever slot you take, so it was
+spending the panel's scarcest space on nothing.
+
+Round flow: the host books the round (`world/series.ts` — pure, headless, `tests/rounds.test.ts`),
+holds a 3 s intermission in its own frame loop *without* stepping the Sim, then builds a fresh `Sim`
+for the next round. Two new wire messages, `roundEnd`/`roundStart`; `matchEnd` gained the series
+score. `Match.tsx` rebuilds its `Arena` on `roundStart` (a round of cell-by-cell terrain edits can't
+be un-patched) and shows the intermission overlay; the result banner is `BLUE WINS 2:0`.
+
+**There are no drawn rounds, by type as well as by rule** — `winner` is `TeamId | null` everywhere,
+`null` only meaning "still playing". A round the clock ran out on goes on respawns left, then on
+which team's nearest living tank got closest to the enemy flag (`Sim.flagDistances`), and if both
+tie the round runs past its clock in `suddenDeath` until something separates them. That last rung is
+not theoretical: two even bot teams on a mirrored map tie on frags *and* respawns routinely — an
+earlier version of this feature replayed drawn rounds and a bot room on `classic` with ×0 respawns
+looped forever, drawing 3:3 with 2 alive each on every seed.
+
+Verified by driving Chromium: rules edited in the room (`/2`, 1 min, ×0) → round end → overlay →
+round 2 with every brick back and the clock reset → `BLUE WINS 2:0`, settings still set on the way
+back to the room, plus the same at 916x412 with touch. The old `×0`-respawn stall now resolves on
+the first round.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -121,6 +149,13 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 - `tests/mapEditor.test.ts` — the level editor's document model (`world/maps/editorModel.ts`):
   painting, the terrain-only rectangle fill, entity semantics (a flag *moves*, a spawn toggles and
   is capped), resize with an anchor, and the rule that **one gesture is one undo step**.
+- `tests/rounds.test.ts` — the round series (SPEC §2.2) and how a timed-out round is decided: the
+  score moves and the target ends the match, the score reads winner-first, stats accumulate across
+  rounds, and `checkWinByTime` walks respawns → distance to the enemy flag → sudden death. The one
+  that matters most is **"dead level goes to sudden death rather than a draw"**: a draw is the one
+  outcome that could stall a series forever, so it must stay unreachable. The series rules are
+  deliberately in `world/series.ts` rather than in `net/host.ts` so they can be tested without a
+  browser.
 - `tests/mapValidation.test.ts` — the editor's map rules (`world/maps/validateMap.ts`). The one that
   matters most is last: **every built-in map must produce zero errors** — a rule that rejects
   `classic` is a wrong rule, however sensible it reads.

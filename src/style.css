@@ -216,6 +216,44 @@ button.chip.active { background: var(--accent); color: #1a1a1a; border-color: va
 .hud-btn:hover { color: var(--text); }
 .hud-btn.active { background: var(--accent); border-color: var(--accent); color: #1a1a1a; }
 .hud-timer { font-size: 1.1rem; font-weight: 700; }
+/* Clock and round score share the centre column: the clock decides a round,
+   the score decides the match (SPEC §2.2). */
+.hud-center { display: flex; flex-direction: column; align-items: center; line-height: 1.1; flex: 0 0 auto; }
+.hud-rounds { display: flex; align-items: baseline; gap: 3px; font-weight: 700; font-size: 0.95rem; }
+.hud-rounds-sep { color: var(--muted); }
+.hud-sudden-death { font-size: 0.8rem; letter-spacing: 0.08em; color: #ffd23d; }
+.hud-rounds-target { color: var(--muted); font-weight: 400; font-size: 0.72rem; }
+/* The team colours are also the topbar's two flexible end blocks; nested in a
+   score they must not stretch. */
+.hud-rounds .hud-blue, .hud-rounds .hud-red,
+.round-score .hud-blue, .round-score .hud-red { flex: 0 0 auto; }
+
+/* The room's match rules: four controls that have to wrap sanely into the
+   preview column on a phone. */
+.room-settings { align-items: flex-end; gap: 8px; }
+.room-settings label { flex: 1 1 130px; }
+.row-label { flex-direction: row; align-items: center; gap: 6px; }
+
+/* Between two rounds (SPEC §2.2): the battlefield stays visible and frozen
+   behind a dimmed wash, so the score and the count-in read over the position
+   the round ended in. */
+.round-overlay {
+  position: absolute; inset: 0; z-index: 30; display: flex;
+  align-items: center; justify-content: center; text-align: center;
+  background: rgba(8,11,16,0.72); backdrop-filter: blur(2px);
+}
+.round-body { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px; }
+.round-headline { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.06em; }
+.round-headline.blue { color: #9dc0ff; }
+.round-headline.red { color: #ffb3b3; }
+.round-score { display: flex; align-items: baseline; gap: 8px; font-size: 2.4rem; font-weight: 700; }
+.round-score-sep { color: var(--muted); }
+.round-countdown { font-size: 3.2rem; font-weight: 700; line-height: 1; margin-top: 4px; }
+@media (max-width: 600px) {
+  .round-score { font-size: 1.8rem; }
+  .round-countdown { font-size: 2.4rem; }
+  .round-headline { font-size: 1.05rem; }
+}
 .hud-team { display: flex; gap: 6px; align-items: center; }
 .hud-blue { color: #9dc0ff; }
 .hud-red { color: #ffb3b3; }

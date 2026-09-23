@@ -40,12 +40,12 @@ the editor's working document) travel inside the route.
 │   ▸ 3         Nina          44ms  ✔    │  │   spawn point of the hovered slot   │  │
 │   ▸ 4  Hard   Hard4         bot   ✔    │  │   highlighted, flags marked         │  │
 │   ▸ 5  Medium Medium5       bot   ✔    │  │                                     │  │
-│                                         │  │   ┌───────┐  slot 2 · BLUE         │  │
-│   RED   (1 human)                       │  │   │ tank  │  currently: Medium2    │  │
-│   ▸ 1  Easy   Easy1         bot   ✔    │  │   │preview│  → you                  │  │
-│   ▸ 2  Easy   Easy3         bot   ✔    │  │   └───────┘                         │  │
-│   ▸ 3         Oleg          61ms  ✔    │  │                                     │  │
-│   ▸ 4  Easy   Easy6         bot   ✔    │  │   Map: Classic · 10 min · ×10 (50) respawns│  │
+│                                         │  │   Map: Classic · 33×25 · 5v5        │  │
+│   RED   (1 human)                       │  │                                     │  │
+│   ▸ 1  Easy   Easy1         bot   ✔    │  │   Rounds to win  [ 5 ▾ ]            │  │
+│   ▸ 2  Easy   Easy3         bot   ✔    │  │   Round time     [ 5 min ▾ ]        │  │
+│   ▸ 3         Oleg          61ms  ✔    │  │   Respawns       [ ×10 (50) ▾ ]     │  │
+│   ▸ 4  Easy   Easy6         bot   ✔    │  │   [x] Friendly fire                 │  │
 │   ▸ 5  Easy   Easy7         bot   ✔    │  └─────────────────────────────────────┘  │
 │                                                                                    │
 │   [ Add local player 2 ]                              host: [ Start match ]        │
@@ -60,25 +60,35 @@ the editor's working document) travel inside the route.
   bot instead; releasing player 2's slot drops the second seat entirely, so the button goes back to
   `Add local player 2`. Your last primary slot can't be released — you would vanish from the roster.
   Human-held slots (someone else's) are not clickable.
-- **The preview updates on hover/focus**, before you commit: a live PixiJS thumbnail of the selected
-  map with the hovered slot's spawn point pulsing, both flags marked, and a rendered preview of the
-  tank you would drive in that team's colors with your nickname above it.
+- **The preview updates on hover/focus**, before you commit: a thumbnail of the selected map with
+  the hovered slot's spawn point pulsing and both flags marked. There is no separate tank preview —
+  the tank is the same silhouette in the team's colour whatever slot you take, so it was a picture
+  that told you nothing, taking the room's scarcest space.
 - Preview is also how the map choice is communicated — the host changing maps re-renders it for
   everyone in real time.
 - Keyboard and touch navigable: arrow keys / swipe move the highlight, `Enter` / tap claims.
 - Every bot slot shows its **difficulty (`Easy` / `Medium` / `Hard`)** as a button right before the
   bot's name — the host's per-bot difficulty control (§10.4), tap to cycle; `All bots:` sets every
   bot slot at once, or one team's at a time.
-- **Respawns per player** is a host-only dropdown here, live for everyone (§2.2): the roster can
-  change after the room was created — a new map resizes the teams — so the pool is retunable
-  without leaving the lobby. Guests see the same value as text.
+- **The match rules live here**, as host-only dropdowns, live for everyone (§2.2): **rounds to
+  win**, **round time limit**, **respawns per player** and **friendly fire**. This is the room's own
+  state (`MatchSettings`), not a creation-time choice: the roster changes after a room exists (a new
+  map resizes the teams), people arrive and leave, and the host should be able to retune a match
+  without tearing the room down. Create Room is left with what must be decided *before* a room can
+  exist — nickname, map and the difficulty its bots start at. Guests see the same rules as one line
+  of text, and every change reaches them as room state.
+- Each map remembers the rules it was last played with (`settings.ts`), so switching back to a map
+  brings its settings back rather than a global default.
 - The host may kick a player — their slot reverts to a bot at the slot's configured difficulty.
 - The host never needs to press `Ready` — their own seat(s) don't count toward the gate, and
   `Start match` is available to them as soon as every *other* human slot is `Ready`.
 
 ## 6.2 HUD
 
-**Top bar is a real layout row, not an overlay** — team respawns (blue left, red right), match timer,
+**Top bar is a real layout row, not an overlay** — team respawns (blue left, red right), the centre
+column holding the **rounds-won score** over the round timer (`3 : 1 /5` — the score decides the
+match, the clock only bounds a round, §2.2; a round running past its clock reads `SUDDEN DEATH`
+there instead of a stopped `0:00`),
 team frag counts, flag-intact indicators — and the arena fills exactly the space left below it, not
 the whole viewport (`MatchScreen`'s `.match-topbar` + `.match-arena`, a plain flex column). Everything
 else layers on top of the arena only, so nothing else needs to dodge the stats bar: bottom-left, your
@@ -90,6 +100,19 @@ sound and an arrow pointing at the base. The top bar also carries the three HUD 
 browser's own fullscreen control and `Esc`; they are bound unconditionally, since a mouse user has no
 reason to be denied them. On touch the personal-state line moves from the bottom-left of the arena to
 the top-left, out from under the `MINE` button.
+
+### Between rounds
+
+The intermission (§2.2) is an overlay **on the arena, not over the whole screen**: a dimmed, lightly
+blurred wash with the round's outcome (`RED TAKES THE ROUND` — always a team, there are no drawn
+rounds), the rounds-won score
+in team colours, what the target is (`First to 5 wins the match`) and a 3-2-1 count-in ending in
+`GO`. The battlefield stays visible and frozen behind it, so the position the round ended in is what
+the players look at while they read the score. The overlay swallows the touch zones, so local input
+is cleared and the sticks released the moment it appears — same rule as the pause menu.
+
+The **result screen** ends the series rather than the round: its banner is the series score,
+winner's first (`BLUE WINS 5:2`), with the rounds spelled out below it and a match-wide scoreboard.
 
 ## 6.3 Live menu backdrop
 

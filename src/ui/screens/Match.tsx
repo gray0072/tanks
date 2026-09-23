@@ -18,7 +18,7 @@ import {
   onFullscreenChange,
   toggleFullscreen,
 } from "../../util/fullscreen";
-import { CELL, type TeamId } from "../../game/config";
+import { CELL, DEFAULT_WINS_TARGET, type TeamId } from "../../game/config";
 import { useEnterKey } from "../hooks/useEnterKey";
 import { HudOverlay, HudTop, type HudAction, type HudHandle, type ScoreRow } from "../components/Hud";
 
@@ -40,7 +40,18 @@ export function Match({
 }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [frags, setFrags] = useState<Record<TeamId, number>>({ blue: 0, red: 0 });
+  // Rounds won so far and, between rounds, what to show over the frozen
+  // battlefield while the next one is counted in (SPEC §2.2).
+  const [wins, setWins] = useState<Record<TeamId, number>>({ blue: 0, red: 0 });
+  const [intermission, setIntermission] = useState<{
+    winner: TeamId;
+    wins: Record<TeamId, number>;
+    seconds: number;
+  } | null>(null);
   const [paused, setPaused] = useState(false);
+  // How many rounds take the match (SPEC §2.2). Settled when the match
+  // started and fixed for its whole length, so it is read once.
+  const [winsTarget] = useState(() => room.settings?.winsTarget || DEFAULT_WINS_TARGET);
   const [scoreboard, setScoreboard] = useState<ScoreRow[] | null>(null);
   const [scoreboardPinned, setScoreboardPinned] = useState(false);
   const [fullscreen, setFullscreen] = useState(isFullscreen);
@@ -59,6 +70,12 @@ export function Match({
 
   const pausedRef = useRef(false);
   const endedRef = useRef(false);
+  /** Rebuilds the scene for a new round; set once the renderer is up. */
+  const rebuildArena = useRef<(() => void) | null>(null);
+  /** The frame loop reads this rather than the state, same as it does for
+   *  the pause flag — it runs outside React's render cycle. */
+  const intermissionRef = useRef(false);
+  intermissionRef.current = intermission !== null;
   const goRef = useRef(go);
   goRef.current = go;
 
@@ -184,11 +201,28 @@ export function Match({
         setSnap(s);
       },
       onMatchEvents: onEvents,
-      onMatchEnd: (winner, stats) => {
+      onRoundEnd: (e) => {
+        setWins(e.wins);
+        setIntermission({ winner: e.winner, wins: e.wins, seconds: Math.ceil(e.nextRoundIn) });
+        // Same reason the pause menu does it: the overlay swallows the touch
+        // zones' pointerup, and nothing should carry over into the next round.
+        room.setLocalInput(0, NO_INPUT);
+        if (room.hasLocalSeat2()) room.setLocalInput(1, NO_INPUT);
+        touch.current?.release();
+        audio.matchEnd();
+      },
+      onRoundStart: (e) => {
+        setWins(e.wins);
+        setIntermission(null);
+        // The terrain is back to the map's own state, so the scene that was
+        // patched cell-by-cell through a whole round has to be thrown away.
+        rebuildArena.current?.();
+      },
+      onMatchEnd: (winner, stats, seriesWins) => {
         if (endedRef.current) return;
         endedRef.current = true;
         audio.matchEnd();
-        goRef.current({ k: "result", room, winner, stats, returnTo });
+        goRef.current({ k: "result", room, winner, stats, wins: seriesWins, returnTo });
       },
       onError: (msg) => hud.current?.banner(msg),
     });
@@ -208,10 +242,20 @@ export function Match({
       }
       pixi.current = host;
       const atlas = createAtlas(host.app);
-      const world = new Arena(atlas, map, room.slots);
-      world.app = host.app;
-      host.world.addChild(world.world);
-      arena.current = world;
+      // The Pixi app and its mount outlive a round; only the scene graph is
+      // rebuilt, exactly as the menu backdrop does between its own rounds.
+      const buildArena = () => {
+        if (arena.current) {
+          host.world.removeChild(arena.current.world);
+          arena.current.destroy();
+        }
+        const world = new Arena(atlas, map, room.slots);
+        world.app = host.app;
+        host.world.addChild(world.world);
+        arena.current = world;
+      };
+      buildArena();
+      rebuildArena.current = buildArena;
 
       if (IS_TOUCH && arenaEl.current) {
         // Mounted on the arena, not the whole screen: the zones then line up
@@ -256,7 +300,7 @@ export function Match({
 
     let scoreboardWasHeld = false;
     const loop = () => {
-      if (!pausedRef.current) {
+      if (!pausedRef.current && !intermissionRef.current) {
         room.setLocalInput(0, seat.getSeatInput(0));
         if (room.hasLocalSeat2()) room.setLocalInput(1, seat.getSeatInput(1));
       }
@@ -286,6 +330,7 @@ export function Match({
 
     return () => {
       disposed = true;
+      rebuildArena.current = null;
       room.setMatchPaused(false);
       cancelAnimationFrame(raf);
       window.removeEventListener("keydown", onKeyDown);
@@ -305,6 +350,17 @@ export function Match({
     if (rotateNotice) touch.current?.release();
   }, [rotateNotice]);
 
+  // The countdown between rounds ticks locally off the one figure the host
+  // sent (SPEC §2.2) — it's a display, and the host alone decides when the
+  // next round actually starts.
+  useEffect(() => {
+    if (!intermission) return;
+    const id = setInterval(() => {
+      setIntermission((cur) => (cur ? { ...cur, seconds: Math.max(0, cur.seconds - 1) } : cur));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [intermission !== null]);
+
   return (
     <div className="screen match-screen" ref={screenEl}>
       {/* Top row is a real layout row (stats + timer), not an overlay — the
@@ -313,6 +369,8 @@ export function Match({
         <HudTop
           snap={snap}
           frags={frags}
+          wins={wins}
+          winsTarget={winsTarget}
           scoreboardPinned={scoreboardPinned}
           fullscreenAvailable={fullscreenSupported()}
           fullscreenActive={fullscreen}
@@ -325,10 +383,50 @@ export function Match({
         <div ref={pixiHostEl} />
         <HudOverlay ref={hud} snap={snap} mySlot={room.mySlots()[0]?.id ?? null} scoreboard={scoreboard} />
       </div>
+      {intermission ? (
+        <RoundOverlay
+          winner={intermission.winner}
+          wins={intermission.wins}
+          winsTarget={winsTarget}
+          seconds={intermission.seconds}
+        />
+      ) : null}
       {paused ? (
         <PauseOverlay freezes={room.canPauseMatch()} onResume={() => togglePauseRef.current()} onLeave={leaveMatch} />
       ) : null}
       {rotateNotice ? <RotateNotice /> : null}
+    </div>
+  );
+}
+
+/** The breather between two rounds (SPEC §2.2): who took the round, where
+ *  the series stands, and the count-in to the next one. The battlefield is
+ *  left visible and frozen behind it — nothing is simulated while this is up. */
+function RoundOverlay({
+  winner,
+  wins,
+  winsTarget,
+  seconds,
+}: {
+  winner: TeamId;
+  wins: Record<TeamId, number>;
+  winsTarget: number;
+  seconds: number;
+}) {
+  const headline = winner.toUpperCase() + " TAKES THE ROUND";
+  return (
+    <div className="round-overlay">
+      <div className="round-body">
+        <div className={"round-headline " + winner}>{headline}</div>
+        <div className="round-score">
+          <span className="hud-blue">{wins.blue}</span>
+          <span className="round-score-sep">:</span>
+          <span className="hud-red">{wins.red}</span>
+        </div>
+        <div className="hint">First to {winsTarget} wins the match</div>
+        <div className="round-countdown">{seconds > 0 ? seconds : "GO"}</div>
+        <div className="hint">Next round — walls rebuilt, clock reset</div>
+      </div>
     </div>
   );
 }

@@ -15,12 +15,7 @@ import {
   saveRoomSetup,
   type RoomSetup,
 } from "../../game/settings";
-import {
-  BOT_DIFFICULTY_LABEL,
-  RESPAWN_MULTIPLIERS,
-  respawnLabel,
-  type BotDifficulty,
-} from "../../game/config";
+import { BOT_DIFFICULTY_LABEL, type BotDifficulty } from "../../game/config";
 
 /** `initialMapId` is what the map library (specs/level-editor.md §5) hands
  *  back on Continue; without one, reopen on the map played last, unless it
@@ -68,7 +63,14 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
 
     const room = new RoomHost(nick, true, { onError: (msg) => setError(msg) });
     room.setMap(mapId);
-    room.setSettings({ timeLimit: setup.timeLimit, respawnMult: setup.respawnMult, friendlyFire: setup.friendlyFire });
+    // The room opens on whatever this map was last played with (settings.ts
+    // keeps a set per map); the room screen is where they are changed.
+    room.setSettings({
+      winsTarget: setup.winsTarget,
+      timeLimit: setup.timeLimit,
+      respawnMult: setup.respawnMult,
+      friendlyFire: setup.friendlyFire,
+    });
     room.setBotDifficulty("all", setup.botDifficulty);
     go({ k: "room", room });
   };
@@ -97,33 +99,11 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
           <button onClick={openLibrary}>Change…</button>
         </div>
 
+        {/* The match rules (rounds to win, round length, respawns, friendly
+            fire) are the room's, not this screen's — they are set and changed
+            in the room itself, where every guest sees them (SPEC §6.1). What
+            is left here is what has to be decided *before* a room exists. */}
         <div className="row wrap">
-          <label>
-            Time limit
-            <select
-              value={setup.timeLimit}
-              onChange={(e) => setSetup({ ...setup, timeLimit: Number(e.target.value) })}
-            >
-              <option value={300}>5 min</option>
-              <option value={600}>10 min</option>
-              <option value={900}>15 min</option>
-            </select>
-          </label>
-          <label>
-            Respawns per player
-            {/* The pool each multiplier works out to depends on this map's
-                roster, so the options follow the map. */}
-            <select
-              value={setup.respawnMult}
-              onChange={(e) => setSetup({ ...setup, respawnMult: Number(e.target.value) })}
-            >
-              {RESPAWN_MULTIPLIERS.map((m) => (
-                <option key={m} value={m}>
-                  {map ? respawnLabel(m, map.spawns.blue.length, map.spawns.red.length) : `x${m}`}
-                </option>
-              ))}
-            </select>
-          </label>
           <label>
             Default bot difficulty
             <select
@@ -134,15 +114,6 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
               <option value="normal">{BOT_DIFFICULTY_LABEL.normal}</option>
               <option value="hard">{BOT_DIFFICULTY_LABEL.hard}</option>
             </select>
-          </label>
-          <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <input
-              type="checkbox"
-              style={{ width: "auto" }}
-              checked={setup.friendlyFire}
-              onChange={(e) => setSetup({ ...setup, friendlyFire: e.target.checked })}
-            />{" "}
-            Friendly fire
           </label>
         </div>
 

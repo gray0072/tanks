@@ -10,7 +10,14 @@ import {
 } from "../world/tank";
 import { Sim, type SeatInput } from "../world/sim";
 import { type MatchSettings } from "../world/rules";
-import { listMaps, getMap } from "../world/maps/loader";
+import {
+  addRoundStats,
+  createSeries,
+  recordRound,
+  seriesWinner,
+  type Series,
+} from "../world/series";
+import { listMaps, getMap, type MapDef } from "../world/maps/loader";
 import { getCustomMap, isCustomMapId } from "../world/maps/customMaps";
 import { BotController } from "../ai/bot";
 import { computeTeamRoles, type Role } from "../ai/teamPlan";
@@ -23,6 +30,8 @@ import {
   DEFAULT_BOT_DIFFICULTY,
   DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
+  DEFAULT_WINS_TARGET,
+  ROUND_INTERMISSION,
   TICK_DT,
   NET_SNAPSHOT_HZ,
   type BotDifficulty,
@@ -48,7 +57,17 @@ export class RoomHost implements RoomController {
   private defaultBotDifficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY;
   private hasSeat2 = false;
   private simPaused = false;
+  /** The round series this match is playing out (SPEC §2.2) — null between
+   *  matches. Outlives each round's Sim, which is rebuilt from scratch every
+   *  time so the terrain, the clock and the respawn pools all come back. */
+  private series: Series | null = null;
+  /** Seconds left of the breather between two rounds; 0 while a round runs. */
+  private intermission = 0;
 
+  /** Seed of the round currently running — replayed to a guest that arrives
+   *  mid-match, and regenerated per round so two rounds never draw the same
+   *  bonus sequence. */
+  private seed = 0;
   private raf = 0;
   private last = 0;
   private acc = 0;
@@ -64,6 +83,7 @@ export class RoomHost implements RoomController {
     this.slots = createDefaultSlots(hostNickname, initial.spawns.blue.length, initial.spawns.red.length);
     this.settings = {
       mapId: this.mapId,
+      winsTarget: DEFAULT_WINS_TARGET,
       timeLimit: DEFAULT_TIME_LIMIT,
       respawnMult: DEFAULT_RESPAWN_MULT,
       friendlyFire: false,
@@ -147,11 +167,16 @@ export class RoomHost implements RoomController {
           this.net?.send(connId, {
             t: "matchStart",
             mapId: this.sim.map.id,
-            seed: 0,
+            seed: this.seed,
             settings: this.sim.settings,
             slots: this.slots,
             mapTemplate: this.mapPayload(),
           });
+          // matchStart alone would leave a guest who joined at 3:1 looking at
+          // a 0:0 scoreboard, so hand them the series score too.
+          if (this.series) {
+            this.net?.send(connId, { t: "roundStart", round: this.series.round, wins: this.series.wins });
+          }
         }
         break;
       case "claimSlot":
@@ -398,18 +423,16 @@ export class RoomHost implements RoomController {
     // getMap, not listMaps().find — it also resolves the debug map
     // (config.DEBUG), which is deliberately kept out of listMaps().
     const map = getMap(this.mapId);
-    const seed = Math.floor(Math.random() * 0x7fffffff);
-    this.sim = new Sim(map, { ...this.settings, mapId: map.id }, this.slots, seed);
+    this.series = createSeries(this.settings.winsTarget, this.slots);
+    this.intermission = 0;
+    this.buildRound(map);
 
-    this.bots.clear();
-    for (const s of this.slots) if (s.kind === "bot") this.bots.set(s.id, new BotController(s.id));
-
-    this.cb.onMatchStart?.(map.id, seed, this.sim.settings, this.slots);
+    this.cb.onMatchStart?.(map.id, this.seed, this.sim!.settings, this.slots);
     this.net?.broadcast({
       t: "matchStart",
       mapId: map.id,
-      seed,
-      settings: this.sim.settings,
+      seed: this.seed,
+      settings: this.sim!.settings,
       slots: this.slots,
       mapTemplate: this.mapPayload(),
     });
@@ -418,6 +441,27 @@ export class RoomHost implements RoomController {
     this.acc = 0;
     this.snapshotAcc = 0;
     this.loop();
+  }
+
+  /** One round: a fresh Sim (so the terrain, clock and respawn pools are back
+   *  to the map's own state — Sim copies the cached MapDef's grid) and a fresh
+   *  bot per bot slot. The room, the roster and the series score carry over. */
+  private buildRound(map: MapDef) {
+    this.seed = Math.floor(Math.random() * 0x7fffffff);
+    this.sim = new Sim(map, { ...this.settings, mapId: map.id }, this.slots, this.seed);
+    this.bots.clear();
+    for (const s of this.slots) if (s.kind === "bot") this.bots.set(s.id, new BotController(s.id));
+  }
+
+  /** Starts the next round of a series already under way. */
+  private startNextRound() {
+    const series = this.series;
+    if (!series) return;
+    this.intermission = 0;
+    this.buildRound(getMap(this.mapId));
+    const e = { round: series.round, wins: series.wins };
+    this.cb.onRoundStart?.(e);
+    this.net?.broadcast({ t: "roundStart", ...e });
   }
 
   private loop = () => {
@@ -434,11 +478,21 @@ export class RoomHost implements RoomController {
     let dt = (now - this.last) / 1000;
     this.last = now;
     if (dt > 0.25) dt = 0.25;
+    // Between rounds the world is left standing exactly as the round ended —
+    // nothing is stepped, so the last snapshot the clients hold stays valid
+    // for the whole breather (SPEC §2.2).
+    if (this.intermission > 0) {
+      this.intermission -= dt;
+      this.acc = 0;
+      if (this.intermission <= 0) this.startNextRound();
+      if (this.sim) this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
     this.acc += dt;
     while (this.acc >= TICK_DT) {
       this.tick();
       this.acc -= TICK_DT;
-      if (!this.sim) break;
+      if (!this.sim || this.intermission > 0) break;
     }
     if (this.sim) this.raf = requestAnimationFrame(this.loop);
   };
@@ -482,17 +536,56 @@ export class RoomHost implements RoomController {
     }
     if (this.net && events.length) this.net.broadcast({ t: "events", events });
 
-    if (sim.rules.ended) {
+    if (sim.rules.ended) this.endRound(sim);
+  }
+
+  /** A round is over (a flag fell, a team ran out of respawns, or the clock
+   *  expired). The score moves, and either the match is decided or the next
+   *  round is queued up behind the intermission countdown — SPEC §2.2. */
+  private endRound(sim: Sim) {
+    const series = this.series;
+    const { winner, stats } = sim.rules;
+    if (!series) {
+      // Defensive: a match with no series can only be a bug, but ending it is
+      // still better than looping the round forever.
       cancelAnimationFrame(this.raf);
-      const { winner, stats } = sim.rules;
-      // Drop the Sim before announcing the end: whoever handles this mounts a
-      // screen synchronously, and setCallbacks() replays matchStart for as
-      // long as `sim` is still set — which bounced the host back into the
-      // match it had just finished.
       this.sim = null;
-      this.cb.onMatchEnd?.(winner, stats);
-      this.net?.broadcast({ t: "matchEnd", winner, stats });
+      this.cb.onMatchEnd?.(winner, stats, { blue: 0, red: 0 });
+      this.net?.broadcast({ t: "matchEnd", winner, stats, wins: { blue: 0, red: 0 } });
+      return;
     }
+
+    addRoundStats(series, stats);
+    const round = series.round;
+    if (!winner) {
+      // Unreachable: sim.ts only ends a round with a winner (SPEC §2.2, no
+      // drawn rounds). Replaying beats hanging the match if it ever happens.
+      this.intermission = ROUND_INTERMISSION;
+      return;
+    }
+    recordRound(series, winner);
+    const champion = seriesWinner(series);
+
+    if (!champion) {
+      this.intermission = ROUND_INTERMISSION;
+      const e = { winner, wins: series.wins, round, nextRoundIn: ROUND_INTERMISSION };
+      this.cb.onRoundEnd?.(e);
+      this.net?.broadcast({ t: "roundEnd", ...e });
+      return;
+    }
+
+    cancelAnimationFrame(this.raf);
+    const wins = series.wins;
+    const total = series.stats;
+    this.series = null;
+    this.intermission = 0;
+    // Drop the Sim before announcing the end: whoever handles this mounts a
+    // screen synchronously, and setCallbacks() replays matchStart for as
+    // long as `sim` is still set — which bounced the host back into the
+    // match it had just finished.
+    this.sim = null;
+    this.cb.onMatchEnd?.(champion, total, wins);
+    this.net?.broadcast({ t: "matchEnd", winner: champion, stats: total, wins });
   }
 
   destroy() {

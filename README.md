@@ -37,7 +37,8 @@ with no server, no install and no account.
 |  |  |
 |---|---|
 | 🧩 **Teams sized by the map** | The roster is the map's spawn count, not a fixed number — a 1v1 test arena and a 16-a-side brawl are the same engine, and every free slot is filled by a bot |
-| ⚔️ **Team battle with an objective** | Destroy the enemy flag for an instant win, or grind the enemy out of respawns before the 10-minute clock runs out |
+| ⚔️ **Team battle with an objective** | Destroy the enemy flag to take the round, or grind the enemy out of respawns before the clock runs out |
+| 🏆 **Played as a series** | A match is best-of: rounds run back to back on rebuilt terrain, and the first team to the room's win target (1–10, default 5) takes it. No draws — a round the clock ran out on goes to whoever has lives left, or got deepest into the enemy base |
 | 🤖 **Bots on every free slot** | Easy / Medium / Hard, set per bot or for the whole roster — genuinely different tactics, not just better aim |
 | 🧱 **Destructible terrain** | Brick crumbles cell by cell, steel resists until you're upgraded, forest conceals, water stops tanks but not bullets, ice slides, sand slows |
 | ✨ **Eight power-ups** | Four are yours, four swing the whole team |
@@ -74,13 +75,18 @@ whole team.
 
 ## How a match goes
 
-1. **Create a room** — pick the map, time limit, respawns and default bot difficulty. You get a
+1. **Create a room** — pick your nickname, the map and the difficulty its bots start at. You get a
    6-character code and an invite link.
-2. **Take a slot** — click any slot on either team; the preview shows the map, your spawn and your
-   tank. Friends join with the code; bots hold everything nobody claimed.
-3. **Fight** — the host's browser simulates everything and streams snapshots to the guests at 20 Hz.
-4. **Win** — blow up the enemy flag, or outlast them on respawns. The result screen has the full
-   scoreboard and a way straight back to the room.
+2. **Set up the match** — rounds to win, round time limit, respawns and friendly fire are all in
+   the room itself, so you can retune them while people arrive; everyone sees the change.
+3. **Take a slot** — click any slot on either team; the preview marks the spawn you would get.
+   Friends join with the code; bots hold everything nobody claimed.
+4. **Fight** — the host's browser simulates everything and streams snapshots to the guests at 20 Hz.
+5. **Take the round** — blow up the enemy flag, or outlast them on respawns. The score goes up over
+   the frozen battlefield, and three seconds later the next round starts on the same map with the
+   walls rebuilt and the clock back to full.
+6. **Win the match** — first team to the room's win target. The result screen states the series
+   score (`BLUE WINS 5:2`), the full match scoreboard, and a way straight back to the room.
 
 ## Controls
 

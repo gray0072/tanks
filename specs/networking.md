@@ -46,7 +46,9 @@ Invite links: `https://<pages-url>/?room=K7QM2X`.
 | `input` `{seq, tick, seats:[{dir, fire, mine}]}` | client → host | 30 Hz | unreliable |
 | `snapshot` (delta-encoded world state) | host → all | 15 Hz | unreliable |
 | `events` (kill, pickup, flag hit, bonus, chat) | host → all | on event | reliable |
-| `matchEnd` (results) | host → all | once | reliable |
+| `roundEnd` (round winner — always a team, rounds-won score, seconds to the next round) | host → all | per round, §2.2 | reliable |
+| `roundStart` (round number, rounds-won score) | host → all | per round after the first | reliable |
+| `matchEnd` (results, series score) | host → all | once | reliable |
 | `ping` / `pong` | both | 1 Hz | unreliable |
 
 **Snapshot contents:** tick, per-tank `{id, x, y, dir, state, upgrade, buffFlags}`, live bullets
