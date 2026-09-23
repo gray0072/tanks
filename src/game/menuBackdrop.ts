@@ -94,13 +94,11 @@ export class MenuBackdrop {
     else this.stop();
   }
 
-  /** Off when the player turned it off, and off when the system asks for
-   *  reduced motion — a battle behind the menu is exactly the kind of
-   *  unsolicited animation that setting is about. */
+  /** One switch decides: the player's own setting, which starts off under
+   *  the system's reduced-motion preference (settings.ts) but is theirs to
+   *  overrule from the Settings screen. */
   private enabled(): boolean {
-    if (!this.layer) return false;
-    if (!loadUserSettings().menuBackdrop) return false;
-    return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    return !!this.layer && loadUserSettings().menuBackdrop;
   }
 
   private async start() {

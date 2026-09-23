@@ -22,18 +22,30 @@ export type UserSettings = {
   menuBackdrop: boolean; // run the live bot match behind the menus (SPEC §6.3)
 };
 
-const DEFAULTS: UserSettings = {
-  nickname: "",
-  volume: 0.6,
-  quality: "auto",
-  touchSide: "left",
-  autoFullscreen: true,
-  showPing: true,
-  menuBackdrop: true,
-};
+/** Not a constant: `menuBackdrop` follows the system's reduced-motion
+ *  preference *as a default*. Once the player saves the Settings screen their
+ *  stored value is explicit and wins — someone who ticks the box has asked
+ *  for the animation with full knowledge of what they turned off elsewhere
+ *  (Windows' "Animation effects" switch alone puts a desktop browser in
+ *  reduced-motion, which would otherwise silently veto the backdrop forever). */
+function defaults(): UserSettings {
+  return {
+    nickname: "",
+    volume: 0.6,
+    quality: "auto",
+    touchSide: "left",
+    autoFullscreen: true,
+    showPing: true,
+    menuBackdrop: !prefersReducedMotion(),
+  };
+}
+
+export function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
 
 export function loadUserSettings(): UserSettings {
-  return { ...DEFAULTS, ...loadSetting<Partial<UserSettings>>("settings", {}) };
+  return { ...defaults(), ...loadSetting<Partial<UserSettings>>("settings", {}) };
 }
 
 export function saveUserSettings(s: UserSettings) {
