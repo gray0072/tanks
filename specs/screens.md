@@ -2,7 +2,10 @@
 
 Part of the [Tanks specification](../SPEC.md) — section numbers (§) are indexed there.
 
-Screens are a stack managed by `ScreenManager`; exactly one is active and rendered per frame.
+Screens are React components over a single `Route` value held by `<App>` (`src/ui/routes.ts`);
+exactly one is active and rendered per frame. Navigation is `go(route)` — a state update, not a
+mount/unmount protocol — and live objects a screen needs to survive the move (a `RoomController`,
+the editor's working document) travel inside the route.
 
 1. **Main Menu** — logo, `Create room`, `Join room`, `Level editor`, `Settings`, `How to play`,
    over the live backdrop (§6.3).
@@ -112,7 +115,7 @@ menu in front of it.
   a *player*, and a backdrop whose tanks disappear into the bushes is a backdrop of empty scenery.
 - **Rounds are short** (2½ minutes, generous respawns) and each one picks a different built-in map,
   so a long menu session doesn't settle into one picture. Custom maps are excluded.
-- **It yields.** `ScreenManager` starts and stops it per screen from `Screen.backdrop`; the match
+- **It yields.** `<App>` starts and stops it per route (`wantsBackdrop`); the match
   and the editor own the canvas themselves, so it is destroyed outright — WebGL context included —
   before either mounts, and rebuilt when the menu comes back. It also stops while the tab is hidden.
 - **On by default for everyone**, `prefers-reduced-motion` included, with a one-click off switch in

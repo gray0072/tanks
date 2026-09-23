@@ -203,7 +203,7 @@ r......*
 
 It's kept out of the room-creation picker (`listMaps()`) and only surfaces when `config.DEBUG` is
 on, which skips the menu/room flow entirely and starts a match on it immediately, offline, bots
-filling every spawn but slot 0, all-default settings (`main.ts`). Never ship `DEBUG` on.
+filling every spawn but slot 0, all-default settings (`main.tsx`). Never ship `DEBUG` on.
 
 ---
 

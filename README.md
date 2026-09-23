@@ -87,8 +87,8 @@ whole team.
 | Action | Player 1 | Player 2 (same machine) |
 |---|---|---|
 | Move | `W` `A` `S` `D` | Arrow keys |
-| Fire | `Left Shift` | `Right Shift` |
-| Drop mine (needs the `MINE` bonus) | `Q` | `M` |
+| Fire | `1` | `N` |
+| Drop mine (needs the `MINE` bonus) | `2` | `M` |
 | Scoreboard | hold `Tab` | |
 | Menu / pause | `Esc` | |
 
@@ -172,7 +172,7 @@ can be hosted anywhere that serves it from `/tanks/`.
 
 ## Tech
 
-**TypeScript** · **PixiJS** (WebGL rendering) · **PeerJS** (WebRTC DataChannel) · **Vite** ·
+**TypeScript** · **React** (menus, HUD) · **PixiJS** (WebGL rendering) · **PeerJS** (WebRTC DataChannel) · **Vite** ·
 static hosting on **GitHub Pages**. No backend, and no shipped art — every texture, from the tanks
 to the power-up icons, is generated procedurally at boot.
 
@@ -181,8 +181,10 @@ to the power-up icons, is generated procedurally at boot.
 
 ```
 src/
-  main.ts            # entry: debug shortcut, ?room= deep link, or the main menu
-  game/              # screens (menu, create, join, room, match, result, settings, editor)
+  main.tsx           # entry: debug shortcut, ?room= deep link, or the main menu
+  ui/                # React: screens (menu, create, join, room, match, result, settings,
+                     # editor), the HUD, and the route value that says which one is up
+  game/              # config, settings, touch controls, the live menu backdrop
     config.ts        # every tuning number: speeds, timings, bot profiles, editor limits
   world/             # the simulation — no rendering, no DOM, no network
     sim.ts           # authoritative tick: movement, bullets, bonuses, flags
@@ -191,8 +193,8 @@ src/
   ai/                # bots: per-tank controller, pathfinder, team role planner
   net/               # RoomHost / RoomClient behind one RoomController interface
     peer.ts          # PeerJS plumbing; protocol.ts — wire messages
-  render/            # PixiJS: arena, procedurally generated atlas, HUD, previews, bonus art
-  util/              # input, audio, fullscreen, math, storage, dialog helpers
+  render/            # PixiJS: arena, procedurally generated atlas, previews, bonus art
+  util/              # input, audio, fullscreen, math, storage
 tests/               # headless node:test suites
 scripts/             # map validation and the test runner
 docs/screenshots/    # the images in this README

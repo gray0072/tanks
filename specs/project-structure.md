@@ -13,15 +13,20 @@ tanks/
 │  └─ runTests.mjs          # `npm test` — globs and runs tests/*.test.ts under node:test
 ├─ tests/                   # headless suites: movement, controls, map format, bot nav, bot tactics
 └─ src/
-   ├─ main.ts                  # bootstrap, ScreenManager, ?room= deep link
-   ├─ style.css                # the one stylesheet for every DOM screen + HUD
+   ├─ main.tsx                 # bootstrap: React root, backdrop layer, ?room= deep link
+   ├─ style.css                # the one stylesheet for every screen + HUD
+   ├─ ui/                      # every screen, in React
+   │  ├─ App.tsx               # the one active route; starts/stops the menu backdrop
+   │  ├─ routes.ts             # the Route union — the whole navigation model
+   │  ├─ screens/              # MainMenu, CreateRoom, JoinRoom, MapLibrary, Editor,
+   │  │                        # RoomScreen, Match, Result, SettingsScreen, HowToPlay
+   │  ├─ components/           # Hud (§6.2), Modal
+   │  └─ hooks/                # useEnterKey (Enter = primary action), useModal (await a dialog)
    ├─ game/
    │  ├─ config.ts             # all tunables from this spec
    │  ├─ settings.ts           # persisted per-viewer settings (volume, quality, ...)
    │  ├─ touchControls.ts      # the mobile two-zone overlay (§5.3): floating stick + fire half
-   │  ├─ menuBackdrop.ts       # the live bot match behind the menus (§6.3)
-   │  ├─ ScreenManager.ts
-   │  └─ screens/              # MainMenu, CreateRoom, JoinRoom, Room, Match, Result, Settings
+   │  └─ menuBackdrop.ts       # the live bot match behind the menus (§6.3)
    ├─ world/
    │  ├─ grid.ts               # terrain, destruction, queries
    │  ├─ maps/
@@ -49,10 +54,9 @@ tanks/
    │  ├─ app.ts                # Pixi app, scaling
    │  ├─ atlas.ts              # procedural texture generation
    │  ├─ arena.ts              # layers, sprites, snapshot interpolation, fx
-   │  ├─ preview.ts            # room-screen map & tank preview (Canvas2D)
-   │  └─ hud.ts                # DOM HUD overlay + top-bar action buttons (§6.2)
+   │  └─ preview.ts            # room-screen map & tank preview (Canvas2D)
    ├─ audio/audio.ts
-   └─ util/                    # math (incl. seeded RNG), input, storage, dialog (Enter binding),
+   └─ util/                    # math (incl. seeded RNG), input, storage,
                                # fullscreen (§5.4: prefixes + orientation lock, all failure-tolerant)
 ```
 

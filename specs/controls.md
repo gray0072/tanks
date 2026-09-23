@@ -7,19 +7,21 @@ Part of the [Tanks specification](../SPEC.md) — section numbers (§) are index
 | Action | Player 1 | Player 2 (local co-op) |
 |---|---|---|
 | Move | `W` `A` `S` `D` | Arrow keys |
-| Fire | `Left Shift` | `Right Shift` |
-| Drop mine | `Q` | `M` |
+| Fire | `1` | `N` |
+| Drop mine | `2` | `M` |
 | Scoreboard | hold `Tab` | — |
 | Menu / pause overlay | `Esc` | — |
 
 **Bindings are physical keys** (`KeyboardEvent.code`), never the character produced, so they are
-the same on a Russian or any other layout: `Q` is whatever key sits where `Q` sits (Й), `M` likewise.
+the same on a Russian or any other layout: `N` is whatever key sits where `N` sits (Т), `M` likewise,
+and `1` / `2` are the number-row keys whatever they type.
 
-**`Ctrl` is deliberately unbound.** It is the natural fire key next to `WASD`, but `Ctrl`+`W` closes
-the tab and `Ctrl`+`Tab` switches it, and a page cannot stop either: browser-reserved chords are
-never delivered cancellable. Keyboard Lock would intercept them, but only while fullscreen and only
-on Chromium — not a base a control scheme can stand on. `Shift` carries no such chords with `WASD`
-or the arrows, so fire lives there instead.
+**`Ctrl` and `Shift` are deliberately unbound.** `Ctrl` is the natural fire key next to `WASD`, but
+`Ctrl`+`W` closes the tab and `Ctrl`+`Tab` switches it, and a page cannot stop either: browser-reserved
+chords are never delivered cancellable. Keyboard Lock would intercept them, but only while fullscreen
+and only on Chromium — not a base a control scheme can stand on. `Shift` is free of such chords but is
+a modifier, and some IMEs and layout switchers swallow a bare press, so fire/mine sit on plain keys:
+`1`/`2` above `WASD`, `N`/`M` under the arrows.
 
 Holding two adjacent direction keys (e.g. `W`+`D`) drives/faces diagonally between them. Holding an
 opposing pair on one axis (e.g. `W`+`S`) resolves last-pressed-wins, same as a single direction always

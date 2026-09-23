@@ -13,11 +13,12 @@ type SeatBindings = {
   mine: string[];
 };
 
-// SPEC §5.1 — Player 1: WASD / LShift / Q. Player 2 (local co-op): Arrows / RShift / M.
+// SPEC §5.1 — Player 1: WASD / 1 / 2. Player 2 (local co-op): Arrows / N / M.
 //
 // Everything below is a `KeyboardEvent.code` — a *physical* key, not the
 // character it produces — so the bindings are identical on a Russian (or any
-// other) layout: `keyq` is the key labelled Й, `keyw` the one labelled Ц.
+// other) layout: `keyn` is the key labelled Т, `keyw` the one labelled Ц, and
+// `digit1`/`digit2` are the number row regardless of what they type.
 // Ctrl is deliberately not bound: `Ctrl`+`W` closes the tab and no page can
 // stop it outside fullscreen.
 const BINDINGS: [SeatBindings, SeatBindings] = [
@@ -28,8 +29,8 @@ const BINDINGS: [SeatBindings, SeatBindings] = [
       [Dir.Down]: ["keys"],
       [Dir.Left]: ["keya"],
     },
-    fire: ["shiftleft"],
-    mine: ["keyq"],
+    fire: ["digit1"],
+    mine: ["digit2"],
   },
   {
     dirs: {
@@ -38,7 +39,7 @@ const BINDINGS: [SeatBindings, SeatBindings] = [
       [Dir.Down]: ["arrowdown"],
       [Dir.Left]: ["arrowleft"],
     },
-    fire: ["shiftright"],
+    fire: ["keyn"],
     mine: ["keym"],
   },
 ];
@@ -53,10 +54,17 @@ const DIAGONAL: Partial<Record<CardinalDir, Partial<Record<CardinalDir, Dir>>>> 
 };
 
 const PREVENT_DEFAULT = new Set([
-  "keyw", "keya", "keys", "keyd", "keyq", "shiftleft",
+  "keyw", "keya", "keys", "keyd", "digit1", "digit2",
   "arrowup", "arrowdown", "arrowleft", "arrowright",
-  "keym", "shiftright", "tab", "escape",
+  "keyn", "keym", "tab", "escape",
 ]);
+
+function isTyping(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable;
+}
 
 export class Input {
   private held = new Set<string>();
@@ -80,6 +88,10 @@ export class Input {
   }
 
   private onKey(e: KeyboardEvent, down: boolean) {
+    // The listeners stay on `window` for the rest of the session once a match
+    // has run, so a bound key must not be swallowed while the player is typing
+    // in a field elsewhere (a room code or map name is full of digits).
+    if (isTyping(e.target)) return;
     const code = e.code.toLowerCase();
     if (PREVENT_DEFAULT.has(code)) e.preventDefault();
     if (down === this.held.has(code)) {

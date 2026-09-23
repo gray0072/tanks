@@ -68,6 +68,23 @@ everyone: gating it on `prefers-reduced-motion` made it look broken on Windows, 
 true whenever "Animation effects" is off. Verified by driving Chromium at 1280x720 and 412x916 —
 including the toggle round-trip and that the backdrop's WebGL context is really gone in a match.
 
+**2026-09-23 (React):** the whole UI layer was rewritten in React/TSX. `ScreenManager` and the
+`Screen` mount/unmount protocol are gone: `src/ui/App.tsx` renders one `Route`
+(`src/ui/routes.ts`) and navigation is `go(route)`, with live objects a screen must keep — a
+`RoomController`, the editor's `EditorDoc` — carried inside the route. The old
+`src/game/screens/*.ts`, `src/util/dialog.ts` and `src/render/hud.ts` were deleted and replaced by
+`src/ui/screens/*.tsx`, `src/ui/components/{Hud,Modal}.tsx` and the `useEnterKey`/`useModal` hooks
+(`showModal`'s `await` shape survived as a hook). Everything below the UI — `world/`, `ai/`,
+`net/`, `render/` (Pixi), `audio/`, `game/{config,settings,touchControls,menuBackdrop}` — is
+untouched, and the CSS class names are the same, so `style.css` was not edited at all. The pieces
+that must stay imperative stayed imperative behind refs: the Pixi app, `Arena`, `TouchControls` and
+the match's `requestAnimationFrame` loop all live in one effect in `Match.tsx`, and the editor's
+grid is still painted by hand onto a Canvas2D with a version counter telling React it changed.
+Verified by driving Chromium at 1280x720 (menu → How to Play → create → room → match → pause →
+leave; editor paint/undo/test-play round trip; library export/delete modals) and at 412x916 /
+916x412 with `hasTouch` (stick, fire zone, MINE, rotate notice, auto-fullscreen), plus `npm test`
+(113 pass), `tsc` and `npm run build`.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project

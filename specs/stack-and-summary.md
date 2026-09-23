@@ -7,16 +7,19 @@ Part of the [Tanks specification](../SPEC.md) — section numbers (§) are index
 | Tool | Version | Role |
 |---|---|---|
 | TypeScript | ^5.6 | The whole codebase; `npm run build` type-checks before bundling |
-| PixiJS | ^8.20 | WebGL renderer for the arena — sprites, layers, effects. No DOM in the hot path |
+| React | ^19.3 | Every screen, overlay and the HUD (§6) — `.tsx` components over one route value |
+| PixiJS | ^8.20 | WebGL renderer for the arena — sprites, layers, effects. No React, no DOM in the hot path |
 | PeerJS | ^1.5 | WebRTC DataChannel wrapper: room codes map to peer ids, star topology (§9) |
-| Vite | ^5.4 | Dev server and production bundler; `base: "/tanks/"` for GitHub Pages |
+| Vite | ^5.4 | Dev server and production bundler (`@vitejs/plugin-react`); `base: "/tanks/"` for GitHub Pages |
 | tsx | ^4.19 | Runs the `.ts` test suites and `scripts/checkMaps.ts` under plain Node |
 | node:test | Node 20 | Test runner for `tests/` (via `scripts/runTests.mjs`, which does the globbing) |
 | gh-pages | ^6.3 | Manual publish of `dist/` to the `gh-pages` branch |
 
-No UI framework, no state library, no CSS framework, no asset pipeline: screens are hand-rolled DOM
-(§6), state lives in the `Sim` and the `RoomController`, and every texture is generated procedurally
-at boot (§7).
+No state library, no CSS framework, no asset pipeline: React renders the screens (§6) and nothing
+else — the arena is Pixi, and the simulation is plain classes. Game state lives in the `Sim` and the
+`RoomController`, not in component state; components read it through callbacks and a few refs, so a
+30 Hz snapshot never becomes a 30 Hz re-render of anything but the HUD. Every texture is generated
+procedurally at boot (§7).
 
 ---
 

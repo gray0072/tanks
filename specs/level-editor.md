@@ -305,7 +305,7 @@ buttons. Cleared on leaving the editor; never persisted.
 
 `Test play` is enabled only when validation passes. It starts an **offline** room-of-one on the
 current (possibly unsaved) template, every other slot a bot at the room default difficulty — exactly
-what `config.DEBUG` does today (`main.ts`), but reached from the editor. The map is registered in the
+what `config.DEBUG` does today (`main.tsx`), but reached from the editor. The map is registered in the
 transient registry (§2.3) under the working id, so nothing needs to be saved to try it. Leaving the
 match returns to the editor with the work and the undo stack intact.
 
@@ -448,11 +448,11 @@ reconnects get it too.
 | `src/world/maps/validateMap.ts` | **new** — §7 rules on top of `parseMap` |
 | `src/world/maps/editorModel.ts` | **new** — grid buffer ⇄ template, paint/rect/entity ops, resize, undo stack (pure, headless-testable) |
 | `src/world/maps/loader.ts` | custom + transient resolution in `getMap`; `listCustomMaps`, `listPlayableMaps` |
-| `src/game/screens/MapLibraryScreen.ts` | **new** — §5, both modes |
-| `src/game/screens/EditorScreen.ts` | **new** — §6 |
-| `src/game/screens/CreateRoomScreen.ts` | inline map grid → `Map: … [Change…]` row (§5.5) |
-| `src/game/screens/MainMenuScreen.ts` | `Level Editor` button |
-| `src/game/screens/RoomScreen.ts` | size/roster on the map line; `Save to my maps` for a received custom map |
+| `src/ui/screens/MapLibrary.tsx` | **new** — §5, both modes |
+| `src/ui/screens/Editor.tsx` | **new** — §6 |
+| `src/ui/screens/CreateRoom.tsx` | inline map grid → `Map: … [Change…]` row (§5.5) |
+| `src/ui/screens/MainMenu.tsx` | `Level Editor` button |
+| `src/ui/screens/RoomScreen.tsx` | size/roster on the map line; `Save to my maps` for a received custom map |
 | `src/game/config.ts` | `EDITOR_*` constants (§3) |
 | `src/net/protocol.ts`, `host.ts`, `client.ts` | optional `mapTemplate` (§9) |
 | `src/render/preview.ts` | reused for library thumbnails; the editor canvas shares `TILE_COLOR` |
