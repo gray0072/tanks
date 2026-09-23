@@ -142,6 +142,13 @@ export const NET_SNAPSHOT_HZ = 15;
 export const NET_FULL_SNAPSHOT_EVERY = 2; // s
 export const RECONNECT_GRACE = 60; // s
 export const RECONNECT_ROOM_TIMEOUT = 30; // s
+// How often the host looks at each peer's RTCPeerConnection state, and how
+// long a peer may sit in "disconnected" before it is treated as gone
+// (net/liveness.ts). A closed tab usually reaches "failed"/"closed" and is
+// dropped at once; this grace is for the ICE blips a roaming phone produces,
+// which must not end someone's match.
+export const PEER_POLL_INTERVAL = 1; // s
+export const PEER_DISCONNECT_GRACE = 8; // s
 
 // --- Bots (SPEC §10) ---
 export type BotDifficulty = "easy" | "normal" | "hard";

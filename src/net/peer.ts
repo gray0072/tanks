@@ -7,6 +7,23 @@
 import Peer, { type DataConnection, type PeerError } from "peerjs";
 import { peerIdForRoom } from "./roomCode";
 import type { ClientMessage, HostMessage } from "./protocol";
+import { PeerWatchdog, type PeerConnState } from "./liveness";
+import { PEER_DISCONNECT_GRACE, PEER_POLL_INTERVAL } from "../game/config";
+
+/** Closing the tab has to take the peer down with it: PeerJS only sends its
+ *  goodbye if something tells it to, and `unload` is too late on mobile,
+ *  where a backgrounded tab can be discarded without it. `pagehide` is the
+ *  one that fires in both cases. Returns the unsubscribe. */
+function closeOnPageHide(teardown: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onHide = () => teardown();
+  window.addEventListener("pagehide", onHide);
+  window.addEventListener("beforeunload", onHide);
+  return () => {
+    window.removeEventListener("pagehide", onHide);
+    window.removeEventListener("beforeunload", onHide);
+  };
+}
 
 export type NetErrorInfo = { type?: string; message: string };
 
@@ -21,12 +38,41 @@ export type HostNetworkCallbacks = {
 export class HostNetwork {
   private peer: Peer;
   private conns = new Map<string, DataConnection>();
+  /** `close` alone loses peers that vanish without saying so (SPEC §9.4) —
+   *  see net/liveness.ts. */
+  private watchdog = new PeerWatchdog(PEER_DISCONNECT_GRACE);
+  private poll: ReturnType<typeof setInterval>;
+  private unbindPageHide: () => void;
 
   constructor(roomCode: string, private cb: HostNetworkCallbacks) {
     this.peer = new Peer(peerIdForRoom(roomCode));
     this.peer.on("open", () => this.cb.onHostReady?.());
     this.peer.on("connection", (conn) => this.attach(conn));
     this.peer.on("error", (e) => this.cb.onError?.(toErrorInfo(e)));
+    this.poll = setInterval(() => this.checkPeers(), PEER_POLL_INTERVAL * 1000);
+    // A host closing the tab drops the room rather than leaving its guests
+    // staring at a lobby nobody is running.
+    this.unbindPageHide = closeOnPageHide(() => this.peer.destroy());
+  }
+
+  /** One sweep of every open connection's underlying WebRTC state. */
+  private checkPeers() {
+    const now = Date.now() / 1000;
+    for (const [id, conn] of [...this.conns]) {
+      const state = (conn.peerConnection?.connectionState as PeerConnState | undefined) ?? "unknown";
+      if (this.watchdog.observe(id, state, now) === "keep") continue;
+      // Same path as a clean close, so the slot goes back to a bot exactly as
+      // it would have. `close()` is still worth calling: it releases the
+      // connection on our side even when the other end is already gone.
+      this.conns.delete(id);
+      this.watchdog.forget(id);
+      try {
+        conn.close();
+      } catch {
+        // Already dead — the point of this sweep.
+      }
+      this.cb.onPeerLeave?.(id);
+    }
   }
 
   private attach(conn: DataConnection) {
@@ -36,7 +82,8 @@ export class HostNetwork {
     });
     conn.on("data", (data) => this.cb.onMessage?.(conn.peer, data as ClientMessage));
     conn.on("close", () => {
-      this.conns.delete(conn.peer);
+      if (!this.conns.delete(conn.peer)) return; // already swept
+      this.watchdog.forget(conn.peer);
       this.cb.onPeerLeave?.(conn.peer);
     });
     conn.on("error", (e) => this.cb.onError?.(toErrorInfo(e)));
@@ -52,6 +99,7 @@ export class HostNetwork {
 
   kick(connId: string) {
     this.conns.get(connId)?.close();
+    this.watchdog.forget(connId);
   }
 
   get connectionIds(): string[] {
@@ -59,6 +107,8 @@ export class HostNetwork {
   }
 
   destroy() {
+    clearInterval(this.poll);
+    this.unbindPageHide();
     this.peer.destroy();
   }
 }
@@ -73,8 +123,13 @@ export type ClientNetworkCallbacks = {
 export class ClientNetwork {
   private peer: Peer;
   private conn: DataConnection | null = null;
+  private unbindPageHide: () => void;
 
   constructor(roomCode: string, private cb: ClientNetworkCallbacks) {
+    // Closing the tab must reach the host, or it keeps this guest in the
+    // roster (SPEC §9.4). The host's own watchdog is the backstop for the
+    // cases this can't cover, like a crash or a dead network.
+    this.unbindPageHide = closeOnPageHide(() => this.peer.destroy());
     this.peer = new Peer();
     this.peer.on("open", () => {
       const conn = this.peer.connect(peerIdForRoom(roomCode), { reliable: true });
@@ -102,6 +157,7 @@ export class ClientNetwork {
   }
 
   destroy() {
+    this.unbindPageHide();
     this.peer.destroy();
   }
 }

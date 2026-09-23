@@ -7,6 +7,7 @@ import { useEnterKey } from "../hooks/useEnterKey";
 
 export function JoinRoom({ go, prefillCode }: { go: Navigate; prefillCode: string }) {
   const [nickname, setNickname] = useState(() => loadUserSettings().nickname || randomGuestNickname());
+  const nameField = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState(prefillCode);
   const [error, setError] = useState("");
   /** The connection in flight. Ownership passes to the room screen once it
@@ -44,20 +45,36 @@ export function JoinRoom({ go, prefillCode }: { go: Navigate; prefillCode: strin
 
   useEnterKey(() => joinRef.current());
 
+  // An invite link fills the code in and stops there — the name is the one
+  // thing the link can't know, so it is what gets the focus, pre-selected so
+  // the suggested `Guest1234` is replaced by just typing.
   useEffect(() => {
-    if (prefillCode) joinRef.current();
-    return () => {
-      if (!navigated.current) room.current?.destroy();
-    };
+    if (!prefillCode) return;
+    nameField.current?.focus();
+    nameField.current?.select();
   }, [prefillCode]);
+
+  useEffect(
+    () => () => {
+      if (!navigated.current) room.current?.destroy();
+    },
+    [],
+  );
 
   return (
     <div className="screen">
       <div className="title">Join Room</div>
       <div className="panel">
+        {prefillCode ? <div className="hint">You were invited to room {prefillCode}.</div> : null}
         <label>
           Nickname
-          <input type="text" maxLength={12} value={nickname} onChange={(e) => setNickname(e.target.value)} />
+          <input
+            ref={nameField}
+            type="text"
+            maxLength={12}
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+          />
         </label>
         <label>
           Room code

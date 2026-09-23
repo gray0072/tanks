@@ -2,6 +2,7 @@
 // is the same "single stack" the old ScreenManager enforced (SPEC §6) — only
 // now it's a value in React state instead of a mounted object.
 
+import { isValidRoomCode, normalizeRoomCode } from "../net/roomCode";
 import type { RoomController } from "../net/room";
 import type { EditorDoc } from "../world/maps/editorModel";
 import type { PlayerStats } from "../world/rules";
@@ -51,6 +52,19 @@ export type Route =
     };
 
 export type Navigate = (route: Route) => void;
+
+/** Where a `?room=CODE` invite link lands, or null when the query string
+ *  carries no usable code (SPEC §6, §9.2).
+ *
+ *  It lands on the **join form**, with the code filled in — never on the room
+ *  itself. A link is an invitation, not a decision: the player still has to
+ *  say who they are, and joining under an auto-generated `Guest1234` they
+ *  never saw, with no way back to change it, is what the auto-connect this
+ *  replaced actually did. */
+export function deepLinkRoute(search: string): Route | null {
+  const code = normalizeRoomCode(new URLSearchParams(search).get("room") ?? "");
+  return isValidRoomCode(code) ? { k: "join", code } : null;
+}
 
 /** Screens that draw their own canvas take the WebGL context over from the
  *  live menu backdrop (SPEC §6.3). */

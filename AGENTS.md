@@ -126,6 +126,27 @@ round 2 with every brick back and the clock reset → `BLUE WINS 2:0`, settings 
 back to the room, plus the same at 916x412 with touch. The old `×0`-respawn stall now resolves on
 the first round.
 
+**2026-09-23 (joining and leaving):** two membership bugs, and the first real two-browser
+verification this project has had.
+- An invite link **auto-connected**: `JoinRoom` called `join()` from an effect whenever
+  `prefillCode` was set, so the form flashed past and the player was seated under a
+  `randomGuestNickname()` they never saw, with no way back. A link now resolves to the join form
+  (`deepLinkRoute` in `ui/routes.ts`, extracted from `main.tsx` so it is testable), code filled in,
+  focus in the name field with the suggestion pre-selected.
+- A guest that **closed its tab stayed in the roster forever**. `conn.on("close")` is not
+  dependable. Fixed on both sides (SPEC §9.4): both peers destroy themselves on `pagehide` (the
+  event a discarded mobile tab still fires, unlike `unload`), and the host additionally polls each
+  connection's `RTCPeerConnection.connectionState` once a second through `net/liveness.ts`
+  (`PeerWatchdog`: `failed`/`closed` drop at once, `disconnected` gets an 8 s grace so a roaming
+  phone's ICE blip doesn't end its match). Both go down the existing `onPeerLeave` path.
+
+Verified with two real Chromium contexts against the dev server (PeerJS's public broker, so this
+needs internet): link → form → name → seated on the host; closing the guest's *tab* removed it in
+under 6 s, and killing the whole context — nothing fires — had Chromium report `disconnected` at
+~10 s with the watchdog dropping it ~8 s later. Worth knowing for the next session: `guest.close()`
+and `guestCtx.close()` in Playwright exercise *different* code paths here, and only the second one
+tests the watchdog.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -162,6 +183,12 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 - `tests/mapEditor.test.ts` — the level editor's document model (`world/maps/editorModel.ts`):
   painting, the terrain-only rectangle fill, entity semantics (a flag *moves*, a spawn toggles and
   is capped), resize with an anchor, and the rule that **one gesture is one undo step**.
+- `tests/joinAndLeave.test.ts` — the two edges of room membership (SPEC §6, §9.4): `deepLinkRoute`
+  resolves an invite link to the *join form* and never to a room (plus the code-normalising cases),
+  and `PeerWatchdog` decides when a peer is gone — dead states drop at once, a brief ICE blip is
+  ridden out, a sustained disconnect drops once the grace is up, recovering resets that grace, and
+  peers are judged independently. The PeerJS plumbing around it still needs two real browsers; the
+  rule it feeds does not, which is why the rule lives apart from `peer.ts`.
 - `tests/rounds.test.ts` — the round series (SPEC §2.2) and how a timed-out round is decided: the
   score moves and the target ends the match, the score reads winner-first, stats accumulate across
   rounds, and `checkWinByTime` walks respawns → distance to the enemy flag → sudden death. The one

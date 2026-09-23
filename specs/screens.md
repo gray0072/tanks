@@ -16,7 +16,10 @@ the editor's working document) travel inside the route.
    library**, not just its `Change…` button: the card is the thing being chosen. It is a focusable
    `role="button"`, so `Enter` on it opens the library instead of triggering `Create`.
 3. **Join room** — nickname, 6-character code field (auto-uppercase, auto-advance, paste-aware).
-   A `?room=CODE` deep link skips straight here with the code filled in.
+   A `?room=CODE` invite link opens **this screen** with the code filled in, the room named in a
+   hint, and the focus in the nickname field with its suggested `Guest1234` pre-selected — it never
+   connects on its own. A link is an invitation, not a decision: joining automatically seated the
+   player under a name they never saw and gave them no way back to change it.
 4. **Map library** — one screen in two modes (`specs/level-editor.md` §5): opened from `Create
    room` to pick a map, or from the menu's `Level editor` to manage them. Every card carries the
    map's thumbnail, name, **size and roster (`33×25 · 5v5`)**, and its actions — clicking the card itself does the obvious one (`Edit` here, `Select` when picking a map for a room), with buttons for `Select`, `Edit`

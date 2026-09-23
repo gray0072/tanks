@@ -83,6 +83,25 @@ predicted — the 100 ms of latency is honest and avoids phantom kills.
 
 - **Client drops:** its slots revert to bots immediately; the tanks keep fighting. A 60-second grace
   window lets the same nickname reclaim its slots on reconnect, mid-match.
+- **How a drop is noticed.** A DataConnection's `close` event is *not* enough: a tab closed
+  abruptly, a crashed browser or a dead network often produce no `close` at all, and the guest stays
+  in the roster forever. Two mechanisms, and the room needs both:
+  1. **The leaver says so.** Both sides tear their `Peer` down on `pagehide` (and `beforeunload`),
+     which is what makes a closed tab leave the roster within a second. `pagehide` rather than
+     `unload` alone because a backgrounded mobile tab can be discarded without ever firing `unload`.
+     A host closing its tab drops the room the same way, instead of leaving guests in a lobby
+     nobody is running.
+  2. **The host watches anyway**, once a second, over each connection's own
+     `RTCPeerConnection.connectionState` (`net/liveness.ts`, `PeerWatchdog`) — the signal the
+     browser maintains from ICE, which no page-lifecycle event can be relied on to replace.
+     `failed`/`closed` drops the peer at once; `disconnected` is given
+     `PEER_DISCONNECT_GRACE` (8 s) first, because ICE blips in and out on a roaming phone and a
+     momentary disconnect must not end someone's match. Either way it goes down the same path a
+     clean close does, so the slot reverts to a bot exactly as it would have.
+
+  Measured in two real Chromium contexts: closing the tab removes the guest in **under 6 s** (path
+  1); killing the context outright, so nothing fires, has Chromium report `disconnected` after
+  ~10 s and the watchdog drop the guest **~8 s later** (path 2).
 - **Host drops:** the match cannot continue — clients see the disconnect overlay and are returned to
   the main menu with the room code preserved so someone can recreate it. *Host migration is
   explicitly out of scope* (§13): it means transferring the authoritative sim mid-match, and the

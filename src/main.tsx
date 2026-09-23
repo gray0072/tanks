@@ -3,9 +3,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./ui/App";
 import { menuBackdrop } from "./game/menuBackdrop";
-import type { Route } from "./ui/routes";
+import { deepLinkRoute, type Route } from "./ui/routes";
 import { RoomHost } from "./net/host";
-import { normalizeRoomCode, isValidRoomCode } from "./net/roomCode";
 import { DEBUG } from "./game/config";
 import { DEBUG_MAP_ID } from "./world/maps/debugMap";
 
@@ -31,10 +30,7 @@ function initialRoute(): Route {
     room.startMatch();
     return { k: "match", room };
   }
-  const params = new URLSearchParams(location.search);
-  const roomParam = normalizeRoomCode(params.get("room") ?? "");
-  if (isValidRoomCode(roomParam)) return { k: "join", code: roomParam };
-  return { k: "menu" };
+  return deepLinkRoute(location.search) ?? { k: "menu" };
 }
 
 createRoot(root).render(
