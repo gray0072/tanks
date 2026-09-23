@@ -1,6 +1,6 @@
 # Tanks
 
-Browser 5v5 team tank battle (Battle City–style). See `SPEC.md` — the index over the section files
+Browser team tank battle (Battle City–style); team size comes from the loaded map. See `SPEC.md` — the index over the section files
 in `specs/` — for the design (authoritative, kept in sync with the code) and `README.md` for the
 player-facing overview.
 

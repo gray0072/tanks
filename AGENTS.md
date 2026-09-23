@@ -19,8 +19,8 @@ deltas, simplified client-side interpolation instead of full prediction/reconcil
 before assuming the spec's prose is what's actually running.
 
 **Status as of 2026-09-06:** rewrote the whole thing from an earlier 2–4 player Canvas2D prototype to
-the current 5v5/PixiJS/team design; verified working end-to-end (menu → create room → claim slot →
-set bot difficulty → local co-op seat → ready → start → live 5v5 match with bots, terrain, bonuses,
+the current PixiJS/team design; verified working end-to-end (menu → create room → claim slot →
+set bot difficulty → local co-op seat → ready → start → live team match with bots, terrain, bonuses,
 kills, HUD). Followed by a bug-fixing pass: tank hitbox shrunk below its 32px slot + auto-center
 assist (tanks were snagging in same-width corridors), tank sprite redrawn with tracks + barrel,
 wall-hit/destruction VFX added, ally-vs-enemy forest concealment, bot stuck-detection with randomized

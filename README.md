@@ -2,7 +2,7 @@
 
 # 🛡️ TANKS
 
-**A browser 5v5 team tank battle in the spirit of _Battle City_ — destructible terrain, power-ups,
+**A browser team tank battle in the spirit of _Battle City_ — destructible terrain, power-ups,
 and a flag you have to defend.**
 
 [![Play now](https://img.shields.io/badge/▶_Play_now-gray0072.github.io%2Ftanks-2f6fed?style=for-the-badge)](https://gray0072.github.io/tanks/)
@@ -14,18 +14,18 @@ and a flag you have to defend.**
 ![No backend](https://img.shields.io/badge/backend-none-2ea043)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-<img src="docs/screenshots/match.png" alt="A 5v5 match on the Classic map" width="860">
+<img src="docs/screenshots/match.png" alt="A team match on the Classic map" width="860">
 
 </div>
 
 ---
 
-Blue against red, five a side, one arena. Bring friends over a 6-character room code, hand a second
-player the arrow keys on your own machine, or take on a team of bots — every slot nobody claims is
-filled by one. Runs in any modern browser, desktop or phone, with no server, no install and no
-account.
+Blue against red, as many tanks a side as the map puts spawn points. Bring friends over a
+6-character room code, hand a second player the arrow keys on your own machine, or take on a team of
+bots — every slot nobody claims is filled by one. Runs in any modern browser, desktop or phone,
+with no server, no install and no account.
 
-> **Status: playable prototype.** A full local match works today: menu → room → live 5v5 with
+> **Status: playable prototype.** A full local match works today: menu → room → a live match with
 > terrain, bonuses, flags and bots, plus a level editor and a headless test suite (`npm test`).
 > Multiplayer (PeerJS) is implemented but not yet verified across two real devices over the
 > internet; the touch controls are verified in an emulated phone browser, not yet on real hardware.
@@ -36,6 +36,7 @@ account.
 
 |  |  |
 |---|---|
+| 🧩 **Teams sized by the map** | The roster is the map's spawn count, not a fixed number — a 1v1 test arena and a 16-a-side brawl are the same engine, and every free slot is filled by a bot |
 | ⚔️ **Team battle with an objective** | Destroy the enemy flag for an instant win, or grind the enemy out of respawns before the 10-minute clock runs out |
 | 🤖 **Bots on every free slot** | Easy / Medium / Hard, set per bot or for the whole roster — genuinely different tactics, not just better aim |
 | 🧱 **Destructible terrain** | Brick crumbles cell by cell, steel resists until you're upgraded, forest conceals, water stops tanks but not bullets, ice slides, sand slows |
