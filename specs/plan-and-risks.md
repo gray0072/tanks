@@ -44,7 +44,7 @@ bot-vs-bot soak (100 matches) that asserts every match terminates and no invaria
 ## 15. Out of scope
 
 Host migration · dedicated/relay servers and TURN · accounts, persistent stats, ranking ·
-matchmaking or a public room browser · in-game text/voice chat · a map editor · spectator mode for
+matchmaking or a public room browser · in-game text/voice chat · spectator mode for
 non-participants · replays · anti-cheat beyond host validation · portrait mobile layout · more than
 2 local seats · game modes other than base attack.
 
@@ -52,7 +52,6 @@ non-participants · replays · anti-cheat beyond host validation · portrait mob
 
 - Should upgrade levels persist through death (spec says yes) or reset like Battle City? Decide after
   the M4 playtest.
-- Are 25 respawns right for 10 minutes, or should the pool scale with team size?
 - Does `GRENADE` wiping all 5 enemies feel great or miserable at this team size? Possible fallback:
   it only kills enemies in your half.
 - One shared bonus pool, or team-side spawns to reduce center-map snowballing?
