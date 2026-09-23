@@ -108,6 +108,19 @@ not theoretical: two even bot teams on a mirrored map tie on frags *and* respawn
 earlier version of this feature replayed drawn rounds and a bot room on `classic` with ×0 respawns
 looped forever, drawing 3:3 with 2 alive each on every seed.
 
+Create Room shrank to nickname + map + `Create`; its map card gained the map's blurb (now
+`MAP_SOURCES[].blurb`, no longer a copy of the same strings in `MapLibrary.tsx`) and the whole card
+opens the picker, which is why `useEnterKey` now also leaves `role="button"` alone — otherwise
+`Enter` on the focused card both opened the library and created the room.
+
+**The room's bot-difficulty chips were dead, and not because of the chips.** `RoomHost` hands its
+own live `slots` array to `onRoomState` and mutates the `Slot` objects in place, so the reference
+never changed and React bailed out of re-rendering: a difficulty change (all or per-slot), a claim,
+a ready tick and a kick were all invisible to the host until something else forced a render.
+`RoomScreen` now copies (`setSlots([...nextSlots])`). While there: the chips are gated on `isHost`
+for real instead of only being styled `disabled` — a guest's click used to reach the host, which
+applies `setBotDifficulty` from any peer (that host-side trust gap is untouched and still open).
+
 Verified by driving Chromium: rules edited in the room (`/2`, 1 min, ×0) → round end → overlay →
 round 2 with every brick back and the clock reset → `BLUE WINS 2:0`, settings still set on the way
 back to the room, plus the same at 916x412 with touch. The old `×0`-respawn stall now resolves on

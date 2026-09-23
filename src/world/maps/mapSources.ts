@@ -11,13 +11,57 @@ import { ICEWORKS_TEMPLATE } from "./iceworks";
 import { SWAMP_TEMPLATE } from "./swamp";
 import { THICKET_TEMPLATE } from "./thicket";
 
-export type MapSource = { id: string; name: string; template: string };
+export type MapSource = {
+  id: string;
+  name: string;
+  template: string;
+  /** One line on how the map plays, shown wherever a map is being chosen or
+   *  confirmed (the library card and the Create Room map row). Lives with the
+   *  map rather than with a screen so the two can't drift apart. */
+  blurb: string;
+};
 
 export const MAP_SOURCES: MapSource[] = [
-  { id: "classic", name: "Classic", template: CLASSIC_TEMPLATE },
-  { id: "crossroads", name: "Crossroads", template: CROSSROADS_TEMPLATE },
-  { id: "swamp", name: "Swamp", template: SWAMP_TEMPLATE },
-  { id: "thicket", name: "Thicket", template: THICKET_TEMPLATE },
-  { id: "fortress", name: "Fortress", template: FORTRESS_TEMPLATE },
-  { id: "iceworks", name: "Iceworks", template: ICEWORKS_TEMPLATE },
+  {
+    id: "classic",
+    name: "Classic",
+    template: CLASSIC_TEMPLATE,
+    blurb: "Battle City homage: brick mazes, steel spine, water gate at midfield.",
+  },
+  {
+    id: "crossroads",
+    name: "Crossroads",
+    template: CROSSROADS_TEMPLATE,
+    blurb: "Four open lanes meeting in the middle, minimal cover, fast and lethal.",
+  },
+  {
+    id: "swamp",
+    name: "Swamp",
+    template: SWAMP_TEMPLATE,
+    blurb: "Water channels and sand flats — movement is the puzzle.",
+  },
+  {
+    id: "thicket",
+    name: "Thicket",
+    template: THICKET_TEMPLATE,
+    blurb: "Wide and horizontal, bases left and right, dense forest cover.",
+  },
+  {
+    id: "fortress",
+    name: "Fortress",
+    template: FORTRESS_TEMPLATE,
+    blurb: "Walled keeps in opposite corners — a siege from both directions at once.",
+  },
+  {
+    id: "iceworks",
+    name: "Iceworks",
+    template: ICEWORKS_TEMPLATE,
+    blurb: "Broad ice floors either side of a steel spine; nothing stops where you meant it to.",
+  },
 ];
+
+/** A map's blurb, or "" for one of the player's own maps — those carry no
+ *  description of their own. */
+export function mapBlurb(id: string): string {
+  return MAP_SOURCES.find((m) => m.id === id)?.blurb ?? "";
+}

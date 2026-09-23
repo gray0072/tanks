@@ -173,11 +173,13 @@ Every card — built-in and custom alike — shows, under the existing `drawMapP
    `map.spawns.red.length` vs `map.spawns.blue.length`, rendered `5v5` when symmetric (always, for a
    valid map) — read off the parsed `MapDef`, never hardcoded. A custom map that fails to parse shows
    its raw grid's dimensions and `—` for the roster.
-3. **Blurb** for built-ins (today's `MAP_BLURB`), **relative `updatedAt`** for custom maps.
+3. **Blurb** for built-ins (`MAP_SOURCES[].blurb`, which is also what the Create Room map card
+   shows — one text, one home), **relative `updatedAt`** for custom maps.
 4. A **source tag**: `built-in` or `custom`, plus `⚠ N problems` when validation failed (§7).
 
-The same size/roster line is added to the room screen's map line (`Map: Classic · 33×25 · 5v5 ·
-10 min · ×10 (50) respawns`), so the information is where the decision is made.
+The same size/roster line is added to the room screen's map line (`Map: Classic · 33×25 · 5v5`),
+so the information is where the decision is made; the match rules sit under it as their own
+controls (§6.1).
 
 ### 5.3 Actions
 

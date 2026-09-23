@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { LibraryRoute, Navigate } from "../routes";
 import { listMaps, listCustomMapEntries, type CustomMapEntry, type MapDef } from "../../world/maps/loader";
 import { mapSizeLabel } from "../../world/maps/mapFormat";
-import { MAP_SOURCES } from "../../world/maps/mapSources";
+import { MAP_SOURCES, mapBlurb } from "../../world/maps/mapSources";
 import {
   copyMapInto,
   deleteCustomMap,
@@ -20,15 +20,6 @@ import { hasErrors, validateMapTemplate } from "../../world/maps/validateMap";
 import { drawMapPreview } from "../../render/preview";
 import { useModal } from "../hooks/useModal";
 import { forgetRoomSetup, loadLastMapId, saveLastMapId } from "../../game/settings";
-
-const MAP_BLURB: Record<string, string> = {
-  classic: "Battle City homage: brick mazes, steel spine, water gate at midfield.",
-  crossroads: "Four open lanes meeting in the middle, minimal cover, fast and lethal.",
-  swamp: "Water channels and sand flats — movement is the puzzle.",
-  thicket: "Wide and horizontal, bases left and right, dense forest cover.",
-  fortress: "Walled keeps in opposite corners — a siege from both directions at once.",
-  iceworks: "Broad ice floors either side of a steel spine; nothing stops where you meant it to.",
-};
 
 type Filter = "all" | "builtin" | "custom";
 
@@ -308,7 +299,7 @@ function BuiltinCard({
       <MapThumb map={map} />
       <b>{map.name}</b>
       <span className="map-meta">{mapSizeLabel(map)}</span>
-      <span className="hint">{MAP_BLURB[map.id] ?? ""}</span>
+      <span className="hint">{mapBlurb(map.id)}</span>
       <span className="map-tag">built-in</span>
       <div className="row wrap map-actions">
         {pick ? <CardAction label="Select" onClick={onSelect} /> : null}

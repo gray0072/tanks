@@ -458,6 +458,13 @@ button.chip.active { background: var(--accent); color: #1a1a1a; border-color: va
    the library screen. */
 .map-row { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; gap: 10px; }
 .map-row-thumb { width: 120px; height: auto; image-rendering: pixelated; border-radius: 4px; }
+/* The whole row opens the map picker, same as a library card does. */
+.map-row.clickable { cursor: pointer; }
+.map-row.clickable:hover { border-color: #3a4a5c; }
+.map-row-blurb { margin-top: 2px; max-width: 46ch; }
+/* A chip nobody but the host may press (the bot-difficulty controls) reads as
+   inert rather than merely doing nothing. */
+button.chip.disabled { opacity: 0.4; cursor: default; }
 
 .editor-screen { justify-content: flex-start; }
 .editor-header { width: min(100%, 1200px); gap: 10px; }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Navigate } from "../routes";
 import { listMaps, listPlayableMaps } from "../../world/maps/loader";
 import { mapSizeLabel } from "../../world/maps/mapFormat";
+import { mapBlurb } from "../../world/maps/mapSources";
 import { drawMapPreview } from "../../render/preview";
 import { RoomHost } from "../../net/host";
 import { useEnterKey } from "../hooks/useEnterKey";
@@ -15,7 +16,7 @@ import {
   saveRoomSetup,
   type RoomSetup,
 } from "../../game/settings";
-import { BOT_DIFFICULTY_LABEL, type BotDifficulty } from "../../game/config";
+
 
 /** `initialMapId` is what the map library (specs/level-editor.md §5) hands
  *  back on Continue; without one, reopen on the map played last, unless it
@@ -29,7 +30,9 @@ function resolveMapId(initialMapId?: string): string {
 export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: string }) {
   const [mapId] = useState(() => resolveMapId(initialMapId));
   const [nickname, setNickname] = useState(() => loadUserSettings().nickname || randomGuestNickname());
-  const [setup, setSetup] = useState<RoomSetup>(() => loadRoomSetup(mapId));
+  // Read-only here now: the match rules are set in the room (SPEC §6.1), and
+  // this screen only carries the last-used set over to it.
+  const [setup] = useState<RoomSetup>(() => loadRoomSetup(mapId));
   const [error, setError] = useState("");
   const thumb = useRef<HTMLCanvasElement>(null);
 
@@ -71,6 +74,8 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
       respawnMult: setup.respawnMult,
       friendlyFire: setup.friendlyFire,
     });
+    // Bots start on whatever this map was last played with; the room's own
+    // "All bots" chips are where it is changed (SPEC §6.1).
     room.setBotDifficulty("all", setup.botDifficulty);
     go({ k: "room", room });
   };
@@ -88,33 +93,32 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
         </label>
 
         <label>Map</label>
-        <div className="row between wrap map-row">
+        {/* The whole card opens the picker, not just the button: it is the
+            thing being chosen, so clicking it should do the obvious thing.
+            The button stays for anyone who reads a card as read-only. */}
+        <div
+          className="row between wrap map-row clickable"
+          onClick={openLibrary}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openLibrary();
+            }
+          }}
+        >
           <div className="row">
             <canvas ref={thumb} className="map-row-thumb" width={120} height={76} />
             <div>
               <b>{map?.name}</b>
               <div className="map-meta">{map ? mapSizeLabel(map) : ""}</div>
+              {/* Same line the library card shows (mapSources.ts). A map of
+                  the player's own carries none, and then this is empty. */}
+              <div className="hint map-row-blurb">{map ? mapBlurb(map.id) : ""}</div>
             </div>
           </div>
           <button onClick={openLibrary}>Change…</button>
-        </div>
-
-        {/* The match rules (rounds to win, round length, respawns, friendly
-            fire) are the room's, not this screen's — they are set and changed
-            in the room itself, where every guest sees them (SPEC §6.1). What
-            is left here is what has to be decided *before* a room exists. */}
-        <div className="row wrap">
-          <label>
-            Default bot difficulty
-            <select
-              value={setup.botDifficulty}
-              onChange={(e) => setSetup({ ...setup, botDifficulty: e.target.value as BotDifficulty })}
-            >
-              <option value="easy">{BOT_DIFFICULTY_LABEL.easy}</option>
-              <option value="normal">{BOT_DIFFICULTY_LABEL.normal}</option>
-              <option value="hard">{BOT_DIFFICULTY_LABEL.hard}</option>
-            </select>
-          </label>
         </div>
 
         <div className="error">{error}</div>

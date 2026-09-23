@@ -15,6 +15,7 @@ import {
 } from "../../world/maps/customMaps";
 import { drawMapPreview } from "../../render/preview";
 import { useEnterKey } from "../hooks/useEnterKey";
+import type { BotDifficultyTarget } from "../../net/protocol";
 import {
   BOT_DIFFICULTIES as DIFFS,
   BOT_DIFFICULTY_LABEL as DIFF_LABEL,
@@ -26,6 +27,7 @@ import {
   WINS_TARGET_OPTIONS,
   respawnLabel,
   winsTargetLabel,
+  type BotDifficulty,
   type TeamId,
 } from "../../game/config";
 import { loadRoomSetup, saveRoomSetup } from "../../game/settings";
@@ -45,7 +47,12 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
   useEffect(() => {
     room.setCallbacks({
       onRoomState: (nextSlots, nextMapId) => {
-        setSlots(nextSlots);
+        // A copy, not the array itself: the host hands out its own live
+        // `slots` and mutates the Slot objects in place (a difficulty change,
+        // a claim, a ready tick, a kick), so the reference never changes and
+        // React would bail out of re-rendering — which is exactly what made
+        // the bot-difficulty chips look dead.
+        setSlots([...nextSlots]);
         setMapId(nextMapId);
       },
       onMatchStart: () => {
@@ -73,6 +80,15 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
    *  so the next room on it opens the way this one was left (settings.ts
    *  keeps a set per map). `setSettings` doesn't come back as room state for
    *  the host itself, hence the explicit re-render. */
+  /** Host-only: retarget bot difficulty and remember it for this map, the
+   *  same way the rules below are remembered. */
+  const setDifficulty = (target: BotDifficultyTarget, difficulty: BotDifficulty) => {
+    if (!isHost) return;
+    room.setBotDifficulty(target, difficulty);
+    if (target === "all") saveRoomSetup(room.mapId, { ...loadRoomSetup(room.mapId), botDifficulty: difficulty });
+    forceRender((n) => n + 1);
+  };
+
   const patchSettings = (patch: Partial<MatchSettings>) => {
     room.setSettings(patch);
     const next = { ...room.settings };
@@ -176,7 +192,7 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
                     onClick={() => onSlotClick(s.id)}
                     onCycleDifficulty={() => {
                       const next = DIFFS[(DIFFS.indexOf(s.botDifficulty) + 1) % DIFFS.length];
-                      room.setBotDifficulty(s.id, next);
+                      setDifficulty(s.id, next);
                     }}
                     onKick={() => room.kickSlot?.(s.id)}
                   />
@@ -186,7 +202,12 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
           <div className="row wrap">
             <span className="hint">All bots:</span>
             {DIFFS.map((d) => (
-              <button key={d} className="chip" onClick={() => room.setBotDifficulty("all", d)}>
+              <button
+                key={d}
+                className={"chip " + (isHost ? "" : "disabled")}
+                disabled={!isHost}
+                onClick={() => setDifficulty("all", d)}
+              >
                 {DIFF_LABEL[d]}
               </button>
             ))}

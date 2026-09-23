@@ -9,9 +9,12 @@ the editor's working document) travel inside the route.
 
 1. **Main Menu** — logo, `Create room`, `Join room`, `Level editor`, `Settings`, `How to play`,
    over the live backdrop (§6.3).
-2. **Create room** — nickname, the chosen map (thumbnail + name + size/roster, with `Change…`
-   opening the map library below), match settings (time limit, respawn count, friendly fire,
-   **default bot difficulty — `Medium`**), `Create`. Produces the room code.
+2. **Create room** — nickname, the chosen map, `Create`. Produces the room code. Nothing else: the
+   match rules and the bot difficulty are the *room's* (§6.1, §2.2), so this screen only carries
+   the last-used set for that map across. The map is a card — thumbnail, name, size/roster and the
+   map's **blurb**, the same line the library card shows — and the **whole card opens the map
+   library**, not just its `Change…` button: the card is the thing being chosen. It is a focusable
+   `role="button"`, so `Enter` on it opens the library instead of triggering `Create`.
 3. **Join room** — nickname, 6-character code field (auto-uppercase, auto-advance, paste-aware).
    A `?room=CODE` deep link skips straight here with the code filled in.
 4. **Map library** — one screen in two modes (`specs/level-editor.md` §5): opened from `Create
