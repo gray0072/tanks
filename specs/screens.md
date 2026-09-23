@@ -8,7 +8,8 @@ mount/unmount protocol — and live objects a screen needs to survive the move (
 the editor's working document) travel inside the route.
 
 1. **Main Menu** — logo, `Create room`, `Join room`, `Level editor`, `Settings`, `How to play`,
-   over the live backdrop (§6.3).
+   over the live backdrop (§6.3). Carries a **notice** when the player did not arrive here by
+   choice — `The host removed you from the room.`, `The host left — the room is gone.` (§9.4).
 2. **Create room** — nickname, the chosen map, `Create`. Produces the room code. Nothing else: the
    match rules and the bot difficulty are the *room's* (§6.1, §2.2), so this screen only carries
    the last-used set for that map across. The map is a card — thumbnail, name, size/roster and the

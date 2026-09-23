@@ -31,7 +31,11 @@ export type RoomCallbacks = {
     wins: Record<TeamId, number>,
   ) => void;
   onError?: (message: string) => void;
-  onKicked?: () => void;
+  /** This client is no longer in the room and is not getting back in: the
+   *  host kicked it, or the host is gone (SPEC §9.4). Whoever is on screen
+   *  tears the room down and returns to the menu with `reason` — without
+   *  this, a kicked player sat in a room that had stopped existing. */
+  onLeft?: (e: { reason: string; kicked: boolean }) => void;
 };
 
 export interface RoomController {

@@ -21,7 +21,7 @@ import { listMaps, getMap, type MapDef } from "../world/maps/loader";
 import { getCustomMap, isCustomMapId } from "../world/maps/customMaps";
 import { BotController } from "../ai/bot";
 import { computeTeamRoles, type Role } from "../ai/teamPlan";
-import { HostNetwork, type NetErrorInfo } from "./peer";
+import { HostNetwork, type HostTransport, type NetErrorInfo } from "./peer";
 import { generateRoomCode } from "./roomCode";
 import type { ClientMessage, BotDifficultyTarget, MapPayload } from "./protocol";
 import type { RoomCallbacks, RoomController } from "./room";
@@ -31,12 +31,17 @@ import {
   DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
   DEFAULT_WINS_TARGET,
+  KICK_CLOSE_DELAY,
   ROUND_INTERMISSION,
   TICK_DT,
   NET_SNAPSHOT_HZ,
   type BotDifficulty,
   type TeamId,
 } from "../game/config";
+
+function makeHostNetwork(roomCode: string, cb: ConstructorParameters<typeof HostNetwork>[1]): HostTransport {
+  return new HostNetwork(roomCode, cb);
+}
 
 export class RoomHost implements RoomController {
   readonly isHost = true;
@@ -46,7 +51,7 @@ export class RoomHost implements RoomController {
   mapId: string;
   settings: MatchSettings;
 
-  private net: HostNetwork | null = null;
+  private net: HostTransport | null = null;
   private sim: Sim | null = null;
   private bots = new Map<number, BotController>();
   private localInputs: [SeatInput, SeatInput] = [NO_INPUT, NO_INPUT];
@@ -73,7 +78,16 @@ export class RoomHost implements RoomController {
   private acc = 0;
   private snapshotAcc = 0;
 
-  constructor(private hostNickname: string, online: boolean, private cb: RoomCallbacks, initialMapId?: string) {
+  /** `makeNet` is the test seam (see peer.ts `HostTransport`): given one, the
+   *  room talks to it instead of opening a PeerJS connection, whatever
+   *  `online` says. */
+  constructor(
+    private hostNickname: string,
+    online: boolean,
+    private cb: RoomCallbacks,
+    initialMapId?: string,
+    makeNet?: (cb: Parameters<typeof makeHostNetwork>[1]) => HostTransport,
+  ) {
     // cb is reassigned via setCallbacks() below as screens change
     this.mapId = initialMapId ?? listMaps()[0]?.id ?? "classic";
     // Team size comes from the chosen map's own spawn count, not a hardcoded
@@ -89,14 +103,15 @@ export class RoomHost implements RoomController {
       friendlyFire: false,
     };
 
-    if (online) {
+    if (online || makeNet) {
       this.roomCode = generateRoomCode();
-      this.net = new HostNetwork(this.roomCode, {
+      const callbacks = {
         onHostReady: () => this.publishRoomState(),
-        onPeerLeave: (connId) => this.handlePeerLeave(connId),
-        onMessage: (connId, msg) => this.handleClientMessage(connId, msg),
-        onError: (e) => this.cb.onError?.(describeError(e)),
-      });
+        onPeerLeave: (connId: string) => this.handlePeerLeave(connId),
+        onMessage: (connId: string, msg: ClientMessage) => this.handleClientMessage(connId, msg),
+        onError: (e: NetErrorInfo) => this.cb.onError?.(describeError(e)),
+      };
+      this.net = makeNet ? makeNet(callbacks) : makeHostNetwork(this.roomCode, callbacks);
     }
     this.publishRoomState();
   }
@@ -380,7 +395,15 @@ export class RoomHost implements RoomController {
   kickSlot(slot: number) {
     const s = this.slots[slot];
     if (!s || s.kind !== "human" || s.owner === "host") return;
-    if (s.owner) this.net?.kick(s.owner);
+    const owner = s.owner;
+    if (owner) {
+      // Say so before hanging up, or the guest only sees the socket drop and
+      // has no idea it was removed — which left it sitting in a room it was
+      // no longer part of (SPEC §9.4). The close is deferred so the message
+      // is really on the wire; the guest normally tears itself down first.
+      this.net?.send(owner, { t: "kicked" });
+      setTimeout(() => this.net?.kick(owner), KICK_CLOSE_DELAY * 1000);
+    }
     this.resetSlotToBot(s);
     this.publishRoomState();
   }

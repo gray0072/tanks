@@ -50,6 +50,10 @@ export function Result({
       // can't reach this screen, but hooking it keeps a guest from being
       // stranded here if one ever does.
       onRoundStart: () => go({ k: "match", room, returnTo }),
+      onLeft: ({ reason }) => {
+        room.destroy();
+        go({ k: "menu", notice: reason });
+      },
       onError: (msg) => setBanner(msg),
     });
   }, [room, go, returnTo]);

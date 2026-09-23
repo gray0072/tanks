@@ -27,6 +27,18 @@ function closeOnPageHide(teardown: () => void): () => void {
 
 export type NetErrorInfo = { type?: string; message: string };
 
+/** What RoomHost needs from the wire (SPEC §9.1). An interface rather than
+ *  the class itself so a test can put a loopback in its place — PeerJS needs
+ *  two real browsers, the room logic on top of it does not
+ *  (tests/kick.test.ts). */
+export interface HostTransport {
+  send(connId: string, msg: HostMessage): void;
+  broadcast(msg: HostMessage): void;
+  kick(connId: string): void;
+  readonly connectionIds: string[];
+  destroy(): void;
+}
+
 export type HostNetworkCallbacks = {
   onHostReady?: () => void;
   onPeerJoin?: (connId: string) => void;
@@ -35,7 +47,7 @@ export type HostNetworkCallbacks = {
   onError?: (err: NetErrorInfo) => void;
 };
 
-export class HostNetwork {
+export class HostNetwork implements HostTransport {
   private peer: Peer;
   private conns = new Map<string, DataConnection>();
   /** `close` alone loses peers that vanish without saying so (SPEC §9.4) —
@@ -113,6 +125,14 @@ export class HostNetwork {
   }
 }
 
+/** The client's half of the same seam. */
+export interface ClientTransport {
+  send(msg: ClientMessage): void;
+  readonly connected: boolean;
+  readonly myId: string | null;
+  destroy(): void;
+}
+
 export type ClientNetworkCallbacks = {
   onConnected?: () => void;
   onDisconnected?: () => void;
@@ -120,7 +140,7 @@ export type ClientNetworkCallbacks = {
   onError?: (err: NetErrorInfo) => void;
 };
 
-export class ClientNetwork {
+export class ClientNetwork implements ClientTransport {
   private peer: Peer;
   private conn: DataConnection | null = null;
   private unbindPageHide: () => void;

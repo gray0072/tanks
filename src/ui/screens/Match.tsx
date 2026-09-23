@@ -224,6 +224,12 @@ export function Match({
         audio.matchEnd();
         goRef.current({ k: "result", room, winner, stats, wins: seriesWins, returnTo });
       },
+      onLeft: ({ reason }) => {
+        if (endedRef.current) return;
+        endedRef.current = true;
+        room.destroy();
+        goRef.current({ k: "menu", notice: reason });
+      },
       onError: (msg) => hud.current?.banner(msg),
     });
 

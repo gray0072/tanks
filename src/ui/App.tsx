@@ -30,7 +30,7 @@ export function App({ initial }: { initial: Route }) {
 
   switch (route.k) {
     case "menu":
-      return <MainMenu go={go} />;
+      return <MainMenu go={go} notice={route.notice} />;
     case "join":
       return <JoinRoom go={go} prefillCode={route.code ?? ""} />;
     case "create":

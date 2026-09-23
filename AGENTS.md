@@ -147,6 +147,28 @@ under 6 s, and killing the whole context — nothing fires — had Chromium repo
 and `guestCtx.close()` in Playwright exercise *different* code paths here, and only the second one
 tests the watchdog.
 
+**2026-09-23 (being thrown out):** a kicked guest kept looking at the lobby. Both halves were
+missing: `kickSlot` only closed the socket (`net.kick`) and never sent the `kicked` message the
+protocol already defined, and no screen listened for it either — `RoomCallbacks.onKicked` existed
+and was wired to nothing. Now the host sends `kicked` and closes `KICK_CLOSE_DELAY` (0.25 s) later
+so the message is really on the wire, and `RoomClient` funnels *both* a kick and a lost host into
+one idempotent `onLeft({ reason, kicked })` which stops the input loop, clears `lastMatchStart` and
+reports why; lobby, match and result all destroy the room and `go({ k: "menu", notice })`, and the
+menu renders the notice. The same fix covers the host closing its tab, which stranded guests the
+same way.
+
+**There is now a way to test netcode.** `RoomHost` and `RoomClient` take an optional transport
+factory (`HostTransport`/`ClientTransport`, `peer.ts`); production passes nothing and gets PeerJS,
+`tests/kick.test.ts` passes a loopback and drives the two **real** room objects against each other.
+Two things to know if you write more of these: `net/host.ts` imports fine under plain node (PeerJS
+touches nothing at module load, and `listMaps()`'s `import.meta.env.DEV` only runs in a catch that
+valid built-ins never reach), and `RoomClient` needs `requestAnimationFrame` stubbed on
+`globalThis` or its input loop throws.
+
+Verified in two Chromium contexts as well: kick → the guest lands on the menu reading "The host
+removed you from the room." while the host's roster shows the slot back as a bot; host closes its
+tab → the remaining guest gets "The host left — the room is gone."
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -183,6 +205,11 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 - `tests/mapEditor.test.ts` — the level editor's document model (`world/maps/editorModel.ts`):
   painting, the terrain-only rectangle fill, entity semantics (a flag *moves*, a spawn toggles and
   is capped), resize with an anchor, and the rule that **one gesture is one undo step**.
+- `tests/kick.test.ts` — the first test of the netcode itself (SPEC §9.4), over the loopback
+  transport seam: a guest saying hello is seated, a kick *tells* the guest before hanging up (the
+  bug was a silent socket close), the slot reverts to a bot, no other slot is touched, the close
+  that follows doesn't report a second reason, a lost host is an exit too, a screen mounting after
+  an exit isn't replayed back into the room, and the host can kick neither itself nor a bot.
 - `tests/joinAndLeave.test.ts` — the two edges of room membership (SPEC §6, §9.4): `deepLinkRoute`
   resolves an invite link to the *join form* and never to a room (plus the code-normalising cases),
   and `PeerWatchdog` decides when a peer is gone — dead states drop at once, a brief ICE blip is

@@ -4,7 +4,7 @@ import { useEnterKey } from "../hooks/useEnterKey";
 import { fullscreenSupported, isFullscreen, onFullscreenChange, toggleFullscreen } from "../../util/fullscreen";
 import { HowToPlay } from "./HowToPlay";
 
-export function MainMenu({ go }: { go: Navigate }) {
+export function MainMenu({ go, notice }: { go: Navigate; notice?: string }) {
   const [howTo, setHowTo] = useState(false);
   const [fullscreen, setFullscreen] = useState(isFullscreen);
 
@@ -16,6 +16,9 @@ export function MainMenu({ go }: { go: Navigate }) {
     <div className="screen">
       <div className="title">TANKS</div>
       <div className="subtitle">Team tank battle — Battle City style</div>
+      {/* Why the player is looking at the menu instead of the room they were
+          in a moment ago (SPEC §9.4). */}
+      {notice ? <div className="error menu-notice">{notice}</div> : null}
       <div className="panel">
         <button className="primary" onClick={() => go({ k: "create" })}>
           Create Room

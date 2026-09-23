@@ -60,6 +60,10 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
         navigated.current = true;
         go({ k: "match", room });
       },
+      onLeft: ({ reason }) => {
+        room.destroy();
+        go({ k: "menu", notice: reason });
+      },
       onError: (msg) => setBanner(msg),
     });
   }, [room, go]);

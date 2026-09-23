@@ -31,7 +31,9 @@ export type EditorRoute = {
 };
 
 export type Route =
-  | { k: "menu" }
+  /** `notice` is why the player is back here rather than where they were —
+   *  kicked, or the host disappeared (SPEC §9.4). */
+  | { k: "menu"; notice?: string }
   | { k: "join"; code?: string }
   | { k: "create"; mapId?: string }
   | { k: "settings" }

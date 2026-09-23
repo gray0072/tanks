@@ -102,10 +102,29 @@ predicted — the 100 ms of latency is honest and avoids phantom kills.
   Measured in two real Chromium contexts: closing the tab removes the guest in **under 6 s** (path
   1); killing the context outright, so nothing fires, has Chromium report `disconnected` after
   ~10 s and the watchdog drop the guest **~8 s later** (path 2).
-- **Host drops:** the match cannot continue — clients see the disconnect overlay and are returned to
-  the main menu with the room code preserved so someone can recreate it. *Host migration is
-  explicitly out of scope* (§13): it means transferring the authoritative sim mid-match, and the
-  complexity is not worth it for a 10-minute casual match.
+- **Host drops:** the match cannot continue — clients are returned to the main menu, told why.
+  *Host migration is explicitly out of scope* (§13): it means transferring the authoritative sim
+  mid-match, and the complexity is not worth it for a casual match.
+- **Kicked:** the host **sends `kicked` and closes the connection a moment later**
+  (`KICK_CLOSE_DELAY`, 0.25 s) rather than closing it outright — a dropped socket on its own tells
+  the guest nothing, and a guest that doesn't know it was removed goes on looking at a lobby it is
+  no longer part of.
+- **Either way, the client is out of the room, and one code path says so.** `RoomClient` turns both
+  a `kicked` message and a lost connection into a single `onLeft({ reason, kicked })`: it stops
+  sending input, forgets the match (so no screen that mounts afterwards can be replayed back into
+  it) and hands the reason up. Every screen that holds a room — lobby, match, result — destroys it
+  and returns to the menu, which shows the reason. The exit is idempotent, so the close that
+  follows a kick doesn't overwrite "you were removed" with "the host left".
+
+> **As implemented.** The room code is *not* carried back to the menu. A new room gets a new code
+> (§9.2 derives the host's peer-id from it, and the old one may still be held by the departing
+> host's broker session), so keeping it would only offer a code that no longer resolves.
+>
+> `RoomHost` and `RoomClient` both take an optional transport factory —
+> `HostTransport`/`ClientTransport` in `peer.ts`. Production passes nothing and gets PeerJS; a test
+> passes a loopback and drives the two real room objects against each other, which is what
+> `tests/kick.test.ts` does. That seam exists because the membership rules are worth testing and
+> PeerJS itself needs two browsers.
 - **Broker unreachable:** create/join fails with a clear message and a retry, plus a note in the
   README about self-hosting a broker.
 - **Cheating:** the host is authoritative and validates every input (rate, direction, fire cooldown),

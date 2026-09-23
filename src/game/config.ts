@@ -148,6 +148,9 @@ export const RECONNECT_ROOM_TIMEOUT = 30; // s
 // dropped at once; this grace is for the ICE blips a roaming phone produces,
 // which must not end someone's match.
 export const PEER_POLL_INTERVAL = 1; // s
+// A kicked player is told first and the socket is closed a moment later, so
+// the message is actually on the wire before the connection goes (§9.4).
+export const KICK_CLOSE_DELAY = 0.25; // s
 export const PEER_DISCONNECT_GRACE = 8; // s
 
 // --- Bots (SPEC §10) ---

@@ -6,7 +6,7 @@
 import type { Slot } from "../world/tank";
 import type { MatchSettings } from "../world/rules";
 import type { SeatInput } from "../world/sim";
-import { ClientNetwork, type NetErrorInfo } from "./peer";
+import { ClientNetwork, type ClientTransport, type NetErrorInfo } from "./peer";
 import { clearTransientMaps, registerTransientMap } from "../world/maps/loader";
 import type { HostMessage, BotDifficultyTarget, MapPayload } from "./protocol";
 import type { RoomCallbacks, RoomController } from "./room";
@@ -20,7 +20,10 @@ export class RoomClient implements RoomController {
   mapId = "";
   settings: MatchSettings = { mapId: "", winsTarget: 0, timeLimit: 0, respawnMult: 0, friendlyFire: false };
 
-  private net: ClientNetwork;
+  private net: ClientTransport;
+  /** Set once this client is out of the room for good, so a late `close`
+   *  can't report "disconnected" on top of "you were kicked". */
+  private left = false;
   private localInputs: [SeatInput, SeatInput] = [NO_INPUT, NO_INPUT];
   private hasSeat2 = false;
   private raf = 0;
@@ -28,18 +31,38 @@ export class RoomClient implements RoomController {
   private acc = 0;
   private lastMatchStart: { mapId: string; seed: number; settings: MatchSettings; slots: Slot[] } | null = null;
 
-  constructor(roomCode: string, private nickname: string, private cb: RoomCallbacks) {
+  /** `makeNet` is the test seam (see peer.ts `ClientTransport`). */
+  constructor(
+    roomCode: string,
+    private nickname: string,
+    private cb: RoomCallbacks,
+    makeNet?: (cb: ConstructorParameters<typeof ClientNetwork>[1]) => ClientTransport,
+  ) {
     this.roomCode = roomCode;
-    this.net = new ClientNetwork(roomCode, {
+    const callbacks = {
       onConnected: () => this.net.send({ t: "hello", nickname: this.nickname }),
       onDisconnected: () => {
-        this.stopInputLoop();
-        this.cb.onError?.("Disconnected from the host.");
+        // The host went away (or hung up on us). Either way this room is over
+        // for us, so say so rather than leaving the lobby on screen.
+        this.leave("The host left — the room is gone.", false);
       },
-      onMessage: (msg) => this.handleHostMessage(msg),
-      onError: (e) => this.cb.onError?.(describeError(e)),
-    });
+      onMessage: (msg: HostMessage) => this.handleHostMessage(msg),
+      onError: (e: NetErrorInfo) => this.cb.onError?.(describeError(e)),
+    };
+    this.net = makeNet ? makeNet(callbacks) : new ClientNetwork(roomCode, callbacks);
     this.startInputLoop();
+  }
+
+  /** One exit for both ways out of a room (SPEC §9.4): stop talking, forget
+   *  the match so no screen can be thrown back into it, and tell whoever is
+   *  on screen why. Idempotent — a kick is normally followed by the socket
+   *  closing, and that must not report a second reason. */
+  private leave(reason: string, kicked: boolean) {
+    if (this.left) return;
+    this.left = true;
+    this.stopInputLoop();
+    this.lastMatchStart = null;
+    this.cb.onLeft?.({ reason, kicked });
   }
 
   /** A player-made map arrives with the room state as text (specs/level-editor.md
@@ -99,7 +122,7 @@ export class RoomClient implements RoomController {
         this.cb.onMatchEnd?.(msg.winner, msg.stats, msg.wins);
         break;
       case "kicked":
-        this.cb.onKicked?.();
+        this.leave("The host removed you from the room.", true);
         break;
       case "welcome":
       case "pong":
