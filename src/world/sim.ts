@@ -52,6 +52,15 @@ import {
 } from "./bonus";
 import { flagPocketWalls } from "./flag";
 import {
+  type GrenadeState,
+  grenadeFlightTime,
+  grenadeKillCap,
+  grenadeRadius,
+  pickGrenadeTarget,
+  resetGrenadeIds,
+  takeGrenadeId,
+} from "./grenade";
+import {
   type MatchSettings,
   type MatchRules,
   createRules,
@@ -83,7 +92,10 @@ export type MatchEvent =
   /** A bullet hit a wall (brick or steel), whether or not it was destroyed —
    *  drives the hit-spark fx even for a brick that took a quarter of damage
    *  and is still standing. */
-  | { type: "impact"; x: number; y: number };
+  | { type: "impact"; x: number; y: number }
+  /** A GRENADE landed (SPEC §4.3): the blast ring and its explosion. The
+   *  kills it caused arrive as ordinary "kill" events. */
+  | { type: "grenadeBlast"; x: number; y: number; radius: number; team: TeamId };
 
 function maxBulletsInFlight(star: number): number {
   return star >= 2 ? 2 : 1;
@@ -103,6 +115,8 @@ export class Sim {
   bonuses: BonusEntity[] = [];
   fortifications: Fortification[] = [];
   mines: MineState[] = [];
+  /** GRENADEs in the air. */
+  grenades: GrenadeState[] = [];
   rules: MatchRules;
   rng: RNG;
   tick = 0;
@@ -132,6 +146,7 @@ export class Sim {
     resetBulletIds();
     resetBonusIds();
     resetMineIds();
+    resetGrenadeIds();
 
     // Nth slot of a team takes that team's Nth spawn. Counting per team
     // rather than indexing by slot id: ids are two contiguous runs that need
@@ -180,6 +195,7 @@ export class Sim {
     this.stepMovement(inputs, dt);
     this.stepFiring(inputs, dt);
     this.stepBullets(dt, events);
+    this.stepGrenades(dt, events);
     this.stepMines(events);
     this.stepBonusPickup(events);
     this.stepBonusSpawning(dt);
@@ -602,9 +618,7 @@ export class Sim {
         events.push({ type: "teamBonus", team: tank.team, kind });
         break;
       case "GRENADE":
-        for (const enemy of this.tanks) {
-          if (enemy.alive && enemy.team !== tank.team) this.killTank(enemy, tank.slot, events);
-        }
+        this.throwGrenade(tank);
         events.push({ type: "teamBonus", team: tank.team, kind });
         break;
       case "RESPAWN":
@@ -612,6 +626,76 @@ export class Sim {
         events.push({ type: "teamBonus", team: tank.team, kind });
         break;
     }
+  }
+
+  /** GRENADE (SPEC §4.3): no longer an instant wipe of every enemy. It is
+   *  thrown from the taker at wherever its blast would catch the most
+   *  enemies — the nearest one when nobody is bunched up — and goes off
+   *  where it lands. Tanks still shielded are skipped when aiming (a blast on
+   *  a fresh respawn would do nothing); if nobody is hittable it goes at
+   *  whoever is there. With no enemy alive at all it is simply spent. */
+  private throwGrenade(tank: TankState) {
+    const enemies = this.tanks.filter((t) => t.alive && t.team !== tank.team);
+    const hittable = enemies.filter((t) => t.invulnT <= 0);
+    const pool = (hittable.length > 0 ? hittable : enemies).map(tankCenter);
+    const radius = this.grenadeRadius;
+    const from = tankCenter(tank);
+    const target = pickGrenadeTarget(from, pool, radius);
+    if (!target) return;
+    this.grenades.push({
+      id: takeGrenadeId(),
+      team: tank.team,
+      ownerSlot: tank.slot,
+      fromX: from.x,
+      fromY: from.y,
+      toX: target.x,
+      toY: target.y,
+      t: 0,
+      flight: grenadeFlightTime(from, target),
+      radius,
+    });
+  }
+
+  get grenadeRadius(): number {
+    return grenadeRadius(this.map.width, this.map.height);
+  }
+
+  /** Where a grenade thrown by `team` right now would land, and how many
+   *  enemies are inside that blast — what a bot weighs a GRENADE by. */
+  grenadeTargetFor(team: TeamId, from: { x: number; y: number }) {
+    const pool = this.tanks.filter((t) => t.alive && t.team !== team && t.invulnT <= 0).map(tankCenter);
+    return pickGrenadeTarget(from, pool, this.grenadeRadius);
+  }
+
+  private stepGrenades(dt: number, events: MatchEvent[]) {
+    if (this.grenades.length === 0) return;
+    this.grenades = this.grenades.filter((g) => {
+      g.t += dt;
+      if (g.t < g.flight) return true;
+      this.detonateGrenade(g, events);
+      return false;
+    });
+  }
+
+  /** Hits enemies whose centre is inside the blast, nearest first, up to
+   *  the cap — at most half the enemy team, so it is never a wipe. A hit is
+   *  a hit: a helmet absorbs it and spawn protection ignores it, same as a
+   *  bullet. Walls neither stop it (it came over them) nor take damage. */
+  private detonateGrenade(g: GrenadeState, events: MatchEvent[]) {
+    events.push({ type: "grenadeBlast", x: g.toX, y: g.toY, radius: g.radius, team: g.team });
+    const enemyTeam = otherTeam(g.team);
+    const cap = grenadeKillCap(this.slots.filter((s) => s.team === enemyTeam).length);
+    const r2 = g.radius * g.radius;
+    const caught = this.tanks
+      .filter((t) => t.alive && t.team === enemyTeam)
+      .map((t) => {
+        const c = tankCenter(t);
+        return { t, d: (c.x - g.toX) ** 2 + (c.y - g.toY) ** 2 };
+      })
+      .filter((e) => e.d <= r2)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, cap);
+    for (const { t } of caught) this.applyTankHit(t.slot, g.ownerSlot, events);
   }
 
   private stepBonusSpawning(dt: number) {
@@ -736,6 +820,7 @@ export class Sim {
       bullets: this.bullets.map((b) => ({ id: b.id, x: b.x, y: b.y, dir: b.dir, team: b.team })),
       bonuses: this.bonuses.map((b) => ({ id: b.id, kind: b.kind, cx: b.cx, cy: b.cy })),
       mines: this.mines.map((m) => ({ id: m.id, team: m.team, cx: m.cx, cy: m.cy })),
+      grenades: this.grenades.map((g) => ({ ...g })),
       respawns: { ...this.rules.respawns },
       flagAlive: { ...this.rules.flagAlive },
       timeLeft: this.rules.timeLeft,
@@ -762,12 +847,14 @@ export type TankSnap = {
 export type BulletSnap = { id: number; x: number; y: number; dir: Dir; team: TeamId };
 export type BonusSnap = { id: number; kind: BonusKind; cx: number; cy: number };
 export type MineSnap = { id: number; team: TeamId; cx: number; cy: number };
+export type GrenadeSnap = GrenadeState;
 export type Snapshot = {
   tick: number;
   tanks: TankSnap[];
   bullets: BulletSnap[];
   bonuses: BonusSnap[];
   mines: MineSnap[];
+  grenades: GrenadeSnap[];
   respawns: Record<TeamId, number>;
   flagAlive: Record<TeamId, boolean>;
   timeLeft: number;

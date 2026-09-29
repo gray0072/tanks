@@ -178,8 +178,8 @@ For players who want the bot team to actually be a threat. Same information, muc
   center by holding steel cover, and refuses to cross ice under fire.
 - **Bonuses:** contests actively and **denies** — will body-block or race a bonus it cannot use
   simply to keep it away from the enemy.
-- **Team bonuses:** timed. `GRENADE` is held until several enemies are alive and pressuring, or fired
-  immediately if the flag is critical. `SHOVEL` is saved for an incoming push rather than burned on
+- **Team bonuses:** timed. `GRENADE` is valued by what its blast would catch right now (the same
+  aiming the sim uses): raced when two or more enemies are bunched, or one is on our flag. `SHOVEL` is saved for an incoming push rather than burned on
   pickup. `CLOCK` is used to open a flag rush.
 - **Mines:** placed at chokepoints and around the flag pocket, not scattered.
 - **Retreat:** disengages when outnumbered locally and regroups instead of trading badly.

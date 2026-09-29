@@ -131,3 +131,13 @@ test("a full quota never breaks painting — the draft save is best effort", () 
   store.full = true;
   assert.doesNotThrow(() => saveEditorDraft({ mapId: null, name: "x", template: TEMPLATE, savedAt: 1 }));
 });
+
+test("a rename reaches the parsed map, not only the stored record", async () => {
+  // The bug: the loader cached parsed maps by template, a rename leaves the
+  // template alone, so Create Room and the room kept the old name.
+  const { getMap } = await import("../src/world/maps/loader");
+  const map = createCustomMap({ name: "Before", template: TEMPLATE, origin: { kind: "blank" } });
+  assert.equal(getMap(map.id).name, "Before");
+  updateCustomMap(map.id, { name: "After" });
+  assert.equal(getMap(map.id).name, "After");
+});

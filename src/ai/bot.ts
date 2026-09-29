@@ -486,11 +486,15 @@ export class BotController {
     if (b.kind === "MINE" && !profile.usesMines) value *= 0.4;
 
     if (profile.timesTeamBonuses) {
-      const livingEnemies = sim.tanks.filter((t) => t.alive && t.team !== tank.team).length;
       switch (b.kind) {
-        case "GRENADE":
-          value *= livingEnemies >= 3 || !sim.rules.flagAlive[tank.team] ? 2 : 0.5;
+        case "GRENADE": {
+          // Worth what its blast would catch now (SPEC §4.3: it lands on the
+          // biggest enemy knot and takes half a team at most), and always
+          // worth it with enemies on our flag.
+          const caught = sim.grenadeTargetFor(tank.team, me)?.count ?? 0;
+          value *= caught >= 2 || (caught >= 1 && this.flagThreatened(sim, tank.team)) ? 2 : caught >= 1 ? 0.8 : 0.3;
           break;
+        }
         case "SHOVEL":
           value *= this.flagThreatened(sim, tank.team) ? 2.2 : 0.4;
           break;

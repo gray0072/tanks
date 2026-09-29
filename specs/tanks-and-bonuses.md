@@ -48,9 +48,27 @@ Bonuses spawn one at a time at a random point from the map's `bonusSpawns`, desp
 | `SPEED` | ×1.6 move speed | Taker | 10 s |
 | `SHOVEL` | Your flag's pocket is rebuilt in steel — shot-out cells too — then reverts to fresh brick | **Your team** | 20 s |
 | `CLOCK` | Enemy team frozen in place (can still be shot) | **Enemy team** | 6 s |
-| `GRENADE` | Every enemy tank currently alive is destroyed | **Enemy team** | instant |
+| `GRENADE` | Lobbed at the biggest enemy cluster; destroys enemies in its blast, at most half their team | **Enemy team** | ~0.5–1.2 s flight |
 | `RESPAWN` | +3 respawns | **Your team** | permanent |
 | `MINE` | Drop up to 3 proximity mines; 1-cell blast, visible only to your team | Taker | until used |
+
+**GRENADE is a lobbed blast, not a wipe.** It used to destroy every enemy alive, which on a 5-a-side
+map decided a round on one pickup. Now (`world/grenade.ts`, `Sim.throwGrenade`):
+- **Aim.** On pickup it is thrown from the taker at the point whose blast catches the most enemies —
+  candidates are each enemy and the centroid of its neighbours inside the radius — ties going to the
+  point nearest the thrower, so with nobody bunched up it goes at the closest enemy. Tanks still
+  under spawn protection are left out of the aiming (unless nobody else is alive).
+- **Size follows the map.** Radius = `GRENADE_RADIUS_PER_SIZE` (0.16) × √(width × height) cells,
+  clamped to 3–8: ~4.6 cells on 33x25, 3 on a small map, 8 on 64x64 — the same absolute radius
+  would be a pinprick on a big map and the whole arena on a small one.
+- **Flight.** 18 cells/s, clamped to 0.55–1.2 s, over walls. The landing ring is drawn for everyone
+  from the moment it is thrown, with a shrinking inner ring as the countdown — a tank that drives
+  out of it in time survives.
+- **Blast.** Enemies whose centre is inside the ring are hit, nearest first, **at most
+  ⌈enemy team size / 2⌉** (1 of 1, 1 of 2, 3 of 5, 10 of 20). A hit is a hit: a helmet absorbs it,
+  spawn protection ignores it. Terrain and flags are untouched. Kills are credited to the thrower.
+  The snapshot carries grenades in flight (`Snapshot.grenades`); the `grenadeBlast` event drives
+  the explosion and its ring.
 
 **SHOVEL works on the pocket the map built**, not on what is left of it: the cells orthogonally
 next to the flag that were brick at round start (`flagPocketWalls` on the pristine `MapDef.grid`).

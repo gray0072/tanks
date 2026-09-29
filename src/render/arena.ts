@@ -10,6 +10,7 @@ import type { Snapshot, MatchEvent } from "../world/sim";
 import type { Slot } from "../world/tank";
 import type { BonusKind } from "../world/bonus";
 import { BONUS_PALETTE } from "./bonusShape";
+import { groundTexture } from "./ground";
 import { DIR_ANGLE } from "../util/math";
 import { CELL, TANK_SIZE, NET_SNAPSHOT_HZ } from "../game/constants";
 import { TEAM_COLOR, type TeamId } from "../game/config";
@@ -86,6 +87,10 @@ export class Arena {
   // wall — which is most of the time in a brick maze.
   private selfLayer = new Container();
   private fxLayer = new Container();
+  /** GRENADEs in the air, their landing markers and blast rings — redrawn
+   *  every frame; there are rarely more than one or two. */
+  private grenadeGfx = new Graphics();
+  private blastRings: { x: number; y: number; r: number; at: number }[] = [];
 
   private wallSprites = new Map<number, Sprite>(); // key: cy*width+cx
   private bonusSprites = new Map<number, Sprite>();
@@ -120,11 +125,17 @@ export class Arena {
 
   /** Slot ids belonging to this client (ArenaOptions.mySlots). */
   private mine: Set<number>;
+  /** Owned by this Arena; its canvas is cached across rounds in ground.ts. */
+  private groundTex: import("pixi.js").Texture;
 
   constructor(private atlas: Atlas, private map: MapDef, slots: Slot[], opts: ArenaOptions = {}) {
     this.labels = opts.labels ?? true;
     this.mine = new Set(opts.mySlots ?? []);
-    const bg = new Graphics().rect(0, 0, map.width * CELL, map.height * CELL).fill(0x2a2f22);
+    // One map-sized grass texture, not a tile per cell (ground.ts).
+    this.groundTex = groundTexture(map);
+    const bg = new Sprite(this.groundTex);
+    bg.width = map.width * CELL;
+    bg.height = map.height * CELL;
     this.world.addChild(bg);
     this.world.addChild(this.decalLayer);
     this.world.addChild(this.bonusLayer);
@@ -137,6 +148,7 @@ export class Arena {
     this.world.addChild(this.friendlyOverlayLayer);
     this.world.addChild(this.selfLayer);
     this.world.addChild(this.fxLayer);
+    this.world.addChild(this.grenadeGfx);
 
     this.buildTerrain();
 
@@ -221,6 +233,18 @@ export class Arena {
         if (v) v.flash.set(e.kind, performance.now() + FLASH_AURA_S * 1000);
       }
       if (e.type === "flagHit") this.destroyFlag(e.team);
+      if (e.type === "grenadeBlast") {
+        // A 16 px spark blown up to the blast's size goes blocky, so the
+        // big flash is vector (drawGrenades); sparks only fill it in.
+        this.spawnBurst(e.x, e.y, { tint: 0xffcc66, maxScale: 8, life: 0.4 });
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + 0.4;
+          this.spawnBurst(e.x + Math.cos(a) * e.radius * 0.5, e.y + Math.sin(a) * e.radius * 0.5, {
+            tint: 0xff9a4a, maxScale: 4, life: 0.3 + 0.05 * (i % 3),
+          });
+        }
+        this.blastRings.push({ x: e.x, y: e.y, r: e.radius, at: performance.now() });
+      }
       if (e.type === "kill") {
         const v = this.tankVisuals.get(e.victimSlot);
         if (v) this.spawnBurst(v.root.x + TANK_SIZE / 2, v.root.y + TANK_SIZE / 2, { tint: 0xffcc66, maxScale: 7, life: 0.33 });
@@ -440,6 +464,7 @@ export class Arena {
     const now = performance.now();
     this.drawFlagCloth("blue", now);
     this.drawFlagCloth("red", now);
+    this.drawGrenades(now);
     if (!this.curr) return;
     const prev = this.prev ?? this.curr;
     const t = Math.max(0, Math.min(1, (performance.now() - this.currAt) / this.snapInterval));
@@ -537,6 +562,41 @@ export class Arena {
     });
   }
 
+  /** Each grenade in flight: a landing marker the size of its blast (so the
+   *  tanks under it can see it coming and drive out), a shadow sliding along
+   *  the ground, and the grenade itself on an arc over it — it is lobbed,
+   *  which is why walls don't stop it. Then the rings of recent blasts. */
+  private drawGrenades(now: number) {
+    const g = this.grenadeGfx;
+    g.clear();
+    const since = this.curr ? (now - this.currAt) / 1000 : 0;
+    for (const gr of this.curr?.grenades ?? []) {
+      // Snapshots arrive at 15-30 Hz; extrapolate between them so the lob
+      // is smooth rather than stepping.
+      const p = Math.min(1, (gr.t + since) / gr.flight);
+      const pulse = 0.5 + 0.5 * Math.sin(now / 90);
+      g.circle(gr.toX, gr.toY, gr.radius).fill({ color: 0xff5a36, alpha: 0.08 + 0.1 * p });
+      g.circle(gr.toX, gr.toY, gr.radius).stroke({ width: 2, color: 0xff7a4a, alpha: 0.45 + 0.4 * pulse });
+      g.circle(gr.toX, gr.toY, gr.radius * (1 - p)).stroke({ width: 1.5, color: 0xffd08a, alpha: 0.7 });
+      const x = lerp(gr.fromX, gr.toX, p);
+      const y = lerp(gr.fromY, gr.toY, p);
+      const dist = Math.hypot(gr.toX - gr.fromX, gr.toY - gr.fromY);
+      const lift = Math.sin(Math.PI * p) * Math.min(120, 30 + dist * 0.25);
+      g.ellipse(x, y, 6, 3.5).fill({ color: 0x000000, alpha: 0.35 });
+      const size = 5 + Math.sin(Math.PI * p) * 3;
+      g.circle(x, y - lift, size).fill(0x3d4a2a);
+      g.circle(x, y - lift, size).stroke({ width: 1.5, color: 0x1c2414 });
+      g.rect(x - 1.5, y - lift - size - 3, 3, 3).fill(0x9aa3a8);
+    }
+    const RING_S = 0.6;
+    this.blastRings = this.blastRings.filter((b) => (now - b.at) / 1000 < RING_S);
+    for (const b of this.blastRings) {
+      const t = (now - b.at) / 1000 / RING_S;
+      g.circle(b.x, b.y, b.r * (0.35 + 0.65 * t)).fill({ color: 0xffb04a, alpha: 0.45 * (1 - t) });
+      g.circle(b.x, b.y, b.r * (0.6 + 0.4 * t)).stroke({ width: 4 * (1 - t) + 1, color: 0xffe0a0, alpha: 1 - t });
+    }
+  }
+
   private endBurst(s: Sprite, anim: () => void) {
     this.bursts.delete(anim);
     this.app?.ticker.remove(anim);
@@ -550,6 +610,7 @@ export class Arena {
     // just torn out from under them.
     for (const [anim, sprite] of this.bursts) this.endBurst(sprite, anim);
     this.world.destroy({ children: true });
+    this.groundTex.destroy(true);
   }
 }
 

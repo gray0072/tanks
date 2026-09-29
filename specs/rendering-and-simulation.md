@@ -34,6 +34,14 @@ Part of the [Tanks specification](../SPEC.md) — section numbers (§) are index
   fissure → branches → a web with chips knocked out, the face darkening as it goes), over a
   masonry-course tile. The sim only knows how many quarters are left (§3.3), so quadrant-by-quadrant
   crumbling pointed at corners that nothing had actually been shot in.
+- **Open ground** is grass, not a flat fill — and not a tile per cell either, because a repeated
+  32 px tile reads as a grid however it is drawn. `render/ground.ts` paints **one map-sized
+  Canvas2D texture**: three octaves of value noise at 1/8 resolution scaled up with smoothing (soft
+  patches of darker and drier turf at scales that are not multiples of a cell), bare-earth spots,
+  tufts of blades and pebbles scattered off-grid. Seeded from the map id and size, so every player
+  sees the same field; cached per map (≤ 6), so a new round reuses it; capped at 2048 px on the long
+  side. At runtime it is a single sprite — no per-frame cost. Colours stay close together: tanks and
+  bullets are read against it.
 - **Effects** (explosions, spawn sparkles, muzzle flashes, mine blasts) are pooled sprites with
   short frame animations, capped at a budget so a `GRENADE` detonating 5 tanks stays smooth.
 - **Quality tiers:** `high` = full effects + water animation; `low` = static water, halved particle

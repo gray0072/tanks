@@ -59,6 +59,16 @@ const CAMERA_DEAD_ZONE = 40;
  *  changing (a kill, two tanks crossing on the far side of the map) can move
  *  the camera at most once a second instead of tugging at it every frame. */
 const CAMERA_RETARGET_MS = 1000;
+/** The backdrop's frame-rate cap. It is blurred and dimmed, so 30 fps reads
+ *  the same as the display's own rate — and it halves (at 144 Hz, more than
+ *  quarters) the GPU work of a screen nobody is playing. */
+const BACKDROP_FPS = 30;
+/** How long the page gets to settle before the backdrop starts, at most:
+ *  the first open is the busiest moment the page has (bundle parse, fonts,
+ *  the menu's own first paint), and piling a WebGL context, an atlas bake
+ *  and a bot match on top of it made a sharp load spike right at open — the
+ *  kind that on some machines is audible as a crackle in the speakers. */
+const BACKDROP_START_DELAY_MS = 700;
 
 export class MenuBackdrop {
   private layer: HTMLElement | null = null;
@@ -113,9 +123,20 @@ export class MenuBackdrop {
     return !!this.layer && loadUserSettings().menuBackdrop;
   }
 
+  /** The first start only: later ones (back from a match) run at once. */
+  private firstStart = true;
+
   private async start() {
     if (this.starting || this.pixi || !this.layer) return;
     this.starting = true;
+    if (this.firstStart) {
+      this.firstStart = false;
+      await idle(BACKDROP_START_DELAY_MS);
+      if (!this.wanted) {
+        this.starting = false;
+        return;
+      }
+    }
     const map = this.pickMap();
     const mount = document.createElement("div");
     mount.className = "menu-backdrop-mount";
@@ -127,6 +148,7 @@ export class MenuBackdrop {
       fit: "cover",
       zoom: cameraZoom,
       maxResolution: 1,
+      maxFps: BACKDROP_FPS,
     });
     if (!this.wanted) {
       // Hidden while we were awaiting the renderer (a fast click through the
@@ -226,6 +248,12 @@ export class MenuBackdrop {
 
   private loop = () => {
     const now = performance.now();
+    // Same cap as the renderer's: the scene isn't redrawn faster than this,
+    // so updating it faster is work nobody sees.
+    if (now - this.last < 1000 / BACKDROP_FPS - 2) {
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
     let dt = (now - this.last) / 1000;
     this.last = now;
     // A backgrounded tab (or a slow frame) must not come back as a burst of
@@ -358,6 +386,19 @@ export class MenuBackdrop {
     this.mount?.remove();
     this.mount = null;
   }
+}
+
+/** Resolves when the browser is idle, or after `ms` at the latest. */
+function idle(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const ric = (window as { requestIdleCallback?: (cb: () => void, o: { timeout: number }) => number })
+      .requestIdleCallback;
+    // Never sooner than ~half the budget: an idle callback can fire the very
+    // next frame, before the load settles at all.
+    const floor = new Promise<void>((r) => setTimeout(r, ms / 2));
+    if (ric) floor.then(() => ric(() => resolve(), { timeout: ms / 2 }));
+    else setTimeout(resolve, ms);
+  });
 }
 
 const ALL_TEAMS: Set<TeamId> = new Set<TeamId>(["blue", "red"]);

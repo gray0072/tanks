@@ -316,14 +316,9 @@ export class RoomHost implements RoomController {
   private doRelease(owner: string, slot: number) {
     const s = this.slots[slot];
     if (!s || s.owner !== owner) return;
-    // A player's primary seat always keeps a slot: releasing the last one
-    // would drop them out of the roster entirely with no way back in other
-    // than spotting a bot row to click, which just reads as "I vanished".
-    // (Seat 1, the local co-op player, may release freely — that's how you
-    // drop P2 out of the match.)
-    const isOnlyPrimarySlot =
-      s.ownerSeat === 0 && !this.slots.some((p) => p !== s && p.owner === owner && p.ownerSeat === 0);
-    if (isOnlyPrimarySlot) return;
+    // Releasing your last slot is allowed: a bot takes it over and you stay
+    // in the room as a spectator (SPEC §6.1), free to claim any bot slot
+    // again. The room screen says so, so it doesn't read as "I vanished".
     // Releasing seat 1's slot *is* dropping P2, so the local-co-op flag goes
     // with it — otherwise the lobby keeps offering "Remove local player 2"
     // for a player who is no longer in the roster.
@@ -389,8 +384,8 @@ export class RoomHost implements RoomController {
     }
     for (const team of ["blue", "red"] as TeamId[]) {
       const seats = next.filter((s) => s.team === team);
-      // Host first, so a shrinking roster never leaves them seatless —
-      // doRelease()'s "you always keep a slot" rule depends on it.
+      // Host first, so a shrinking roster keeps the host seated before any
+      // guest.
       const humans = this.slots
         .filter((s) => s.kind === "human" && s.team === team)
         .sort((a, b) => Number(b.owner === "host") - Number(a.owner === "host") || a.ownerSeat - b.ownerSeat);

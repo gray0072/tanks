@@ -39,7 +39,7 @@ export const BONUS_INFO: Record<BonusKind, { title: string; text: string }> = {
   SPEED: { title: "Speed", text: "Your tank drives noticeably faster for a short time." },
   SHOVEL: { title: "Shovel", text: "Team bonus — the wall around your own flag is rebuilt in steel, gaps included, and comes back as fresh brick when it wears off." },
   CLOCK: { title: "Clock", text: "Team bonus — every enemy tank is frozen in place for a few seconds." },
-  GRENADE: { title: "Grenade", text: "Team bonus — destroys every enemy tank on the field at once." },
+  GRENADE: { title: "Grenade", text: "Team bonus — lobbed at the biggest knot of enemies and blows up where it lands: everyone in the ring goes, up to half their team. Drive out of the red circle!" },
   RESPAWN: { title: "Respawn", text: "Team bonus — refills your team's pool of remaining respawns." },
   MINE: { title: "Mines", text: "Hands you proximity mines to drop behind you (Q, or M for player 2); only your team can see them." },
 };

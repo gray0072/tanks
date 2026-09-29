@@ -39,16 +39,18 @@ export function isBuiltinMapId(id: string): boolean {
 // --- Custom maps ------------------------------------------------------------
 
 /** Parsed custom maps, keyed by id and re-parsed only when the stored text
- *  changes — the library re-renders on every action, and re-parsing a 64x64
- *  grid per card per render is pure waste. */
-const customCache = new Map<string, { template: string; map: MapDef }>();
+ *  or name changes — the library re-renders on every action, and re-parsing a
+ *  64x64 grid per card per render is pure waste. The name is part of the key
+ *  because a rename leaves the template alone, and the MapDef carries the
+ *  name: keying on the template only kept showing the old name. */
+const customCache = new Map<string, { template: string; name: string; map: MapDef }>();
 
 function parseCustom(record: CustomMap): MapDef | null {
   const hit = customCache.get(record.id);
-  if (hit && hit.template === record.template) return hit.map;
+  if (hit && hit.template === record.template && hit.name === record.name) return hit.map;
   try {
     const map = parseMap(record.id, record.name, record.template);
-    customCache.set(record.id, { template: record.template, map });
+    customCache.set(record.id, { template: record.template, name: record.name, map });
     return map;
   } catch {
     customCache.delete(record.id);

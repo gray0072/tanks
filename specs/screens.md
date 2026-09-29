@@ -66,7 +66,10 @@ the editor's working document) travel inside the route.
 - Every slot is a button. Clicking a **bot** slot claims it, moving you there **and returning your
   previous slot to a bot** — a swap, not a second seat. Clicking your own slot releases it back to a
   bot instead; releasing player 2's slot drops the second seat entirely, so the button goes back to
-  `Add local player 2`. Your last primary slot can't be released — you would vanish from the roster.
+  `Add local player 2`. **Releasing your last slot makes you a spectator:** a bot takes the seat, the
+  room says `Spectating — click a bot slot to play`, and clicking any bot slot hires it back. A
+  spectator (host or guest) stays in the room and watches the match — the whole arena, forest hiding
+  nobody, no touch controls — and never blocks `Start match`.
   Human-held slots (someone else's) are not clickable.
 - **The preview updates on hover/focus**, before you commit: a thumbnail of the selected map with
   the hovered slot's spawn point pulsing and both flags marked. There is no separate tank preview —
@@ -149,6 +152,11 @@ menu in front of it.
 - **It yields.** `<App>` starts and stops it per route (`wantsBackdrop`); the match
   and the editor own the canvas themselves, so it is destroyed outright — WebGL context included —
   before either mounts, and rebuilt when the menu comes back. It also stops while the tab is hidden.
+- **It is cheap.** Half resolution, capped at **30 fps** (both the Pixi ticker and its own update
+  loop — blurred, it looks the same as 144), and its **first start waits for the page to settle**
+  (an idle callback, 350–700 ms): piling a WebGL context, an atlas bake and a bot match on top of
+  the page's own first paint made a sharp load spike right at open, which on some machines was
+  audible as a faint crackle in the speakers.
 - **On by default for everyone**, `prefers-reduced-motion` included, with a one-click off switch in
   Settings. Windows' "Animation effects" toggle alone puts a desktop browser in reduced-motion, so
   keying the backdrop off that media query meant most Windows players never saw the feature at all

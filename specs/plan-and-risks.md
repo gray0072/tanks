@@ -52,6 +52,6 @@ non-participants · replays · anti-cheat beyond host validation · portrait mob
 
 - Should upgrade levels persist through death (spec says yes) or reset like Battle City? Decide after
   the M4 playtest.
-- Does `GRENADE` wiping all 5 enemies feel great or miserable at this team size? Possible fallback:
-  it only kills enemies in your half.
+- ~~Does `GRENADE` wiping all 5 enemies feel great or miserable?~~ Answered: miserable. It is now a
+  lobbed, map-scaled blast capped at half the enemy team (specs/tanks-and-bonuses.md §4.3).
 - One shared bonus pool, or team-side spawns to reduce center-map snowballing?

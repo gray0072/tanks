@@ -76,6 +76,7 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
   const code = room.roomCode;
   const mySlotIds = new Set(room.mySlots().map((s) => s.id));
   const myReady = room.mySlots()[0]?.ready ?? false;
+  const spectating = !slots.some((s) => s.kind === "human" && mySlotIds.has(s.id));
   // The host starts the match themselves, so their own seat(s) don't need to
   // be Ready — only other humans block Start match.
   const humansReady = slots.filter((s) => s.kind === "human" && s.owner !== "host").every((s) => s.ready);
@@ -135,13 +136,10 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
     const slot = slots.find((s) => s.id === slotId);
     if (!slot) return;
     if (mySlotIds.has(slotId)) {
-      // Your primary seat always keeps a slot (see RoomHost.doRelease) — say
-      // so instead of letting the click look like it did nothing.
-      const primaries = room.mySlots().filter((s) => s.ownerSeat === 0);
-      if (slot.ownerSeat === 0 && primaries.length <= 1) {
-        setBanner("You need a slot — click another slot to move there.");
-        return;
-      }
+      // Clicking yourself hands the slot to a bot. The last primary slot
+      // too: you then watch the match as a spectator (SPEC §6.1) and can
+      // take any bot's slot back with one more click — the hint by the
+      // Start/Ready button says so while it lasts.
       room.releaseSlot(slotId);
     } else if (slot.kind === "bot") {
       setPendingLocalSeat(0);
@@ -333,10 +331,11 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
                 Start match
               </button>
             ) : (
-              <button className={myReady ? "primary" : ""} onClick={() => room.setReady(!myReady)}>
+              <button className={myReady ? "primary" : ""} disabled={spectating} onClick={() => room.setReady(!myReady)}>
                 {myReady ? "Ready ✔" : "Ready"}
               </button>
             )}
+            {spectating ? <span className="hint">Spectating — click a bot slot to play.</span> : null}
           </div>
         </div>
       </div>

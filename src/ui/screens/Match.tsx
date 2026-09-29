@@ -99,6 +99,12 @@ export function Match({
       liveStats.set(s.id, { frags: 0, deaths: 0 });
     }
     for (const s of room.mySlots()) myTeams.add(s.team);
+    // A spectator (no slot of their own, SPEC §6.1) sits on neither side, so
+    // forest hides nobody from them.
+    if (myTeams.size === 0) {
+      myTeams.add("blue");
+      myTeams.add("red");
+    }
     meta.current = { nicknames, slotTeams, liveStats, myTeams };
   }
 
@@ -192,6 +198,7 @@ export function Match({
           audio.teamBonusFanfare();
         }
         if (e.type === "terrain") audio.brickCrumble();
+        if (e.type === "grenadeBlast") audio.grenadeBlast();
       }
       setFrags({ blue: teamFrags("blue"), red: teamFrags("red") });
     };
@@ -264,7 +271,7 @@ export function Match({
       buildArena();
       rebuildArena.current = buildArena;
 
-      if (IS_TOUCH && arenaEl.current) {
+      if (IS_TOUCH && arenaEl.current && room.mySlots().length > 0) {
         // Mounted on the arena, not the whole screen: the zones then line up
         // with the battlefield and leave the top bar (and the system gesture
         // strip above it) alone. See touchControls.ts for the scheme.
@@ -336,6 +343,7 @@ export function Match({
     loop();
 
     return () => {
+      audio.sleep();
       disposed = true;
       rebuildArena.current = null;
       room.setMatchPaused(false);

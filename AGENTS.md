@@ -279,6 +279,23 @@ Two test-harness bugs surfaced on the way: `botFixture` counted shots by new bul
 misses every point-blank shot (the bullet hits within the tick it's born) — it now counts cooldown
 resets; and the lead test's score was, with a helmeted target, only measuring flag damage.
 
+**2026-09-29 (spectating, grenade, grass):**
+- **Renamed custom maps kept their old name** in Create Room and the room: `loader.ts` cached parsed
+  maps by template only, and a rename leaves the template alone. The cache key now includes the name.
+- **Spectating** (SPEC §6.1): clicking your own last slot hands it to a bot; you stay in the room
+  with no slot and can hire any bot slot back. `RoomHost.doRelease` no longer refuses the last
+  primary slot. A spectator's match shows everything (forest hides nobody) and has no touch controls.
+- **GRENADE** (SPEC §4.3, `world/grenade.ts`) is no longer "kill every enemy": lobbed at the biggest
+  enemy knot, blast radius scaled by √(map area), a 0.55–1.2 s flight with a visible landing ring,
+  and at most ⌈enemy team / 2⌉ kills. Bots value it by what the blast would catch.
+- **Grass ground** (`render/ground.ts`): one map-sized Canvas2D texture (low-res value noise scaled
+  up + off-grid tufts/pebbles), cached per map — no per-cell tiles, so no visible grid.
+- **Speaker crackle at open** could not be reproduced headlessly and nothing creates audio before a
+  match, so the fix targets the likely cause, the load spike at open: the menu backdrop is capped at
+  30 fps and its first start waits for an idle moment. Audio also got 4 ms attacks and the context
+  is suspended between matches. **Needs confirming on the user's machine.**
+- README screenshots re-shot (Playwright, 2x) for the backdrop and the grass.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -364,6 +381,10 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 - `tests/mapSync.test.ts` — cloud map sync over a fake two-device cloud: a map crosses devices, a delete propagates instead of being resurrected, the later edit wins, a failed pull writes and pushes nothing.
 - `tests/teamPlan.test.ts` — the team plan: role counts add up for every size and posture, the plan holds for the round, a team spreads over at least two lanes, rounds differ, and a threat pulls midfielders home.
 - `tests/shovel.test.ts` — SHOVEL rebuilds the pocket (gaps too), reverts to brick, never walls a tank in, and is not dropped where a flag has no pocket.
+- `tests/grenade.test.ts` — GRENADE: radius scales with the map, the half-team cap, aiming at the
+  biggest knot, a flight before the blast, a tank that drives out survives, a helmet absorbs it.
+- `tests/spectate.test.ts` — releasing your last slot makes you a spectator (host and guest), a bot
+  slot can be hired back, a spectator doesn't block Start.
 - `tests/respawn.test.ts` — a tank respawns on its own slot's spawn, or another free one of its team's if that is blocked (the bug: everyone came back on spawn #1).
 - `tests/bonusRate.test.ts` — the bonus drop rate (SPEC §4.3): one bonus on the field at round
   start, and drops per minute following the room's `bonusesPerMinute` across the range.

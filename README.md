@@ -72,7 +72,8 @@ its icon spins around your tank in that bonus's colour, so everyone can see what
 <img src="docs/screenshots/bonuses.png" alt="The eight power-ups" width="860">
 
 `HELMET` `STAR` `SPEED` `MINE` are yours alone; `SHOVEL` `CLOCK` `GRENADE` `RESPAWN` swing your
-whole team.
+whole team. `GRENADE` is lobbed at the biggest knot of enemies and takes out whoever is still inside
+its ring when it lands — at most half their team, with a blast that grows with the map.
 
 ## How a match goes
 
@@ -154,7 +155,8 @@ One player creates a room and gets a code like `K7QM2X` (or an invite link `?roo
 else joins with it, picks a slot on either team — the preview shows the map, your spawn point, and
 your tank before you commit — and hits ready. Any slot you don't fill is played by a bot, so the
 teams are always full whether there are two of you or ten. Clicking another slot moves you there;
-your own seat always keeps a slot, so you can't accidentally drop yourself out of the roster.
+clicking your own hands it to a bot and makes you a spectator, and clicking any bot slot puts you
+back in.
 
 The room creator hosts the match: their browser runs the authoritative simulation and all the bots.
 If someone drops, a bot takes their tank over for the rest of the match.

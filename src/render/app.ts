@@ -35,6 +35,10 @@ export type PixiHostOptions = {
   /** Device-pixel cap. The default follows the display; a blurred backdrop
    *  doesn't need the extra pixels and shouldn't pay for them. */
   maxResolution?: number;
+  /** Frame-rate cap. The default follows the display (60, 120, 144 Hz…); the
+   *  backdrop caps itself, since a blurred picture nobody looks at directly
+   *  gains nothing from the extra frames and the GPU load is not free. */
+  maxFps?: number;
 };
 
 export async function createPixiApp(
@@ -52,6 +56,7 @@ export async function createPixiApp(
     autoDensity: true,
     resolution: Math.min(window.devicePixelRatio || 1, opts.maxResolution ?? 2),
   });
+  if (opts.maxFps) app.ticker.maxFPS = opts.maxFps;
   mount.appendChild(app.canvas);
 
   const world = new Container();

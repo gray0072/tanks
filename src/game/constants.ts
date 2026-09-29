@@ -99,6 +99,23 @@ export const BONUS_DURATION = {
 export const MAX_MINES_HELD = 3;
 export const MINE_BLAST_RADIUS_CELLS = 1;
 
+// GRENADE (SPEC §4.3): thrown at the enemy cluster it would catch most of,
+// blows up where it lands. The blast radius follows the map's size — the same
+// 4-5 cells that catch a knot of tanks on a 33x25 map would be a rounding
+// error on 64x64 and the whole arena on a 13x13. Radius in cells is
+// GRENADE_RADIUS_PER_SIZE × √(width × height), clamped.
+export const GRENADE_RADIUS_PER_SIZE = 0.16;
+export const GRENADE_RADIUS_MIN_CELLS = 3;
+export const GRENADE_RADIUS_MAX_CELLS = 8;
+/** At most this share of the enemy team (rounded up) dies to one grenade, so
+ *  it is a swing, never a wipe — the old grenade killed every enemy alive. */
+export const GRENADE_KILL_SHARE = 0.5;
+/** Flight: cells per second, bounded, so there is always a beat to see the
+ *  landing marker and drive out of it, and never a long wait. */
+export const GRENADE_SPEED_CELLS = 18;
+export const GRENADE_FLIGHT_MIN = 0.55; // s
+export const GRENADE_FLIGHT_MAX = 1.2; // s
+
 // =============================================================================
 // Respawns and scoring (SPEC §2.3, §2.4)
 // =============================================================================
