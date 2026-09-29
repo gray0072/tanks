@@ -8,7 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_WINS_TARGET, WINS_TARGET_OPTIONS } from "../src/game/constants";
+import { DEFAULT_BONUS_RATE, DEFAULT_WINS_TARGET, WINS_TARGET_OPTIONS } from "../src/game/constants";
 import { winsTargetLabel } from "../src/game/config";
 import {
   addRoundStats,
@@ -83,7 +83,7 @@ test("stats add up over the series rather than showing only the last round", () 
 function timedOut(blueRespawns: number, redRespawns: number): MatchRules {
   const slots = createDefaultSlots("host", 1, 1);
   const rules = createRules(
-    { mapId: "m", winsTarget: 5, timeLimit: 60, respawnMult: 0, friendlyFire: false },
+    { mapId: "m", winsTarget: 5, timeLimit: 60, respawnMult: 0, friendlyFire: false, bonusesPerMinute: DEFAULT_BONUS_RATE },
     slots,
   );
   rules.respawns.blue = blueRespawns;

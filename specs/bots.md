@@ -17,22 +17,55 @@ spreads over ticks) and drives toward the winner:
 | `Evade` | A bullet is inbound (utility spike, overrides almost everything) |
 | `Collect` | A bonus is on the field and reachable before the enemy |
 | `Regroup` | Alone, low on team respawns, or heavily outnumbered locally |
+| `Hold` | A midfielder with nothing better to do: patrols its flank of the middle |
 
 Considerations are normalized 0..1 curves: distance to target, line of sight, local team advantage,
 flag threat level, bonus value and contest risk, remaining buff time, own upgrade level.
 
-**Team coordination** is a thin layer, not a full commander: the host keeps a per-team desired
-assignment (roughly 2 defenders / 3 attackers, shifting toward defense when the flag is threatened)
-and biases each bot's action scores toward its assigned role. It's enough to stop all 5 bots from
-suiciding into the same lane.
+**Team coordination** is a thin layer, not a full commander (`ai/teamPlan.ts`). At the start of every
+round each team draws a **posture** and deals its bots **roles** and **lanes**; the plan then holds
+for the round, so no bot's job flips on its own.
+
+- **Posture**, drawn at random per team per round: *aggressive* (30 %), *balanced* (45 %) or
+  *defensive* (25 %) (`BOT_POSTURE_WEIGHTS`). It sets the split between the three roles as shares of
+  the team (`BOT_POSTURE_SHARES`): aggressive ≈ 15 % defend / 20 % midfield / rest attack, balanced ≈
+  25 / 30 / rest, defensive ≈ 40 / 35 / rest.
+- **Roles**, from those shares for any team size (`roleCounts`): a lone bot attacks (the flag-threat
+  signal still brings it home); two bots never both sit at home; from three up there is always at
+  least one defender and one attacker. On 5 a side that is 1/1/3, 1/2/2 or 2/2/1; on 20 a side,
+  balanced is 5/6/9. Defenders are the bots that start nearest home, with a little noise.
+  - **Attack:** drives out along its lane to the middle of the map (`BOT_ATTACK_STAGE_ALONG`), then
+    turns in on the enemy flag.
+  - **Midfield:** patrols its lane between 30 % and 50 % of the way up the map (`Hold`), taking
+    whatever comes through.
+  - **Defend:** waits a few cells in front of the flag, defenders side by side rather than stacked
+    (`BOT_GUARD_*`), and goes for anything it sees.
+- **Lanes**: one per 8 cells of map width across the flag-to-flag line, up to three (left, middle,
+  right). Attackers and midfielders are dealt round them from a random starting lane, so the team
+  covers the flanks instead of every bot taking the same shortest route, and which flank gets the
+  heavier push changes every round.
+- **Threat response**, recomputed every tick: two or more enemies near our flag pull every
+  midfielder back to defend until they are gone.
+
+How closely a bot follows its role is its profile's `roleAdherence` (§10.3) — Easy wanders off its
+job most of the time, Hard hardly ever. The lane is its route either way.
+
+> **As implemented.** This replaced a per-tick "the 2–3 bots nearest our flag defend, the rest
+> attack" rule, under which every attacker ran the same A* route to the enemy flag and the whole team
+> arrived down one side. Measured as where tanks first cross the middle of the map, over 6 seeds of
+> 40 s on each built-in: on `classic` the old split was 33 left / 8 right, now 20 / 18; on
+> `crossroads` every crossing was down the centre, now 11 left / 21 centre / 7 right. Maps whose
+> walls funnel traffic (`swamp`, `fortress`) look the same either way.
 
 **Pathing:** A* on the map’s own cell grid with a cost map (brick = expensive but passable by shooting,
 water = blocked, sand = ×2, ice = ×1.5), recomputed on terrain change and at most once per second per
 bot, cached per team.
 
-> **As implemented.** Brick's cost comes from the bot's own profile, not from the shared cost map: a
-> bot that never shoots brick (Easy) treats it as impassable and routes around, because a route it
-> can't open is worse than a longer one it can walk. And an objective that sits on an impassable
+> **As implemented.** Brick's cost comes from the bot's own profile, not from the shared cost map.
+> Easy's is `BOT_LAST_RESORT_BRICK_COST` (25 per cell): any sensible way round wins, but it is
+> finite, so a goal with *no* way round — a walled-in flag, a plugged corridor — still gets a route
+> through the wall, and the bot shoots it open. (It used to be infinite, and an Easy bot sat forever
+> in front of a wall it had no idea it could shoot.) And an objective that sits on an impassable
 > tile — a flag, always — is snapped to the nearest cell A* can actually stand on before the search
 > runs. Without that snap, `AttackFlag` asked for the flag's own cell, got no path at all, and left
 > the bot with no movement input; roughly three-quarters of all `AttackFlag` ticks produced nothing
@@ -42,6 +75,20 @@ bot, cached per team.
 > probabilistic scoring is re-rolled. At a 100–250 ms re-score interval those dice came up several
 > times a second, and bots oscillated between two goals on opposite sides of the map, converging on
 > neither.
+>
+> **No dithering.** A bot turning back and forth on the spot reads as broken, so every per-tick
+> choice that can flip is committed to for a beat (`BOT_*` in `constants.ts`):
+> - *Path following* keeps its direction until that axis is done (`BOT_PATH_AXIS_DONE_PX`) instead
+>   of re-picking the larger axis every tick — off both axes of a waypoint, that zig-zagged
+>   Right, Down, Right, Down.
+> - *Aim error* is re-sampled every `BOT_AIM_RESAMPLE_TIME` (0.4 s), not every tick, and a target
+>   already being tracked keeps ×1.5 lane tolerance and holds the barrel for `BOT_AIM_HOLD_TIME`
+>   after slipping off — a per-tick roll flipped a marginal target in and out of the firing window.
+> - *A dodge* steps to the side the tank already leans toward and keeps that direction for
+>   `BOT_EVADE_COMMIT_TIME`.
+>
+> Measured over 60 s bot-vs-bot matches on every map: quick A→B→A reversals went from ~1.0 to ~0.1
+> per bot per second.
 
 ## 10.2 Fair perception
 
@@ -73,13 +120,14 @@ A newcomer, or a filler tank for players who want a relaxed match.
   angular error. Never leads a moving target — it shoots where you *are*, so strafing beats it.
 - **Awareness:** forgets an enemy ~1 s after losing sight. Tracks one target at a time and
   tunnel-visions on it, ignoring a closer threat behind it.
-- **Dodging:** only reacts to a bullet already very close and directly in line, and often reacts too
-  late. Never pre-emptively leaves an enemy's firing lane.
+- **Dodging:** only reacts to a bullet already very close and directly in line, and with a
+  beginner's reaction time it mostly notices too late. Never pre-emptively leaves an enemy's firing
+  lane.
 - **Objective play:** attacks the enemy flag only when it happens to be nearby; defends only once
   the flag is *already* taking hits. Ignores the team role assignment most of the time.
-- **Terrain:** does not shoot brick to open a path — if the route is blocked it goes around, and it
-  will happily grind against a wall for a moment before re-pathing. Walks into sand and ice without
-  accounting for them.
+- **Terrain:** goes around brick whenever there is any reasonable way round, but when there is none
+  (a walled-in flag, a plugged corridor) it does work out that the wall can be shot, and shoots it
+  open — slowly. Walks into sand and ice without accounting for them.
 - **Bonuses:** picks up what it drives past; does not detour, does not contest.
 - **Mines:** never uses them.
 - **Idle tells:** short pauses and slightly wandering routes, so it reads as a tank being driven
@@ -140,16 +188,16 @@ For players who want the bot team to actually be a threat. Same information, muc
 
 | Parameter | Easy | Medium | Hard |
 |---|---|---|---|
-| Reaction delay | 450 ms | 220 ms | 90 ms |
-| Between-shot hesitation | 550 ms | 150 ms | 0 |
-| Re-score interval | 250 ms | 150 ms | 100 ms |
-| Aim error (±) | 14° | 5° | 1.5° |
+| Reaction time | 600 ms | 350 ms | 200 ms |
+| Between-shot hesitation | 800 ms | 150 ms | 0 |
+| Re-score interval | 500 ms | 300 ms | 200 ms |
+| Aim error (±) | 18° | 5° | 1.5° |
 | Fire tolerance | wide | medium | tight |
 | Target leading | none | ~50 % | full |
 | Target selection | sticky (tunnel vision) | nearest | most dangerous |
 | Enemy memory | 1.0 s | 2.5 s | 4.0 s |
 | Bullet evasion | late, in-line only | reliable | pre-emptive |
-| Shoots brick to path | no | when it saves time | proactively, for the team |
+| Shoots brick to path | only when there is no way round | when it saves time | proactively, for the team |
 | Bonus detour chance | 0 (never detours) | 45 % | 70 % |
 | Bonus behavior | opportunistic | contests | contests + denies |
 | Role adherence | ~35 % | ~85 % | ~100 % + coordinated pushes |
@@ -166,6 +214,11 @@ For players who want the bot team to actually be a threat. Same information, muc
 >   not an angle. The angular tolerance only ever *widens* that window for a sloppy profile. Left
 >   purely angular, Hard's 1.5° refused shots at close range that would have connected, and Easy's
 >   18° cone let it take every shot Hard passed up; Easy beat Hard roughly 3 : 1.
+> - **Reaction time is human-scale.** Easy plays like a beginner (~0.6 s, decision included),
+>   Medium like a regular player, Hard like a strong one (~0.2 s) — fast, but not faster than a
+>   person can be; the old 90 ms read as an aimbot. The same number gates *both* firing at a target
+>   that has just lined up *and* dodging: a bullet younger than the reaction time hasn't been
+>   noticed yet.
 > - **"Between-shot hesitation" is the main thing that makes Easy feel easy.** Reaction delay only
 >   applies when a target is first acquired; without a separate per-shot pause, an Easy bot that had
 >   locked on kept firing at its tank's full cooldown, which reads as relentless rather than clumsy.

@@ -7,9 +7,11 @@ export function flagCells(at: { cx: number; cy: number }): { cx: number; cy: num
   return [{ cx: at.cx, cy: at.cy }];
 }
 
-/** The brick walls immediately surrounding a flag's 2x2 pocket (SPEC §3.2,
- *  "walled in by brick on three sides"). Found generically by adjacency so it
- *  works for any map, not just the authored three. */
+/** The brick walls immediately surrounding a flag (SPEC §3.2, "walled in by
+ *  brick on three sides"). Found generically by adjacency so it works for
+ *  any map, not just the authored three. Given the *pristine* map grid
+ *  (MapDef.grid, not a match's damaged copy) this is the pocket as built —
+ *  the wall a SHOVEL rebuilds (SPEC §4.3). */
 export function flagPocketWalls(grid: Grid, at: { cx: number; cy: number }): { cx: number; cy: number }[] {
   const flagSet = new Set(flagCells(at).map((c) => c.cy * grid.width + c.cx));
   const walls = new Map<number, { cx: number; cy: number }>();

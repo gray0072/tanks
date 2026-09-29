@@ -12,6 +12,11 @@ Part of the [Tanks specification](../SPEC.md) — section numbers (§) are index
   proportions preserved, with a letterbox margin on whichever axis the viewport's aspect ratio
   leaves over. All gameplay coordinates are logical px — resolution independence for free, identical
   simulation on every device.
+- **Flags wave, slowly.** The atlas holds only the pole; `Arena` redraws each flag's cloth every
+  frame as a pennant with a travelling sine along it, pinned at the pole and swinging most at the
+  tip — one wave per 2.6 s, ±1.8 px (`FLAG_WAVE_*` in `render/arena.ts`). Slow on purpose: a flag
+  flicking several times a second reads as jitter, not wind. The two teams' flags are half a wave out
+  of phase so they don't move in lockstep.
 - **Layers** are separate `Container`s in the order of §3.3, so z-order is structural, not sorted
   per frame.
 - **Terrain** uses `@pixi/tilemap` (a single draw call per terrain layer). Only the changed cells are
@@ -43,7 +48,8 @@ effects; ≤ 400 draw calls per frame; first interactive under 2 s on a cold cac
 ## 8. Simulation
 
 - **Fixed timestep, 30 Hz** (33.33 ms). Rendering runs at display rate and interpolates between the
-  last two simulation states.
+  last two simulation states — except for a tank that was dead in the older one: that is a respawn,
+  and interpolating from where it died drew it for a moment somewhere mid-map sliding onto its spawn.
 - **Deterministic given the same inputs**: no `Math.random` in the simulation — a seeded xorshift
   RNG, its seed distributed with the match start message. Bonus spawns, spawn point choice, and bot
   jitter all draw from it.

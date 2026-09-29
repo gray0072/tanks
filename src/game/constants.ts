@@ -79,7 +79,14 @@ export const BULLET_RADIUS = 3;
 export const MAX_STAR = 3;
 export const SPEED_BONUS_MULT = 1.6;
 
-export const BONUS_SPAWN_INTERVAL: [number, number] = [20, 30]; // s
+// Bonus rate is a room setting in bonuses per minute (1..10, default 6);
+// each gap is 60 / rate seconds, jittered by this factor either way so drops
+// don't tick like a metronome. One bonus is dropped the moment a round starts.
+export const BONUS_RATE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+export const DEFAULT_BONUS_RATE = 6; // per minute
+export const BONUS_SPAWN_JITTER = 0.2;
+// Field cap at the slowest rates; faster rates raise it to whatever the rate
+// keeps alive for BONUS_DESPAWN_AFTER, so a high rate isn't silently capped.
 export const BONUS_MAX_ON_FIELD = 2;
 export const BONUS_DESPAWN_AFTER = 15; // s
 export const BONUS_DURATION = {
@@ -151,7 +158,12 @@ export const TOUCH_STICK_RADIUS = 52;
 export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = "normal";
 
 export type BotProfile = {
-    reactionDelay: number; // s, before shooting at a newly acquired target
+    /** Human-scale reaction time (SPEC §10.4): how long after a target lines
+     *  up before the bot fires at it, and how old an incoming bullet has to
+     *  be before the bot has noticed it and starts to dodge. A beginner sits
+     *  around 0.5-0.7 s once the decision is included; a strong player is
+     *  near 0.2 s. Below that reads as an aimbot, not as skill. */
+    reactionDelay: number; // s
     /** Extra pause between consecutive shots at a target it is already
      *  tracking, on top of the tank's own FIRE_COOLDOWN. This is what makes
      *  Easy read as sluggish on the trigger rather than merely inaccurate —
@@ -164,10 +176,13 @@ export type BotProfile = {
     memory: number; // s, last-known-position decay
     preemptiveDodge: boolean;
     /** Whether the bot will shoot brick, and how eagerly it routes through
-     *  it: "never" paths around brick entirely, "whenFaster" treats it as
+     *  it: "lastResort" goes around brick whenever there is any sensible way
+     *  round, and only shoots through when the detour is absurd or there is
+     *  none (a walled-in flag) — a beginner still figures out that a wall
+     *  can be shot; "whenFaster" treats it as
      *  expensive-but-passable, "proactive" opens lanes cheaply and also
      *  fires *through* brick at an enemy it knows is behind it. */
-    shootsBrickToPath: "never" | "whenFaster" | "proactive";
+    shootsBrickToPath: "lastResort" | "whenFaster" | "proactive";
     /** How the bot picks which known enemy to shoot at: "sticky" keeps the
      *  current one until it is forgotten (tunnel vision), "nearest" always
      *  retargets, "threat" weighs upgrade level, buffs and proximity to our
@@ -188,16 +203,18 @@ export type BotProfile = {
 };
 
 export const BOT_PROFILE: Record<BotDifficulty, BotProfile> = {
+  // A beginner: slow to react, slow on the trigger, sloppy aim, no lead, and
+  // forgets you the moment you're out of sight.
   easy: {
-    reactionDelay: 0.45,
-    fireHesitation: 0.55,
-    rescoreInterval: 0.25,
-    aimErrorDeg: 14,
+    reactionDelay: 0.6,
+    fireHesitation: 0.8,
+    rescoreInterval: 0.5,
+    aimErrorDeg: 18,
     fireToleranceDeg: 18,
     leadFactor: 0,
     memory: 1.0,
     preemptiveDodge: false,
-    shootsBrickToPath: "never",
+    shootsBrickToPath: "lastResort",
     targetPriority: "sticky",
     roleAdherence: 0.35,
     bonusDetour: 0,
@@ -207,10 +224,11 @@ export const BOT_PROFILE: Record<BotDifficulty, BotProfile> = {
     retreatsWhenLosing: false,
     deniesBonuses: false,
   },
+  // A regular player.
   normal: {
-    reactionDelay: 0.22,
+    reactionDelay: 0.35,
     fireHesitation: 0.15,
-    rescoreInterval: 0.15,
+    rescoreInterval: 0.3,
     aimErrorDeg: 5,
     fireToleranceDeg: 8,
     leadFactor: 0.5,
@@ -226,10 +244,11 @@ export const BOT_PROFILE: Record<BotDifficulty, BotProfile> = {
     retreatsWhenLosing: true,
     deniesBonuses: false,
   },
+  // Close to a strong player — fast, but still human-fast.
   hard: {
-    reactionDelay: 0.09,
+    reactionDelay: 0.2,
     fireHesitation: 0,
-    rescoreInterval: 0.1,
+    rescoreInterval: 0.2,
     aimErrorDeg: 1.5,
     fireToleranceDeg: 3,
     leadFactor: 1,
@@ -248,6 +267,25 @@ export const BOT_PROFILE: Record<BotDifficulty, BotProfile> = {
 };
 
 // Shared by every difficulty — the profiles above are what sets them apart.
+
+/** Anti-jitter commitments (SPEC §10.4 "no dithering"). Aim error is
+ *  re-sampled this often rather than every tick — a per-tick roll kept
+ *  flipping a marginal target in and out of the firing window, and the bot
+ *  turned back and forth with it. A target already being tracked is held
+ *  onto with this much extra lane tolerance (hysteresis: harder to lose a
+ *  lane than to find one), and the barrel stays on it briefly once it has
+ *  slipped off. A dodge, once started, keeps its direction for a
+ *  beat. And path following finishes an axis before switching to the other
+ *  unless it is this close to done, instead of zig-zagging a staircase. */
+export const BOT_AIM_RESAMPLE_TIME = 0.4; // s
+export const BOT_AIM_HOLD_MULT = 1.5;
+export const BOT_AIM_HOLD_TIME = 0.35; // s, barrel stays on a target that just slipped off
+export const BOT_EVADE_COMMIT_TIME = 0.3; // s
+export const BOT_PATH_AXIS_DONE_PX = 3;
+/** What brick costs a "lastResort" bot per cell on its route: dear enough
+ *  that any real way round wins, finite so a walled-in goal is still
+ *  reachable by shooting through. */
+export const BOT_LAST_RESORT_BRICK_COST = 25;
 
 /** How close to a firing lane counts as lined up, in px. One movement step
  *  at TANK_SPEED is ~2.8px, so anything tighter than this just oscillates. */
@@ -294,6 +332,32 @@ export const BOT_BONUS_VALUE: Record<BonusKind, number> = {
  *  to defend. */
 export const BOT_THREAT_RADIUS_CELLS = 14;
 export const BOT_THREAT_COUNT_FOR_FULL_DEFENSE = 2;
+/** A team's posture for the round (ai/teamPlan.ts), drawn at random with
+ *  these weights so rounds play differently: how the team splits between
+ *  defending, holding the middle and attacking. Shares are of the bots on
+ *  the team; roleCounts() turns them into whole bots for any team size. */
+export type BotPosture = "aggressive" | "balanced" | "defensive";
+export const BOT_POSTURE_WEIGHTS: Record<BotPosture, number> = {
+  aggressive: 0.3,
+  balanced: 0.45,
+  defensive: 0.25,
+};
+export const BOT_POSTURE_SHARES: Record<BotPosture, { defend: number; midfield: number }> = {
+  aggressive: { defend: 0.15, midfield: 0.2 },
+  balanced: { defend: 0.25, midfield: 0.3 },
+  defensive: { defend: 0.4, midfield: 0.35 },
+};
+/** One flank per this many cells of map width across the flag-to-flag
+ *  line, up to three (left, middle, right). */
+export const BOT_LANE_MIN_WIDTH_CELLS = 8;
+/** An attacker drives out along its flank to this point (0 = own flag,
+ *  1 = enemy flag) before turning in on the flag; a midfielder patrols its
+ *  flank between the two HOLD points. */
+export const BOT_ATTACK_STAGE_ALONG = 0.5;
+export const BOT_HOLD_ALONG: [number, number] = [0.3, 0.5];
+/** Defenders wait this far in front of the flag, this far apart. */
+export const BOT_GUARD_AHEAD_CELLS = 3;
+export const BOT_GUARD_SPREAD_CELLS = 3;
 
 // =============================================================================
 // Networking (SPEC §9)

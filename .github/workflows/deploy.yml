@@ -18,6 +18,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # Optional Google sign-in + map sync (SPEC §6.4). Without these secrets the build
+          # simply has no cloud section — a fork works as-is. The anon key is public by
+          # design (row-level security guards the data); never put the service_role key here.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

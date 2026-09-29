@@ -20,7 +20,7 @@ import {
 import { listMaps, getMap, type MapDef } from "../world/maps/loader";
 import { getCustomMap, isCustomMapId } from "../world/maps/customMaps";
 import { BotController } from "../ai/bot";
-import { computeTeamRoles, type Role } from "../ai/teamPlan";
+import { computeTeamRoles, type Assignment } from "../ai/teamPlan";
 import { HostNetwork, type HostTransport, type NetErrorInfo } from "./peer";
 import { generateRoomCode, normalizeRoomCode } from "./roomCode";
 import type { ClientMessage, BotDifficultyTarget, MapPayload } from "./protocol";
@@ -30,6 +30,7 @@ import {
   DEFAULT_BOT_DIFFICULTY,
   DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
+  DEFAULT_BONUS_RATE,
   DEFAULT_WINS_TARGET,
   KICK_CLOSE_DELAY,
   ROUND_INTERMISSION,
@@ -118,6 +119,7 @@ export class RoomHost implements RoomController {
       timeLimit: DEFAULT_TIME_LIMIT,
       respawnMult: DEFAULT_RESPAWN_MULT,
       friendlyFire: false,
+      bonusesPerMinute: DEFAULT_BONUS_RATE,
     };
 
     if (opts.online || opts.makeNet) {
@@ -570,7 +572,7 @@ export class RoomHost implements RoomController {
   private tick() {
     const sim = this.sim;
     if (!sim) return;
-    const roles: Record<TeamId, Map<number, Role>> = {
+    const roles: Record<TeamId, Map<number, Assignment>> = {
       blue: computeTeamRoles(sim, "blue"),
       red: computeTeamRoles(sim, "red"),
     };

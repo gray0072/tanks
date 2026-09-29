@@ -86,6 +86,7 @@ export function CreateRoom({ go, initialMapId }: { go: Navigate; initialMapId?: 
       timeLimit: setup.timeLimit,
       respawnMult: setup.respawnMult,
       friendlyFire: setup.friendlyFire,
+      bonusesPerMinute: setup.bonusesPerMinute,
     });
     // Bots start on whatever this map was last played with; the room's own
     // "All bots" chips are where it is changed (SPEC §6.1).

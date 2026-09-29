@@ -20,7 +20,8 @@ import {
   MAX_STAR,
   MAX_MINES_HELD,
   MINE_BLAST_RADIUS_CELLS,
-  BONUS_SPAWN_INTERVAL,
+  BONUS_SPAWN_JITTER,
+  DEFAULT_BONUS_RATE,
   BONUS_MAX_ON_FIELD,
   BONUS_DESPAWN_AFTER,
   BONUS_DURATION,
@@ -108,6 +109,14 @@ export class Sim {
   time = 0; // seconds elapsed, for assist windows etc.
   clockFrozen: Record<TeamId, number> = { blue: 0, red: 0 };
   private nextBonusIn: number;
+  /** Each slot's own spawn point — where it starts and where it comes back. */
+  private homeSpawn = new Map<number, { cx: number; cy: number }>();
+  /** Each team's flag pocket as the map built it (see SHOVEL). */
+  private pocket: Record<TeamId, { cx: number; cy: number }[]>;
+  /** Bonus kinds this map can drop. SHOVEL is left out unless both flags
+   *  have a pocket: with no wall to build, it would be a pickup that does
+   *  nothing — and a team-scoped one, loudly announced. */
+  private bonusKinds: readonly BonusKind[];
 
   constructor(map: MapDef, settings: MatchSettings, slots: Slot[], seed: number) {
     this.map = map;
@@ -132,10 +141,32 @@ export class Sim {
     this.tanks = slots.map((s) => {
       const spawns = map.spawns[s.team];
       const p = spawns[taken[s.team]++ % spawns.length] ?? spawns[0];
+      this.homeSpawn.set(s.id, p);
       return createTank(s.id, s.team, p.cx, p.cy);
     });
     for (const t of this.tanks) t.invulnT = SPAWN_INVULN;
-    this.nextBonusIn = this.rng.range(...BONUS_SPAWN_INTERVAL);
+    this.pocket = {
+      blue: flagPocketWalls(map.grid, map.flags.blue),
+      red: flagPocketWalls(map.grid, map.flags.red),
+    };
+    this.bonusKinds = this.pocket.blue.length > 0 && this.pocket.red.length > 0
+      ? BONUS_KINDS
+      : BONUS_KINDS.filter((k) => k !== "SHOVEL");
+    // A round opens with one bonus already on the field (§4.3); the rate
+    // setting paces the rest.
+    this.spawnBonus();
+    this.nextBonusIn = this.bonusInterval();
+  }
+
+  /** Bonuses per minute from the room setting, clamped to the offered range
+   *  so a malformed or missing value can't stall or flood the field. */
+  private get bonusRate(): number {
+    const rate = this.settings.bonusesPerMinute;
+    return Number.isFinite(rate) && rate > 0 ? Math.min(10, Math.max(1, rate)) : DEFAULT_BONUS_RATE;
+  }
+
+  private bonusInterval(): number {
+    return (60 / this.bonusRate) * this.rng.range(1 - BONUS_SPAWN_JITTER, 1 + BONUS_SPAWN_JITTER);
   }
 
   tankBySlot(slot: number): TankState {
@@ -261,6 +292,12 @@ export class Sim {
     const nx = axis === "x" ? tank.x + step : tank.x;
     const ny = axis === "y" ? tank.y + step : tank.y;
     if (this.footprintFree(nx, ny, tank.slot)) tank[axis] = axis === "x" ? nx : ny;
+  }
+
+  private overlapsCell(t: TankState, cx: number, cy: number): boolean {
+    const hx = t.x + TANK_MARGIN;
+    const hy = t.y + TANK_MARGIN;
+    return hx < (cx + 1) * CELL && hx + TANK_HITBOX > cx * CELL && hy < (cy + 1) * CELL && hy + TANK_HITBOX > cy * CELL;
   }
 
   private footprintFree(x: number, y: number, ignoreSlot: number): boolean {
@@ -541,18 +578,21 @@ export class Sim {
         tank.mines = Math.min(MAX_MINES_HELD, tank.mines + 1);
         break;
       case "SHOVEL": {
-        const walls = flagPocketWalls(this.grid, this.map.flags[tank.team]);
-        for (const w of walls) {
+        // The pocket as the map built it, not as it stands: a wall that has
+        // been shot out is rebuilt in steel, and every cell comes back as
+        // fresh brick when the shovel runs out — Battle City's shovel.
+        for (const w of this.pocket[tank.team]) {
           const existing = this.fortifications.find((f) => f.cx === w.cx && f.cy === w.cy);
           if (existing) {
             existing.ttl = BONUS_DURATION.SHOVEL;
-          } else {
-            const prev = this.grid.fortify(w.cx, w.cy);
-            if (prev !== null) {
-              this.fortifications.push({ cx: w.cx, cy: w.cy, restoreTile: prev, ttl: BONUS_DURATION.SHOVEL });
-              events.push({ type: "terrain", cx: w.cx, cy: w.cy, tile: Tile.Steel });
-            }
+            continue;
           }
+          // Never wall a tank in: a cell someone is standing in stays open.
+          if (this.tanks.some((t) => t.alive && this.overlapsCell(t, w.cx, w.cy))) continue;
+          if (this.grid.fortify(w.cx, w.cy) === null) continue;
+          this.mines = this.mines.filter((m) => m.cx !== w.cx || m.cy !== w.cy);
+          this.fortifications.push({ cx: w.cx, cy: w.cy, restoreTile: Tile.Brick, ttl: BONUS_DURATION.SHOVEL });
+          events.push({ type: "terrain", cx: w.cx, cy: w.cy, tile: Tile.Steel });
         }
         events.push({ type: "teamBonus", team: tank.team, kind });
         break;
@@ -578,14 +618,19 @@ export class Sim {
     this.bonuses = this.bonuses.filter((b) => (b.ttl -= dt) > 0);
     this.nextBonusIn -= dt;
     if (this.nextBonusIn > 0) return;
-    this.nextBonusIn = this.rng.range(...BONUS_SPAWN_INTERVAL);
-    if (this.bonuses.length >= BONUS_MAX_ON_FIELD) return;
+    this.nextBonusIn = this.bonusInterval();
+    this.spawnBonus();
+  }
+
+  private spawnBonus() {
+    const cap = Math.max(BONUS_MAX_ON_FIELD, Math.ceil((this.bonusRate * BONUS_DESPAWN_AFTER) / 60));
+    if (this.bonuses.length >= cap) return;
 
     const occupied = new Set(this.bonuses.map((b) => b.cy * this.grid.width + b.cx));
     const free = this.map.bonusSpawns.filter((p) => !occupied.has(p.cy * this.grid.width + p.cx));
     if (free.length === 0) return;
     const point = this.rng.pick(free);
-    const kind = this.rng.pick(BONUS_KINDS);
+    const kind = this.rng.pick(this.bonusKinds);
     this.bonuses.push(createBonus(kind, point.cx, point.cy, BONUS_DESPAWN_AFTER));
   }
 
@@ -623,9 +668,17 @@ export class Sim {
   }
 
   private respawnTank(tank: TankState) {
+    // Back at the slot's own spawn, the one it started the round on. Taking
+    // the first free spawn in the list instead sent every respawn to spawn
+    // #1. If someone is parked on it, a random free one of the team's.
     const spawns = this.map.spawns[tank.team];
-    let point = spawns.find((p) => this.footprintFree(p.cx * CELL, p.cy * CELL, tank.slot));
-    if (!point) point = this.rng.pick(spawns);
+    const free = (p: { cx: number; cy: number }) => this.footprintFree(p.cx * CELL, p.cy * CELL, tank.slot);
+    const home = this.homeSpawn.get(tank.slot) ?? spawns[0];
+    let point = home;
+    if (!free(home)) {
+      const others = spawns.filter(free);
+      point = others.length > 0 ? this.rng.pick(others) : home;
+    }
     tank.x = point.cx * CELL;
     tank.y = point.cy * CELL;
     tank.alive = true;

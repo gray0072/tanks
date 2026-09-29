@@ -28,19 +28,40 @@ long to reset progress on every respawn), and reset at match end.
 
 ## 4.3 Bonuses
 
-Bonuses spawn one at a time at a random point from the map's `bonusSpawns`, every **20–30 s**, max
-**2** on the field, despawning after **15 s** if untouched. Both teams compete for the same pickups.
+Bonuses spawn one at a time at a random point from the map's `bonusSpawns`, despawning after
+**15 s** if untouched. Both teams compete for the same pickups.
+
+- **One bonus is on the field the moment a round starts**, so the opening rush has something to
+  fight over; the rest follow at the room's rate.
+- The rate is a **room setting, `bonusesPerMinute`: 1 – 10, default 6** — part of `MatchSettings`,
+  host-only in the room screen (§6.1) like the other rules, and remembered per map. Each gap is
+  `60 / rate` seconds, jittered ±20 % (`BONUS_SPAWN_JITTER`) so drops don't tick like a metronome.
+- At most **2** on the field (`BONUS_MAX_ON_FIELD`), raised at high rates to however many the rate
+  keeps alive for the despawn time (`ceil(rate × 15 / 60)`, i.e. 3 at 9–10/min), so the top of the
+  range isn't quietly capped back down. A drop that finds the field full, or every spawn point
+  taken, is skipped rather than queued.
 
 | Bonus | Effect | Scope | Duration |
 |---|---|---|---|
 | `HELMET` | Shield absorbing one hit | Taker | 12 s or until hit |
 | `STAR` | +1 upgrade level | Taker | Rest of match |
 | `SPEED` | ×1.6 move speed | Taker | 10 s |
-| `SHOVEL` | Your flag's brick walls turn to steel, then revert | **Your team** | 20 s |
+| `SHOVEL` | Your flag's pocket is rebuilt in steel — shot-out cells too — then reverts to fresh brick | **Your team** | 20 s |
 | `CLOCK` | Enemy team frozen in place (can still be shot) | **Enemy team** | 6 s |
 | `GRENADE` | Every enemy tank currently alive is destroyed | **Enemy team** | instant |
 | `RESPAWN` | +3 respawns | **Your team** | permanent |
 | `MINE` | Drop up to 3 proximity mines; 1-cell blast, visible only to your team | Taker | until used |
+
+**SHOVEL works on the pocket the map built**, not on what is left of it: the cells orthogonally
+next to the flag that were brick at round start (`flagPocketWalls` on the pristine `MapDef.grid`).
+Brick still standing and cells already shot out both become steel, a cell a tank is standing in is
+left open (a shovel never walls anyone in, and a mine in a rebuilt cell is gone), and when it runs
+out every one of them comes back as **full brick** — Battle City's shovel, which repairs the base.
+A shovel that turned only *surviving* brick to steel did nothing at all once the pocket had been
+shot open, which is exactly when a team wants it. And because it is a team bonus, loudly announced,
+**a map where either flag has no pocket never drops one** (`Sim.bonusKinds`): taking it would be a
+pickup that visibly does nothing. Requiring both flags keeps it from being a dud for whichever team
+happens to grab it.
 
 Mines are laid on the **press edge** of the mine control, not while it is held — one press, one mine,
 whether that press came from `Q` or the touch button (`Sim.stepFiring`; the per-tank `mineHeld` flag

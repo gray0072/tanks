@@ -37,6 +37,9 @@ export type CustomMapDraft = {
 export class MapStorageError extends Error {}
 
 const STORE_KEY = "tanks.customMaps";
+/** Deleted map ids and when, so cloud sync (cloud/mapSync.ts) can tell "deleted here" from
+ *  "never had it" and propagate a delete instead of pulling the map back down. */
+const TOMBSTONE_KEY = "tanks.customMapsDeleted";
 const DRAFT_KEY = "tanks.editorDraft";
 const SCHEMA = 1;
 const ID_PREFIX = "custom-";
@@ -106,8 +109,45 @@ export function getCustomMap(id: string): CustomMap | null {
   return listCustomMaps().find((m) => m.id === id) ?? null;
 }
 
-function writeAll(maps: CustomMap[]) {
+function writeAll(maps: CustomMap[], source: LibraryChangeSource = "local") {
   writeRaw(STORE_KEY, { v: SCHEMA, maps });
+  for (const cb of listeners) cb(source);
+}
+
+// --- Change notification and tombstones (cloud sync) --------------------------
+
+/** "local" is an edit made on this device (cloud sync pushes it); "sync" is the library
+ *  being rewritten from a merge with the cloud (screens re-read it, nothing is pushed). */
+export type LibraryChangeSource = "local" | "sync";
+const listeners = new Set<(source: LibraryChangeSource) => void>();
+
+export function onCustomMapsChanged(cb: (source: LibraryChangeSource) => void): () => void {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+export type MapTombstone = { id: string; deletedAt: number };
+
+export function listTombstones(): MapTombstone[] {
+  const data = readRaw(TOMBSTONE_KEY) as { v?: number; deleted?: unknown[] } | null;
+  if (!data || data.v !== SCHEMA || !Array.isArray(data.deleted)) return [];
+  return data.deleted.filter(
+    (t): t is MapTombstone =>
+      !!t && typeof (t as MapTombstone).id === "string" && typeof (t as MapTombstone).deletedAt === "number",
+  );
+}
+
+function writeTombstones(list: MapTombstone[]) {
+  writeRaw(TOMBSTONE_KEY, { v: SCHEMA, deleted: list });
+}
+
+/** Cloud sync's write path: the merged library replaces the local one in one go, reported
+ *  as a "sync" change so it isn't pushed straight back up. */
+export function replaceLibrary(maps: CustomMap[], tombstones: MapTombstone[]): void {
+  writeTombstones(tombstones);
+  writeAll(maps, "sync");
 }
 
 function newId(): string {
@@ -162,6 +202,9 @@ export function updateCustomMap(id: string, patch: { name?: string; template?: s
 }
 
 export function deleteCustomMap(id: string): void {
+  // The tombstone first: if the library write then fails, the map is still there and a
+  // stray tombstone older than it is simply ignored by the merge.
+  writeTombstones([...listTombstones().filter((t) => t.id !== id), { id, deletedAt: Date.now() }]);
   writeAll(listCustomMaps().filter((m) => m.id !== id));
 }
 

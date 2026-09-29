@@ -76,11 +76,13 @@ export class Grid {
     return false;
   }
 
-  /** SHOVEL bonus: turn a cell to steel and remember what to restore it to. */
+  /** SHOVEL bonus: turn a pocket cell to steel — brick still standing, or
+   *  one that has been shot out (the shovel rebuilds the wall). Returns what
+   *  was there, or null if the cell isn't brick or open ground. */
   fortify(cx: number, cy: number): Tile | null {
     if (!this.inBounds(cx, cy)) return null;
     const prev = this.tileAt(cx, cy);
-    if (prev !== Tile.Brick) return null;
+    if (prev !== Tile.Brick && prev !== Tile.Empty) return null;
     this.setTile(cx, cy, Tile.Steel);
     return prev;
   }

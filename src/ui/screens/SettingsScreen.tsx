@@ -4,6 +4,45 @@ import { loadUserSettings, saveUserSettings, type Quality, type TouchSide } from
 import { audio } from "../../audio/audio";
 import { menuBackdrop as backdrop } from "../../game/menuBackdrop";
 import { useEnterKey } from "../hooks/useEnterKey";
+import { isCloudAvailable, signIn, signOut, useCloudStatus, type CloudStatus } from "../../cloud/cloudSync";
+
+const STATUS_TEXT: Partial<Record<CloudStatus, string>> = {
+  syncing: "Syncing…",
+  synced: "Synced",
+  error: "Sync failed — will retry",
+};
+
+/** Optional Google sign-in that keeps your own maps in sync across devices (SPEC §6.4).
+ *  Absent entirely from a build without Supabase configured. */
+function CloudSection({ beforeSignIn }: { beforeSignIn: () => void }) {
+  const { status, user } = useCloudStatus();
+  if (!isCloudAvailable()) return null;
+  return (
+    <div className="cloud-section">
+      <div className="cloud-title">Cloud maps</div>
+      <div className="hint">Optional: sign in with Google to keep the maps you make in sync across your devices.</div>
+      {user ? (
+        <div className="row between wrap">
+          <div className="cloud-user">
+            <span className="cloud-email">{user.email ?? "Signed in"}</span>
+            {STATUS_TEXT[status] ? <span className={`cloud-status cloud-status-${status}`}>{STATUS_TEXT[status]}</span> : null}
+          </div>
+          <button onClick={() => void signOut()}>Sign out</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => {
+            // Sign-in leaves the page for Google; don't lose what was edited here meanwhile.
+            beforeSignIn();
+            void signIn();
+          }}
+        >
+          Sign in with Google
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function SettingsScreen({ go }: { go: Navigate }) {
   const [s, setS] = useState(loadUserSettings);
@@ -87,6 +126,7 @@ export function SettingsScreen({ go }: { go: Navigate }) {
           />{" "}
           Show ping
         </label>
+        <CloudSection beforeSignIn={() => saveUserSettings({ ...s, nickname: s.nickname.trim().slice(0, 12) })} />
         <div className="row between">
           <button onClick={() => go({ k: "menu" })}>Back</button>
           <button className="primary" onClick={() => saveRef.current()}>

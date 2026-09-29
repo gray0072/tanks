@@ -12,7 +12,7 @@ import { findPath, nearestPassable } from "../src/ai/pathfinder";
 import { createBonus } from "../src/world/bonus";
 import { Tile } from "../src/world/grid";
 import { Dir } from "../src/util/math";
-import { BOT_PROFILE, FIRE_COOLDOWN } from "../src/game/constants";
+import { BOT_LAST_RESORT_BRICK_COST, BOT_PROFILE, CELL, FIRE_COOLDOWN } from "../src/game/constants";
 import type { BotDifficulty } from "../src/game/config";
 import { botFixture, cells, matchFrags, place } from "./helpers";
 
@@ -54,13 +54,13 @@ test("every production map offers bots a path to the enemy flag", () => {
   }
 });
 
-test("a bot that never shoots brick still gets a path, around it", () => {
+test("an Easy bot goes around brick when there is a way round", () => {
   const map = parseMap("classic", "Classic", MAP_SOURCES[0].template);
-  const around = findPath(map.grid, map.spawns.blue[0], map.spawns.red[0], { brickCost: Infinity });
+  const around = findPath(map.grid, map.spawns.blue[0], map.spawns.red[0], { brickCost: BOT_LAST_RESORT_BRICK_COST });
   assert.ok(around, "an Easy bot must still be able to cross the map");
   assert.ok(
     around.every((c) => map.grid.tileAt(c.cx, c.cy) !== Tile.Brick),
-    "a route for a bot that never shoots brick must not run through brick",
+    "a beginner's route across classic must not run through brick",
   );
 });
 
@@ -178,11 +178,15 @@ test("a bot shoots open a brick wall blocking its route", () => {
 @r......R@
 @@@@@@@@@@
 `;
-  const f = botFixture(CORRIDOR, "normal", { seed: 1 });
-  place(f.tank, cells(4), cells(1));
-  const seen = f.run(12);
-  assert.equal(f.sim.grid.tileAt(4, 2), Tile.Empty, "the blocking brick should have been shot open");
-  assert.ok(seen.bricksOpened >= 1);
+  // Every difficulty — a beginner included: Easy avoids brick when it can,
+  // but must still work out that a wall with no way round can be shot.
+  for (const difficulty of DIFFICULTIES) {
+    const f = botFixture(CORRIDOR, difficulty, { seed: 1 });
+    place(f.tank, cells(4), cells(1));
+    const seen = f.run(15);
+    assert.equal(f.sim.grid.tileAt(4, 2), Tile.Empty, `${difficulty}: the blocking brick should have been shot open`);
+    assert.ok(seen.bricksOpened >= 1);
+  }
 });
 
 // --- bonuses ---------------------------------------------------------------
@@ -202,19 +206,25 @@ test("Medium and Hard detour for a bonus; Easy does not", () => {
 });
 
 test("a bot prefers the more valuable bonus when two are equally close", () => {
-  const f = botFixture(ARENA, "normal", { seed: 8 });
-  place(f.tank, cells(7), cells(4));
-  f.sim.bonuses.push(createBonus("MINE", 7, 1, 60));
-  f.sim.bonuses.push(createBonus("STAR", 7, 7, 60));
-  const order: string[] = [];
-  for (let i = 0; i < 12 * 30 && order.length < 2; i++) {
-    const before = f.sim.bonuses.map((b) => b.kind);
-    f.run(1 / 30);
-    for (const kind of before) {
-      if (!f.sim.bonuses.some((b) => b.kind === kind)) order.push(kind);
-    }
+  // Whether a bot goes for a bonus at all is a dice roll (bonusDetour), so
+  // one seed only tests the roll. Over several, the STAR must come first.
+  // The enemy flag is sealed in steel: it is only here as a destination,
+  // and a bot that shot it would end the match mid-test.
+  let starFirst = 0;
+  let mineFirst = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const f = botFixture(ARENA, "normal", { seed });
+    f.sim.grid.setTile(13, 8, Tile.Steel);
+    f.sim.grid.setTile(14, 7, Tile.Steel);
+    place(f.tank, cells(7), cells(4));
+    f.sim.bonuses.push(createBonus("MINE", 7, 1, 60));
+    f.sim.bonuses.push(createBonus("STAR", 7, 7, 60));
+    for (let i = 0; i < 12 * 30 && f.sim.bonuses.length === 2; i++) f.run(1 / 30);
+    if (f.sim.bonuses.length === 2) continue;
+    if (f.sim.bonuses[0]?.kind === "MINE") starFirst++;
+    else mineFirst++;
   }
-  assert.equal(order[0], "STAR", `took ${order[0] ?? "nothing"} first, not the STAR`);
+  assert.ok(starFirst > mineFirst, `STAR first ${starFirst}, MINE first ${mineFirst}`);
 });
 
 // --- fair perception (SPEC §10.2) -----------------------------------------
@@ -326,13 +336,22 @@ test("Hard leads a moving target, Easy shoots where it already is", () => {
     place(enemy, cells(11), cells(1));
     f.tank.dir = Dir.Right;
     enemy.helmetT = 999;
-    let killed = 0;
+    // The target is helmeted so it survives to be shot at again, which
+    // means kills can't be the score — count bullets that vanished on it.
+    // (The old score was kills + flag damage: with a helmet that was only
+    // ever measuring how often the bot shot the flag.)
+    let hit = 0;
     for (let i = 0; i < 12 * 30; i++) {
       const dir = Math.floor(i / 45) % 2 === 0 ? Dir.Down : Dir.Up;
+      const mine = f.sim.bullets.filter((b) => b.ownerSlot === 0).map((b) => ({ id: b.id, x: b.x, y: b.y }));
       f.run(1 / 30, { 1: { dir, fire: false, mine: false } });
-      if (f.sim.rules.stats[0].frags > killed) killed = f.sim.rules.stats[0].frags;
+      for (const b of mine) {
+        if (f.sim.bullets.some((n) => n.id === b.id)) continue;
+        const pad = CELL / 2;
+        if (b.x > enemy.x - pad && b.x < enemy.x + CELL + pad && b.y > enemy.y - pad && b.y < enemy.y + CELL + pad) hit++;
+      }
     }
-    hits[difficulty] = f.sim.rules.stats[0].flagDamage + killed;
+    hits[difficulty] = hit;
   }
   // Not a strict ordering assertion — the point is only that full leading
   // isn't *worse*, which it was while the lead assumed every target runs at
@@ -382,7 +401,10 @@ test("the difficulty ladder holds up over full bot matches", () => {
     let bf = 0;
     let rf = 0;
     for (const src of MAP_SOURCES) {
-      for (const seed of [1, 2]) {
+      // Eight seeds, not two: Hard's edge over Medium is a few percent, and
+      // two seeds a map measured seed luck — they flipped the moment the
+      // bonus rate or the opening bonus shifted the RNG.
+      for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
         const map = parseMap(src.id, src.name, src.template);
         const f = matchFrags(map, blue, red, seed);
         bf += f.blue;

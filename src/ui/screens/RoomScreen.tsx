@@ -19,7 +19,9 @@ import type { BotDifficultyTarget } from "../../net/protocol";
 import {
   DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
+  DEFAULT_BONUS_RATE,
   DEFAULT_WINS_TARGET,
+  BONUS_RATE_OPTIONS,
   RESPAWN_MULTIPLIERS,
   TIME_LIMIT_OPTIONS,
   WINS_TARGET_OPTIONS,
@@ -81,6 +83,7 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
   const winsTarget = room.settings?.winsTarget ?? DEFAULT_WINS_TARGET;
   const timeLimit = room.settings?.timeLimit ?? DEFAULT_TIME_LIMIT;
   const friendlyFire = room.settings?.friendlyFire ?? false;
+  const bonusRate = room.settings?.bonusesPerMinute ?? DEFAULT_BONUS_RATE;
 
   /** Host-only: push a rule change to the room and remember it for this map,
    *  so the next room on it opens the way this one was left (settings.ts
@@ -104,6 +107,7 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
       timeLimit: next.timeLimit,
       respawnMult: next.respawnMult,
       friendlyFire: next.friendlyFire,
+      bonusesPerMinute: next.bonusesPerMinute,
     });
     forceRender((n) => n + 1);
   };
@@ -272,6 +276,16 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
                     ))}
                   </select>
                 </label>
+                <label>
+                  Bonuses per minute
+                  <select value={bonusRate} onChange={(e) => patchSettings({ bonusesPerMinute: Number(e.target.value) })}>
+                    {BONUS_RATE_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="row-label">
                   <input
                     type="checkbox"
@@ -284,7 +298,7 @@ export function RoomScreen({ go, room }: { go: Navigate; room: RoomController })
               </>
             ) : (
               <span className="hint">
-                {winsTargetLabel(winsTarget)} · {(timeLimit / 60) | 0} min/round · {respawnOptionLabel(mult)} respawns
+                {winsTargetLabel(winsTarget)} · {(timeLimit / 60) | 0} min/round · {respawnOptionLabel(mult)} respawns · {bonusRate} bonuses/min
                 {friendlyFire ? " · friendly fire" : ""}
               </span>
             )}

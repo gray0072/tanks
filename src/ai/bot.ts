@@ -9,7 +9,7 @@ import { tankCenter } from "../world/tank";
 import { Tile } from "../world/grid";
 import type { BonusEntity } from "../world/bonus";
 import { findPath, nearestPassable, type CellPoint } from "./pathfinder";
-import type { Role } from "./teamPlan";
+import { guardPoint, lanePoint, progressAlong, type Assignment } from "./teamPlan";
 import { Dir, DIR_VECTOR } from "../util/math";
 import {
   CELL,
@@ -31,11 +31,22 @@ import {
   BOT_VELOCITY_SAMPLE_MAX_GAP,
   BOT_VELOCITY_SMOOTHING,
   BOT_BONUS_VALUE,
+  BOT_AIM_RESAMPLE_TIME,
+  BOT_AIM_HOLD_MULT,
+  BOT_AIM_HOLD_TIME,
+  BOT_EVADE_COMMIT_TIME,
+  BOT_PATH_AXIS_DONE_PX,
+  BOT_LAST_RESORT_BRICK_COST,
+  BOT_ATTACK_STAGE_ALONG,
+  BOT_HOLD_ALONG,
+  BOT_GUARD_AHEAD_CELLS,
+  BOT_GUARD_SPREAD_CELLS,
   type BotProfile,
 } from "../game/constants";
 import type { BotDifficulty, TeamId } from "../game/config";
 
-type Action = "AttackFlag" | "DefendFlag" | "Hunt" | "Collect" | "Regroup";
+/** `Hold` is the midfielder's job: patrol its flank of the middle. */
+type Action = "AttackFlag" | "DefendFlag" | "Hunt" | "Collect" | "Regroup" | "Hold";
 
 /** A last-known enemy sighting. `vx/vy` is the velocity the bot has actually
  *  *watched* that tank move at (px/s, smoothed), which is what target leading
@@ -121,12 +132,12 @@ function dirTowards(dx: number, dy: number): Dir {
 }
 
 /** What a brick cell costs this profile to route through (SPEC §10.3
- *  "Shoots brick to path"). Infinity for a bot that never shoots brick, so
- *  it paths *around* instead of walking into a wall it will never open —
- *  otherwise A*'s cheap brick route wedges it against the wall for good. */
+ *  "Shoots brick to path"). Always finite: a bot that treated brick as
+ *  impassable sat forever in front of a walled-in goal. The beginner's cost
+ *  is just high enough that any real way round wins. */
 function brickPathCost(profile: BotProfile): number {
   switch (profile.shootsBrickToPath) {
-    case "never": return Infinity;
+    case "lastResort": return BOT_LAST_RESORT_BRICK_COST;
     case "whenFaster": return 6;
     case "proactive": return 2.5;
   }
@@ -148,6 +159,27 @@ export class BotController {
    *  one per lane test would let a bot re-roll its way onto a shot it just
    *  missed, within the same tick. */
   private aimJitter = 0.5;
+  private aimResampleT = 0;
+  /** Path-following direction last tick, kept until its axis is done. */
+  private lastMoveDir: Dir | null = null;
+  /** A started dodge keeps its direction for BOT_EVADE_COMMIT_TIME. */
+  private evadeDir: Dir | null = null;
+  private evadeT = 0;
+  /** This round's job from the team plan (ai/teamPlan.ts). */
+  private assignment: Assignment = { role: "attack", lane: 0 };
+  /** An attacker first drives out along its flank, then turns in on the
+   *  flag; this flips once it is far enough up the map. Reset on death. */
+  private staged = false;
+  /** Which of the two Hold points a midfielder is heading for. */
+  private holdLeg = 0;
+  /** Barrel direction held toward the tracked target for a moment after it
+   *  slips off the lane, so a marginal target doesn't swing the turret
+   *  back and forth between it and the path. */
+  private aimHoldDir: Dir | null = null;
+  private aimHoldUntil = 0;
+  /** When each enemy bullet was first seen: a bullet younger than the
+   *  profile's reaction time hasn't been noticed yet. */
+  private bulletSeenAt = new Map<number, number>();
 
   // Stuck detection: if the tank barely moves for half a second despite
   // trying to, pursue()'s rigid path-following has wedged it against a
@@ -178,12 +210,20 @@ export class BotController {
     return [...this.memory.keys()];
   }
 
-  decide(sim: Sim, roles: Map<number, Role>, difficulty: BotDifficulty): SeatInput {
+  decide(sim: Sim, roles: Map<number, Assignment>, difficulty: BotDifficulty): SeatInput {
     const tank = sim.tankBySlot(this.slot);
     const profile = BOT_PROFILE[difficulty];
-    if (!tank.alive) return { dir: null, fire: false, mine: false };
+    if (!tank.alive) {
+      this.staged = false;
+      return { dir: null, fire: false, mine: false };
+    }
+    this.assignment = roles.get(this.slot) ?? { role: "attack", lane: 0 };
 
-    this.aimJitter = sim.rng.next();
+    this.aimResampleT -= TICK_DT;
+    if (this.aimResampleT <= 0) {
+      this.aimResampleT = BOT_AIM_RESAMPLE_TIME;
+      this.aimJitter = sim.rng.next();
+    }
     this.updateMemory(sim, tank, profile.memory);
 
     this.rescoreT -= TICK_DT;
@@ -348,8 +388,8 @@ export class BotController {
 
   // --- action selection (SPEC §10.1) --------------------------------------
 
-  private chooseAction(sim: Sim, tank: TankState, roles: Map<number, Role>, profile: BotProfile) {
-    const role = roles.get(tank.slot) ?? "attack";
+  private chooseAction(sim: Sim, tank: TankState, roles: Map<number, Assignment>, profile: BotProfile) {
+    const role = (roles.get(tank.slot) ?? this.assignment).role;
     const followRole = sim.rng.next() < profile.roleAdherence;
     const knownEnemy = this.nearestKnownEnemy(tank);
     const flagUnderThreat = this.flagThreatened(sim, tank.team);
@@ -379,6 +419,8 @@ export class BotController {
       this.action = "Collect";
     } else if (this.bestBonus(sim, tank, profile) && sim.rng.next() < profile.bonusDetour) {
       this.action = "Collect";
+    } else if (followRole && role === "midfield") {
+      this.action = "Hold";
     } else {
       this.action = "AttackFlag";
     }
@@ -495,24 +537,44 @@ export class BotController {
     const box = { x: tank.x, y: tank.y, w: TANK_SIZE, h: TANK_SIZE };
     const reactWindow = profile.preemptiveDodge ? 0.6 : profile.memory > 2 ? 0.35 : 0.12;
 
+    const live = new Set<number>();
+    for (const b of sim.bullets) {
+      live.add(b.id);
+      if (!this.bulletSeenAt.has(b.id)) this.bulletSeenAt.set(b.id, sim.time);
+    }
+    for (const id of this.bulletSeenAt.keys()) if (!live.has(id)) this.bulletSeenAt.delete(id);
+
+    this.evadeT -= TICK_DT;
+    if (this.evadeT > 0 && this.evadeDir !== null && this.canStep(sim, tank, this.evadeDir)) return this.evadeDir;
+    this.evadeDir = null;
+
     for (const b of sim.bullets) {
       if (b.team === tank.team) continue;
+      // Not noticed yet — the reaction time applies to dodging too.
+      if (sim.time - (this.bulletSeenAt.get(b.id) ?? sim.time) < profile.reactionDelay) continue;
       const v = DIR_VECTOR[b.dir];
       const t = v.x !== 0
         ? (box.x + box.w / 2 - b.x) / (v.x * b.speed)
         : (box.y + box.h / 2 - b.y) / (v.y * b.speed);
       if (!Number.isFinite(t) || t < 0 || t > reactWindow) continue;
-      // Easy often reacts too late even within its short window.
-      if (reactWindow <= 0.12 && sim.rng.next() < 0.5) continue;
 
       const futureX = b.x + v.x * b.speed * t;
       const futureY = b.y + v.y * b.speed * t;
       if (futureX < box.x - CELL || futureX > box.x + box.w + CELL) continue;
       if (futureY < box.y - CELL || futureY > box.y + box.h + CELL) continue;
 
-      const perp: Dir[] = v.x !== 0 ? [Dir.Up, Dir.Down] : [Dir.Left, Dir.Right];
+      // Step off the line on the side we already lean toward — the short way
+      // out, and the same answer tick after tick, so consecutive dodges
+      // don't alternate sides.
+      const c = tankCenter(tank);
+      const perp: Dir[] = v.x !== 0
+        ? (c.y < b.y ? [Dir.Up, Dir.Down] : [Dir.Down, Dir.Up])
+        : (c.x < b.x ? [Dir.Left, Dir.Right] : [Dir.Right, Dir.Left]);
       for (const d of perp) {
-        if (this.canStep(sim, tank, d)) return d;
+        if (!this.canStep(sim, tank, d)) continue;
+        this.evadeDir = d;
+        this.evadeT = BOT_EVADE_COMMIT_TIME;
+        return d;
       }
     }
 
@@ -590,9 +652,10 @@ export class BotController {
         if (Math.hypot(targetPx.x - center.x, targetPx.y - center.y) < CELL / 2) {
           this.path.shift();
         }
-        moveDir = dirTowards(targetPx.x - center.x, targetPx.y - center.y);
+        moveDir = this.followDir(targetPx.x - center.x, targetPx.y - center.y);
       }
     }
+    this.lastMoveDir = moveDir;
 
     // Facing the shot wins over following the path: a bot that has to turn
     // to take a shot would otherwise never line up, and against a wall or a
@@ -605,17 +668,48 @@ export class BotController {
     };
   }
 
+  /** Which way to drive toward a waypoint `dx, dy` away. Keeps last tick's
+   *  direction while that axis still has distance to cover: re-picking the
+   *  larger axis every tick zig-zagged any tank that was off both axes
+   *  (Right, Down, Right, Down…) — the visible jitter. */
+  private followDir(dx: number, dy: number): Dir {
+    const last = this.lastMoveDir;
+    if (last !== null && AXIS_FOR_DIR[last]) {
+      const v = DIR_VECTOR[last];
+      const along = v.x !== 0 ? dx * v.x : dy * v.y;
+      if (along > BOT_PATH_AXIS_DONE_PX) return last;
+    }
+    return dirTowards(dx, dy);
+  }
+
   private resolveGoalCell(sim: Sim, tank: TankState, profile: BotProfile): CellPoint | null {
     switch (this.action) {
       case "AttackFlag": {
+        // Out along our own flank first, then in on the flag — otherwise
+        // every attacker takes the same shortest route and the whole team
+        // arrives down one side. Already past the staging line (having
+        // chased someone up the map, say) counts as staged.
+        const c = tankCenter(tank);
+        if (!this.staged && progressAlong(sim, tank.team, c.x, c.y) >= BOT_ATTACK_STAGE_ALONG - 0.05) this.staged = true;
+        if (!this.staged) {
+          const stage = lanePoint(sim, tank.team, this.assignment.lane, BOT_ATTACK_STAGE_ALONG);
+          if (Math.hypot((stage.cx + 0.5) * CELL - c.x, (stage.cy + 0.5) * CELL - c.y) < 2.5 * CELL) this.staged = true;
+          else return stage;
+        }
         const enemyFlag = sim.map.flags[tank.team === "blue" ? "red" : "blue"];
         return { cx: enemyFlag.cx, cy: enemyFlag.cy };
       }
+      case "Hold": {
+        const c = tankCenter(tank);
+        const at = lanePoint(sim, tank.team, this.assignment.lane, BOT_HOLD_ALONG[this.holdLeg]);
+        if (Math.hypot((at.cx + 0.5) * CELL - c.x, (at.cy + 0.5) * CELL - c.y) < 1.5 * CELL) this.holdLeg = 1 - this.holdLeg;
+        return at;
+      }
       case "DefendFlag": {
-        const ownFlag = sim.map.flags[tank.team];
         const known = this.nearestKnownEnemy(tank);
         if (known) return { cx: Math.floor(known.x / CELL), cy: Math.floor(known.y / CELL) };
-        return { cx: ownFlag.cx, cy: Math.max(0, ownFlag.cy + (tank.team === "blue" ? -3 : 3)) };
+        // Defenders side by side in front of the flag, not stacked on one cell.
+        return guardPoint(sim, tank.team, this.assignment.lane, BOT_GUARD_AHEAD_CELLS, BOT_GUARD_SPREAD_CELLS);
       }
       case "Hunt": {
         const known = this.nearestKnownEnemy(tank);
@@ -684,7 +778,8 @@ export class BotController {
         targetY += seen.vy * travelTime * profile.leadFactor;
       }
 
-      const wantDir = this.laneDir(center.x, center.y, targetX, targetY, profile);
+      const hold = target.slot === this.aimingAt ? BOT_AIM_HOLD_MULT : 1;
+      const wantDir = this.laneDir(center.x, center.y, targetX, targetY, profile, hold);
       if (wantDir === null) continue;
 
       const block = shotObstruction(sim, center.x, center.y, target.x, target.y);
@@ -697,22 +792,28 @@ export class BotController {
         this.aimingAt = target.slot;
         this.aimingSince = sim.time;
       }
+      this.aimHoldDir = wantDir;
+      this.aimHoldUntil = sim.time + BOT_AIM_HOLD_TIME;
       if (tank.dir !== wantDir) return { fire: false, aimDir: wantDir };
       if (sim.time - this.aimingSince < profile.reactionDelay) return { fire: false, aimDir: wantDir };
       if (sim.time < this.nextShotAt) return { fire: false, aimDir: wantDir };
       return { fire: true, aimDir: wantDir };
     }
+    if (this.aimHoldDir !== null && sim.time < this.aimHoldUntil && this.aimingAt !== null && this.memory.has(this.aimingAt)) {
+      return { fire: false, aimDir: this.aimHoldDir };
+    }
+    this.aimHoldDir = null;
     return null;
   }
 
-  private planFlagShot(sim: Sim, tank: TankState, profile: BotProfile): { fire: boolean; aimDir: Dir | null } | null {
+  private planFlagShot(sim: Sim, tank: TankState, _profile: BotProfile): { fire: boolean; aimDir: Dir | null } | null {
     const enemy: TeamId = tank.team === "blue" ? "red" : "blue";
     if (!sim.rules.flagAlive[enemy]) return null;
     const flag = sim.map.flags[enemy];
     const f = cellCenter(flag.cx, flag.cy);
-    // Anything but steel is worth punching through to reach a flag; an Easy
-    // bot that never shoots brick has to find an already-open angle.
-    return this.planStaticShot(sim, tank, f.x, f.y, profile.shootsBrickToPath !== "never");
+    // Anything but steel is worth punching through to reach a flag, from
+    // close up (planStaticShot) — every profile, a beginner included.
+    return this.planStaticShot(sim, tank, f.x, f.y, true);
   }
 
   /** Shooting something that doesn't move — a flag, or a brick wall in the
@@ -765,11 +866,10 @@ export class BotController {
 
   /** The route A* handed us runs through a brick cell — shoot it open
    *  instead of grinding against it (SPEC §10.3 "Shoots brick to path"). An
-   *  Easy bot paths around brick entirely (brickPathCost), so it never gets
-   *  here. */
-  private planBrickShot(sim: Sim, tank: TankState, profile: BotProfile): { fire: boolean; aimDir: Dir | null } {
+   *  Easy bot's route only does that when there is no sensible way round
+   *  (brickPathCost). */
+  private planBrickShot(sim: Sim, tank: TankState, _profile: BotProfile): { fire: boolean; aimDir: Dir | null } {
     const none = { fire: false, aimDir: null };
-    if (profile.shootsBrickToPath === "never") return none;
     if (!this.path || this.path.length === 0) return none;
 
     const center = tankCenter(tank);
@@ -790,7 +890,7 @@ export class BotController {
    *  if the target is too far off that lane for this profile's tolerance.
    *  The aim error is applied here, so a sloppy profile both misses lanes it
    *  could have taken and takes ones it shouldn't. */
-  private laneDir(cx: number, cy: number, tx: number, ty: number, profile: BotProfile): Dir | null {
+  private laneDir(cx: number, cy: number, tx: number, ty: number, profile: BotProfile, hold = 1): Dir | null {
     const dx = tx - cx;
     const dy = ty - cy;
     const dist = Math.hypot(dx, dy) || 1;
@@ -801,7 +901,7 @@ export class BotController {
     // it must never narrow it below a shot that would actually connect, or
     // the *tightest* profile ends up passing up its free kills (which is
     // precisely why Hard used to lose to Easy).
-    const toleranceDist = Math.max(
+    const toleranceDist = hold * Math.max(
       TANK_HITBOX / 2,
       dist * Math.tan((profile.fireToleranceDeg * Math.PI) / 180),
     );

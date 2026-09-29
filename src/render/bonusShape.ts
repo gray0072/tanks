@@ -37,7 +37,7 @@ export const BONUS_INFO: Record<BonusKind, { title: string; text: string }> = {
   HELMET: { title: "Helmet", text: "A shield that soaks one hit and keeps you safe for a while." },
   STAR: { title: "Star", text: "Upgrades your tank: faster shells, more of them in the air, and at full rank you punch through steel." },
   SPEED: { title: "Speed", text: "Your tank drives noticeably faster for a short time." },
-  SHOVEL: { title: "Shovel", text: "Team bonus — the brick around your own flag turns to steel until it wears off." },
+  SHOVEL: { title: "Shovel", text: "Team bonus — the wall around your own flag is rebuilt in steel, gaps included, and comes back as fresh brick when it wears off." },
   CLOCK: { title: "Clock", text: "Team bonus — every enemy tank is frozen in place for a few seconds." },
   GRENADE: { title: "Grenade", text: "Team bonus — destroys every enemy tank on the field at once." },
   RESPAWN: { title: "Respawn", text: "Team bonus — refills your team's pool of remaining respawns." },

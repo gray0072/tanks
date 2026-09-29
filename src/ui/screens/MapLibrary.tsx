@@ -14,6 +14,7 @@ import {
   deleteCustomMap,
   createCustomMap,
   MapStorageError,
+  onCustomMapsChanged,
   uniqueMapName,
 } from "../../world/maps/customMaps";
 import { hasErrors, validateMapTemplate } from "../../world/maps/validateMap";
@@ -34,6 +35,9 @@ export function MapLibrary({ go, route }: { go: Navigate; route: LibraryRoute })
    *  fresh read after a copy, an import or a delete. */
   const [revision, setRevision] = useState(0);
   const refresh = () => setRevision((n) => n + 1);
+  // Cloud sync can rewrite the library while this screen is open (a map made on another
+  // device arriving) — re-read it then too.
+  useEffect(() => onCustomMapsChanged(refresh), []);
   const { show, node: modal } = useModal();
 
   const builtins = listMaps();

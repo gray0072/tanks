@@ -638,3 +638,12 @@ button.chip.disabled { opacity: 0.4; cursor: default; }
   .editor-tip { display: none; }
   .editor-extras { overflow: visible; }
 }
+
+/* Settings: optional cloud sign-in (SPEC §6.4). */
+.cloud-section { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.cloud-title { font-weight: 600; }
+.cloud-user { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cloud-email { word-break: break-all; }
+.cloud-status { font-size: 0.8rem; color: var(--muted); }
+.cloud-status-synced { color: var(--green, #5fbf6a); }
+.cloud-status-error { color: var(--red); }

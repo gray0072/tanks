@@ -6,6 +6,7 @@ import {
   DEFAULT_BOT_DIFFICULTY,
   DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
+  DEFAULT_BONUS_RATE,
   DEFAULT_WINS_TARGET,
 } from "./constants";
 import type { BotDifficulty } from "./config";
@@ -66,6 +67,7 @@ export type RoomSetup = {
   respawnMult: number; // respawns per team member
   botDifficulty: BotDifficulty;
   friendlyFire: boolean;
+  bonusesPerMinute: number;
 };
 
 export const DEFAULT_ROOM_SETUP: RoomSetup = {
@@ -74,6 +76,7 @@ export const DEFAULT_ROOM_SETUP: RoomSetup = {
   respawnMult: DEFAULT_RESPAWN_MULT,
   botDifficulty: DEFAULT_BOT_DIFFICULTY,
   friendlyFire: false,
+  bonusesPerMinute: DEFAULT_BONUS_RATE,
 };
 
 export function loadLastMapId(): string | null {

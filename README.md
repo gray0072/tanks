@@ -79,8 +79,9 @@ whole team.
 1. **Create a room** — pick your nickname, the map and the difficulty its bots start at. You get a
    code and an invite link. Leave the code field empty for a random one, or type your own (3–12
    letters or digits): it's remembered, so the link you send your friends keeps working.
-2. **Set up the match** — rounds to win, round time limit, respawns and friendly fire are all in
-   the room itself, so you can retune them while people arrive; everyone sees the change.
+2. **Set up the match** — rounds to win, round time limit, respawns, bonuses per minute and
+   friendly fire are all in the room itself, so you can retune them while people arrive; everyone
+   sees the change.
 3. **Take a slot** — click any slot on either team; the preview marks the spawn you would get.
    Friends join with the code; bots hold everything nobody claimed.
 4. **Fight** — the host's browser simulates everything and streams snapshots to the guests at 20 Hz.
@@ -144,7 +145,8 @@ spawns and bonus points, resize the grid around any anchor, undo a gesture at a 
 **Test play** to drop straight into a match on it. A map is validated before it can be played, so an
 unplayable one never reaches a match. Built-in maps are read-only but can be copied. Custom maps live
 in `localStorage`, export and import as text, and travel to your guests over the wire when you host
-on one.
+on one. Sign in with Google in **Settings** (optional) and your maps follow you to your other
+devices.
 
 ## Playing together
 
@@ -177,6 +179,14 @@ why `npm run dev` opens at <http://localhost:5173/tanks/> rather than the bare r
 `main` deploys automatically via [.github/workflows/deploy.yml](.github/workflows/deploy.yml);
 `npm run deploy` publishes from your machine instead. The build is a plain static site — `./dist/`
 can be hosted anywhere that serves it from `/tanks/`.
+
+**Optional cloud maps.** Google sign-in and map sync need a Supabase project; without one the game
+simply has no cloud section. To enable it: run [supabase/schema.sql](supabase/schema.sql) in the
+project's SQL editor, enable the Google provider under Authentication, add
+`http://localhost:5173/tanks/` and your Pages URL to the allowed redirect URLs, then put
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local` (see `.env.example`) and, for the
+automatic deploy, in the repo's Actions secrets. The anon key is public by design — row-level
+security is what protects the data; never use the `service_role` key.
 
 ## Tech
 

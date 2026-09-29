@@ -13,6 +13,7 @@
     "test": "node scripts/runTests.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
     "peerjs": "^1.5.5",
     "pixi.js": "^8.20.1",
     "react": "^19.3.0",

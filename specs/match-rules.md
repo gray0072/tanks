@@ -24,7 +24,7 @@ A match on a map is a **series of rounds**. A round is one fight on pristine ter
 to win **`winsTarget`** rounds takes the match.
 
 `winsTarget` is **1 – 10, default 5**, and it is a **room setting** — part of `MatchSettings`
-alongside the round length, the respawn pool and friendly fire. The host sets it in the room screen
+alongside the round length, the respawn pool, friendly fire and the bonus rate (§4.3). The host sets it in the room screen
 (§6.1) and may change it right up to `Start match`; every guest sees the change arrive as room
 state. It is not a creation-time choice and not a property of the map: the roster changes after a
 room exists, people come and go, and a host should be able to retune a match without tearing the
@@ -101,7 +101,8 @@ round, not to the map. Without the copy the next round would begin on the last o
 ## 2.3 Lives, death, respawn
 
 - Every death costs the team **one respawn**. Respawns are a shared team pool, not per-player.
-- Respawn after **3 s** at a free spawn point in the team's spawn zone, with **3 s** of spawn
+- Respawn after **3 s** at the tank's **own spawn point** — the one its slot started the round on —
+  or, if something is parked on it, a random free one of the team's; with **3 s** of spawn
   invulnerability (blinking shield). Invulnerability breaks early if the tank fires.
 - When a team's respawns reach 0, its dead players become spectators; the round continues until the
   team's last living tank dies.

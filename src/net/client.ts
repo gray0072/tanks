@@ -19,7 +19,7 @@ export class RoomClient implements RoomController {
   roomCode: string;
   slots: Slot[] = [];
   mapId = "";
-  settings: MatchSettings = { mapId: "", winsTarget: 0, timeLimit: 0, respawnMult: 0, friendlyFire: false };
+  settings: MatchSettings = { mapId: "", winsTarget: 0, timeLimit: 0, respawnMult: 0, friendlyFire: false, bonusesPerMinute: 0 };
 
   private net: ClientTransport;
   /** Set once this client is out of the room for good, so a late `close`

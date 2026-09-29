@@ -12,8 +12,8 @@ import { MAP_SOURCES } from "../src/world/maps/mapSources";
 import { Sim, type SeatInput } from "../src/world/sim";
 import { createDefaultSlots } from "../src/world/tank";
 import { BotController } from "../src/ai/bot";
-import { computeTeamRoles, type Role } from "../src/ai/teamPlan";
-import { CELL, TICK_DT } from "../src/game/constants";
+import { computeTeamRoles, type Assignment } from "../src/ai/teamPlan";
+import { CELL, DEFAULT_BONUS_RATE, TICK_DT } from "../src/game/constants";
 import { TEAMS, type TeamId } from "../src/game/config";
 import { dist } from "../src/util/math";
 
@@ -29,7 +29,7 @@ for (const { id, name, template } of MAP_SOURCES) {
       s.kind = "bot";
       s.owner = null;
     }
-    const sim = new Sim(map, { mapId: id, winsTarget: 1, timeLimit: 600, respawnMult: 999, friendlyFire: false }, slots, 12345);
+    const sim = new Sim(map, { mapId: id, winsTarget: 1, timeLimit: 600, respawnMult: 999, friendlyFire: false, bonusesPerMinute: DEFAULT_BONUS_RATE }, slots, 12345);
     const bots = new Map(slots.map((s) => [s.id, new BotController(s.id)]));
 
     // Distance covered per slot, summed across lives (a respawn teleport is
@@ -38,7 +38,7 @@ for (const { id, name, template } of MAP_SOURCES) {
     let last = new Map(sim.tanks.map((t) => [t.slot, { x: t.x, y: t.y, alive: t.alive }]));
 
     for (let i = 0; i < SECONDS / TICK_DT; i++) {
-      const roles: Record<TeamId, Map<number, Role>> = {
+      const roles: Record<TeamId, Map<number, Assignment>> = {
         blue: computeTeamRoles(sim, "blue"),
         red: computeTeamRoles(sim, "red"),
       };

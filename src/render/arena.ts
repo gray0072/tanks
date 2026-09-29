@@ -3,7 +3,7 @@
 // snapshots and terrain events and calls tick() once per animation frame.
 
 import { Container, Sprite, Graphics, Text, TextStyle } from "pixi.js";
-import type { Atlas } from "./atlas";
+import { FLAG_POLE_W, FLAG_POLE_X, type Atlas } from "./atlas";
 import type { MapDef } from "../world/maps/loader";
 import { Tile } from "../world/grid";
 import type { Snapshot, MatchEvent } from "../world/sim";
@@ -92,7 +92,8 @@ export class Arena {
   private mineSprites = new Map<number, Sprite>();
   private bulletSprites = new Map<number, Sprite>();
   private tankVisuals = new Map<number, TankVisual>();
-  private flagSprites: Record<TeamId, Sprite>;
+  private flagSprites: Record<TeamId, Container>;
+  private flagCloths: Record<TeamId, Graphics> = { blue: new Graphics(), red: new Graphics() };
   private flagDestroyed: Record<TeamId, boolean> = { blue: false, red: false };
 
   /** In-flight explosion sprites, keyed by the ticker callback driving them
@@ -227,12 +228,42 @@ export class Arena {
     }
   }
 
-  private makeFlagSprite(team: TeamId): Sprite {
+  private makeFlagSprite(team: TeamId): Container {
     const tl = this.map.flags[team];
-    const sprite = new Sprite(this.atlas.flag[team]);
-    sprite.position.set(tl.cx * CELL, tl.cy * CELL);
-    this.flagLayer.addChild(sprite);
-    return sprite;
+    const root = new Container();
+    root.addChild(new Sprite(this.atlas.flagPole));
+    root.addChild(this.flagCloths[team]);
+    root.position.set(tl.cx * CELL, tl.cy * CELL);
+    this.flagLayer.addChild(root);
+    return root;
+  }
+
+  /** The cloth waves gently: a travelling sine along the cloth, pinned at
+   *  the pole, growing toward the free end. Slow on purpose — a flag
+   *  snapping back and forth several times a second reads as jitter, not
+   *  wind. Blue and red are out of phase so the two don't move in lockstep. */
+  private drawFlagCloth(team: TeamId, now: number) {
+    const g = this.flagCloths[team];
+    const x0 = FLAG_POLE_X + FLAG_POLE_W;
+    const len = TANK_SIZE * 0.85 - x0;
+    const top = 3;
+    const height = TANK_SIZE * 0.52;
+    const phase = (now / 1000) * ((2 * Math.PI) / FLAG_WAVE_PERIOD) + (team === "red" ? Math.PI : 0);
+    const steps = 8;
+    const wave = (u: number) => Math.sin(phase - u * Math.PI * 1.4) * FLAG_WAVE_AMPLITUDE * u;
+    const pts: number[] = [];
+    // Top edge out to the tip, then the bottom edge back: a pennant that
+    // narrows toward its free end.
+    for (let i = 0; i <= steps; i++) {
+      const u = i / steps;
+      pts.push(x0 + u * len, top + (height / 2) * u + wave(u));
+    }
+    for (let i = steps; i >= 0; i--) {
+      const u = i / steps;
+      pts.push(x0 + u * len, top + height - (height / 2) * u + wave(u));
+    }
+    g.clear();
+    g.poly(pts).fill(TEAM_COLOR[team]);
   }
 
   private destroyFlag(team: TeamId) {
@@ -406,6 +437,9 @@ export class Arena {
   }
 
   tick(myTeams: Set<TeamId>) {
+    const now = performance.now();
+    this.drawFlagCloth("blue", now);
+    this.drawFlagCloth("red", now);
     if (!this.curr) return;
     const prev = this.prev ?? this.curr;
     const t = Math.max(0, Math.min(1, (performance.now() - this.currAt) / this.snapInterval));
@@ -414,7 +448,11 @@ export class Arena {
     for (const tk of this.curr.tanks) {
       const v = this.tankVisuals.get(tk.slot);
       if (!v) continue;
-      const p = prevTankBySlot.get(tk.slot) ?? tk;
+      // A tank that was dead last snapshot has just respawned: its previous
+      // position is where it died, and lerping from there drew it for a
+      // moment somewhere on the map before it slid onto its spawn.
+      const prevTk = prevTankBySlot.get(tk.slot);
+      const p = prevTk && prevTk.alive ? prevTk : tk;
       v.root.visible = tk.alive;
       if (!tk.alive) {
         if (v.marker) v.marker.visible = false;
@@ -514,6 +552,10 @@ export class Arena {
     this.world.destroy({ children: true });
   }
 }
+
+/** One full wave of the flag cloth, and how far its free end swings. */
+const FLAG_WAVE_PERIOD = 2.6; // s
+const FLAG_WAVE_AMPLITUDE = 1.8; // px
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;

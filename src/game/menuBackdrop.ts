@@ -14,11 +14,11 @@ import { createDefaultSlots, botNickname, type Slot } from "../world/tank";
 import { listMaps } from "../world/maps/loader";
 import type { MapDef } from "../world/maps/loader";
 import { BotController } from "../ai/bot";
-import { computeTeamRoles, type Role } from "../ai/teamPlan";
+import { computeTeamRoles, type Assignment } from "../ai/teamPlan";
 import { createPixiApp, type PixiHost } from "../render/app";
 import { createAtlas, type Atlas } from "../render/atlas";
 import { Arena } from "../render/arena";
-import { CELL, TANK_SIZE, TICK_DT } from "./constants";
+import { CELL, DEFAULT_BONUS_RATE, TANK_SIZE, TICK_DT } from "./constants";
 import type { TeamId } from "./config";
 import { loadUserSettings } from "./settings";
 
@@ -177,6 +177,7 @@ export class MenuBackdrop {
       timeLimit: ROUND_SECONDS,
       respawnMult: ROUND_RESPAWN_MULT,
       friendlyFire: false,
+      bonusesPerMinute: DEFAULT_BONUS_RATE,
     };
     this.sim = new Sim(map, settings, this.slots, Math.floor(Math.random() * 0x7fffffff));
     // Start centred; the camera drifts to the first firefight from there
@@ -314,7 +315,7 @@ export class MenuBackdrop {
   private tick() {
     const sim = this.sim;
     if (!sim) return;
-    const roles: Record<TeamId, Map<number, Role>> = {
+    const roles: Record<TeamId, Map<number, Assignment>> = {
       blue: computeTeamRoles(sim, "blue"),
       red: computeTeamRoles(sim, "red"),
     };

@@ -290,7 +290,7 @@ function clamp(v: number, lo: number, hi: number): number {
 
 /**
  * Model + undo stack. Every committed gesture — one click, one freehand drag,
- * one rectangle, one resize — is a single step (§6.4/§6.6), which is why
+ * one rectangle, one resize — is a single step (§6.4/§6.4), which is why
  * mutation goes through `commit()`: it snapshots the template before, and
  * throws the snapshot away again if the gesture turned out to change nothing.
  *

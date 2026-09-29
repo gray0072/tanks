@@ -229,6 +229,56 @@ menu backdrop, editor camera) stayed next to their code. The spawn cap is now
 the validator, and `TEAM_SIZE` is gone: there is no default roster, `createDefaultSlots` requires
 both team sizes and every caller takes them from the map's spawns.
 
+**2026-09-29 (bonus rate):** the bonus drop rate is a room setting, `bonusesPerMinute` (1–10,
+default 6; was a fixed 20–30 s gap, ~2.4/min), and every round opens with one bonus already on the
+field (SPEC §4.3). `tests/bonusRate.test.ts` covers both. Worth knowing: the difficulty-ladder test
+in `tests/bots.test.ts` failed on this change, and not because of it — over 8 seeds a map Hard
+beats Medium by only ~2–4 % at *any* rate, and the old 2 seeds happened to favour Hard. It now
+plays 8 seeds. Hard's thin edge over Medium is a real bot-tuning gap, still open.
+
+**2026-09-29 (bots and respawns):** three fixes (SPEC §10, §2.3, §8).
+- **Bot tuning.** Reaction times are human-scale (Easy 0.6 s, Medium 0.35 s, Hard 0.2 s — Hard was
+  90 ms) and now also gate dodging: a bullet younger than that hasn't been "noticed". Easy is
+  sloppier and slower on the trigger, but its brick cost is `BOT_LAST_RESORT_BRICK_COST` (25), not
+  Infinity, so it goes round brick when it can and shoots through when there's no way round.
+  Ladder over 8 seeds: Hard vs Medium went from +2 % to +20 %, Medium vs Easy stayed ~1.6 : 1.
+- **Jitter.** Measured with a throwaway harness that tags which branch chose each bot's direction
+  and counts A→B→A reversals within 4 ticks: ~1.0 per bot per second, now ~0.1. Three sources, each
+  now committed to for a beat: path following re-picking the larger axis every tick (a
+  Right/Down staircase), aim error re-rolled every tick (a marginal target flicking in and out of
+  the lane), and dodges alternating sides.
+- **Respawns** went to the team's *first free* spawn, so nearly everyone came back on spawn #1; now
+  each slot returns to its own (`Sim.homeSpawn`). The "flash somewhere else first" was the renderer
+  interpolating a respawned tank from its death position (`Arena.tick`).
+
+**2026-09-29 (team plan, shovel, flag):**
+- **Team plan** (`ai/teamPlan.ts`, SPEC §10.1) rewritten: per round each team draws a posture
+  (aggressive/balanced/defensive) that splits its bots into defend/midfield/attack for any team
+  size (`roleCounts`), and deals attackers and midfielders onto up to three lanes. Attackers stage
+  at mid-map on their lane before turning on the flag; midfielders patrol (`Hold`); defenders
+  spread in front of the flag. The plan is cached per `Sim` in a WeakMap (a round is a Sim), drawn
+  from `sim.rng`; `computeTeamRoles` now returns `Map<slot, Assignment>` (`{ role, lane }`).
+  `tests/teamPlan.test.ts`.
+- **SHOVEL** rebuilds the flag pocket *as the map built it* (shot-out cells too), reverts it to
+  fresh brick, skips a cell a tank stands in, and is never dropped unless both flags have a pocket
+  (`Sim.bonusKinds`). `tests/shovel.test.ts`.
+- **The flag waves** — it never did before; the request was that it shouldn't wave *fast*, so it's
+  one gentle wave per 2.6 s. The atlas now holds only the pole (`flagPole`).
+
+**2026-09-29 (cloud maps):** optional Google sign-in in Settings syncs the custom-map library
+through Supabase (SPEC §6.4), modelled on `D:\Projects\my\swedish` (same env var names, PKCE,
+"a failed fetch must throw, never read as empty"). Differences on purpose: one row per map rather
+than one save blob, and local tombstones (`tanks.customMapsDeleted`) so deletes propagate.
+`src/cloud/` holds it; `mapSync.ts` is DOM-free behind a `MapsRemote` interface and tested with a
+two-device fake (`tests/mapSync.test.ts`). The Supabase side is `supabase/schema.sql`; keys come from
+`.env.local` locally and Actions secrets in `deploy.yml`. **Not yet verified against the real
+project** — only against a fake cloud and a dummy URL (sign-in reaches `/auth/v1/authorize` with
+PKCE and the right redirect).
+
+Two test-harness bugs surfaced on the way: `botFixture` counted shots by new bullet ids, which
+misses every point-blank shot (the bullet hits within the tick it's born) — it now counts cooldown
+resets; and the lead test's score was, with a helmeted target, only measuring flag damage.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -311,6 +361,12 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 - `tests/customMaps.test.ts` — the custom-map library's localStorage layer against a stubbed
   `localStorage`: copy naming, delete, corrupt-entry tolerance, and that a *save* fails loudly on a
   full quota (a silent one loses the player's map).
+- `tests/mapSync.test.ts` — cloud map sync over a fake two-device cloud: a map crosses devices, a delete propagates instead of being resurrected, the later edit wins, a failed pull writes and pushes nothing.
+- `tests/teamPlan.test.ts` — the team plan: role counts add up for every size and posture, the plan holds for the round, a team spreads over at least two lanes, rounds differ, and a threat pulls midfielders home.
+- `tests/shovel.test.ts` — SHOVEL rebuilds the pocket (gaps too), reverts to brick, never walls a tank in, and is not dropped where a flag has no pocket.
+- `tests/respawn.test.ts` — a tank respawns on its own slot's spawn, or another free one of its team's if that is blocked (the bug: everyone came back on spawn #1).
+- `tests/bonusRate.test.ts` — the bonus drop rate (SPEC §4.3): one bonus on the field at round
+  start, and drops per minute following the room's `bonusesPerMinute` across the range.
 - `tests/bots.test.ts` — bot tactics per difficulty (SPEC §10): objective play, shooting through
   brick, bonus behaviour, fair perception, rate of fire, and an integration test that plays
   full bot-vs-bot matches and asserts **Hard > Medium > Easy**. That last one is the important

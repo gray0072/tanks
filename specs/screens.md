@@ -49,10 +49,10 @@ the editor's working document) travel inside the route.
 │   ▸ 4  Hard   Hard4         bot   ✔    │  │   highlighted, flags marked         │  │
 │   ▸ 5  Medium Medium5       bot   ✔    │  │                                     │  │
 │                                         │  │   Map: Classic · 33×25 · 5v5        │  │
-│   RED   (1 human)                       │  │                                     │  │
-│   ▸ 1  Easy   Easy1         bot   ✔    │  │   Rounds to win  [ 5 ▾ ]            │  │
-│   ▸ 2  Easy   Easy3         bot   ✔    │  │   Round time     [ 5 min ▾ ]        │  │
-│   ▸ 3         Oleg          61ms  ✔    │  │   Respawns       [ ×10 (50) ▾ ]     │  │
+│   RED   (1 human)                       │  │   Rounds to win  [ 5 ▾ ]            │  │
+│   ▸ 1  Easy   Easy1         bot   ✔    │  │   Round time     [ 5 min ▾ ]        │  │
+│   ▸ 2  Easy   Easy3         bot   ✔    │  │   Respawns       [ ×10 (50) ▾ ]     │  │
+│   ▸ 3         Oleg          61ms  ✔    │  │   Bonuses/min    [ 6 ▾ ]            │  │
 │   ▸ 4  Easy   Easy6         bot   ✔    │  │   [x] Friendly fire                 │  │
 │   ▸ 5  Easy   Easy7         bot   ✔    │  └─────────────────────────────────────┘  │
 │                                                                                    │
@@ -79,7 +79,7 @@ the editor's working document) travel inside the route.
   bot's name — the host's per-bot difficulty control (§10.4), tap to cycle; `All bots:` sets every
   bot slot at once, or one team's at a time.
 - **The match rules live here**, as host-only dropdowns, live for everyone (§2.2): **rounds to
-  win**, **round time limit**, **respawns per player** and **friendly fire**. This is the room's own
+  win**, **round time limit**, **respawns per player**, **bonuses per minute** and **friendly fire**. This is the room's own
   state (`MatchSettings`), not a creation-time choice: the roster changes after a room exists (a new
   map resizes the teams), people arrive and leave, and the host should be able to retune a match
   without tearing the room down. Create Room is left with what must be decided *before* a room can
@@ -153,3 +153,31 @@ menu in front of it.
   Settings. Windows' "Animation effects" toggle alone puts a desktop browser in reduced-motion, so
   keying the backdrop off that media query meant most Windows players never saw the feature at all
   and a Settings switch that appeared to do nothing.
+
+## 6.4 Settings: optional Google sign-in and cloud maps
+
+Settings has an optional **Cloud maps** section: sign in with Google and the maps you make in the
+level editor stay in sync across your devices. Nothing else is synced, and nothing requires it —
+the game is complete signed out, and a build without Supabase configured (a fork, a local checkout
+with no `.env.local`) doesn't show the section at all (`cloud/supabaseClient.ts` is `null`).
+
+- **Auth:** Supabase Auth with Google, PKCE flow, redirecting back to the page itself (so
+  `/tanks/` on Pages, `http://localhost:5173/tanks/` in dev — both must be in Supabase's allowed
+  redirect URLs). The returning `?code=` is exchanged by supabase-js and then stripped from the URL.
+  Unsaved Settings edits are saved before leaving for Google.
+- **Storage:** one row per map in `public.custom_maps` (`supabase/schema.sql`), keyed by
+  `(user_id, map id)`, row-level security limiting every row to its owner. A deleted map stays as a
+  **tombstone** row, and locally as `tanks.customMapsDeleted` — without it, the next sync would pull
+  a map deleted on this device straight back down from the cloud.
+- **Merge** (`cloud/mapSync.ts`, pure, `tests/mapSync.test.ts`): per map id, the newest of the local
+  copy, the local tombstone and the cloud row wins; a tie goes to the delete. Different maps edited
+  on two devices never conflict. A failed *pull* throws before anything is written or pushed — it
+  must never read as "the cloud is empty" and be answered by pushing over real data. A map larger
+  than the table allows (`CLOUD_MAX_TEMPLATE`) stays local-only rather than failing every push.
+- **When it runs** (`cloud/cloudSync.ts`): on sign-in (including an existing session on load),
+  3 s after any library edit made on this device, when the tab returns to the foreground (at most
+  every 15 s), and on `pagehide` if a push is still pending. Syncs never overlap; a request during
+  one runs once more after it. A sync's own rewrite of the library is reported as a `"sync"` change,
+  so it re-renders the map library without being pushed back up.
+- **Status** next to the email: *Syncing…*, *Synced*, or *Sync failed — will retry*.
+

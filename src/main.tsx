@@ -7,6 +7,7 @@ import { deepLinkRoute, type Route } from "./ui/routes";
 import { RoomHost } from "./net/host";
 import { DEBUG } from "./game/config";
 import { DEBUG_MAP_ID } from "./world/maps/debugMap";
+import { startCloudSync } from "./cloud/cloudSync";
 
 const root = document.getElementById("ui");
 if (!root) throw new Error("#ui not found");
@@ -20,6 +21,9 @@ backdropLayer.className = "menu-backdrop";
 backdropLayer.setAttribute("aria-hidden", "true");
 document.body.insertBefore(backdropLayer, root);
 menuBackdrop.attach(backdropLayer);
+
+// Optional Google sign-in + map sync (SPEC §6.4); a no-op without Supabase configured.
+startCloudSync();
 
 function initialRoute(): Route {
   if (DEBUG) {

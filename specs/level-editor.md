@@ -59,12 +59,13 @@ export type CustomMap = {
 
 ### 2.2 localStorage layout
 
-Two keys, read and written by `customMaps.ts` directly rather than through `util/storage.ts` — that
+Three keys, read and written by `customMaps.ts` directly rather than through `util/storage.ts` — that
 wrapper swallows every failure, which is right for a volume slider and wrong for a map (§2.4):
 
 | Key | Contents |
 |---|---|
 | `tanks.customMaps` | `{ v: 1, maps: CustomMap[] }` — the library, newest-updated first |
+| `tanks.customMapsDeleted` | `{ v: 1, deleted: { id, deletedAt }[] }` — tombstones for cloud sync (SPEC §6.4), so a delete propagates instead of the map coming back |
 | `tanks.editorDraft` | `{ v: 1, mapId: string \| null, name, template, savedAt }` — crash/refresh recovery for unsaved work (§6.8) |
 
 `v` is a schema version. On load, an unknown/missing `v`, a non-array `maps`, or an entry failing a

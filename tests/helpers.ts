@@ -8,9 +8,9 @@ import { Sim, type SeatInput } from "../src/world/sim";
 import type { MatchSettings } from "../src/world/rules";
 import { createDefaultSlots, type TankState } from "../src/world/tank";
 import { BotController } from "../src/ai/bot";
-import { computeTeamRoles, type Role } from "../src/ai/teamPlan";
+import { computeTeamRoles, type Assignment } from "../src/ai/teamPlan";
 import { Dir } from "../src/util/math";
-import { CELL, TICK_DT } from "../src/game/constants";
+import { CELL, DEFAULT_BONUS_RATE, FIRE_COOLDOWN, TICK_DT } from "../src/game/constants";
 import type { BotDifficulty, TeamId } from "../src/game/config";
 
 export const DT = TICK_DT;
@@ -34,6 +34,7 @@ export function makeSimFromMap(map: MapDef, seed = 1): Sim {
     timeLimit: 600,
     respawnMult: 5,
     friendlyFire: false,
+    bonusesPerMinute: DEFAULT_BONUS_RATE,
   };
   const sim = new Sim(map, settings, createDefaultSlots("host", blueSize, redSize), seed);
   // Spawn invulnerability is irrelevant to movement and only adds noise to
@@ -92,7 +93,7 @@ export function dirName(dir: Dir): string {
 export function botFixture(
   template: string,
   difficulty: BotDifficulty,
-  opts: { seed?: number; keep?: number[]; roles?: Map<number, Role> } = {},
+  opts: { seed?: number; keep?: number[]; roles?: Map<number, Assignment> } = {},
 ) {
   const sim = makeSim(template, opts.seed ?? 1);
   const keep = new Set([0, ...(opts.keep ?? [])]);
@@ -101,7 +102,7 @@ export function botFixture(
     if (!keep.has(t.slot)) { t.alive = false; t.respawnT = Infinity; }
   }
   const bots = new Map([...keep].map((slot) => [slot, new BotController(slot)]));
-  const roles = opts.roles ?? new Map<number, Role>();
+  const roles = opts.roles ?? new Map<number, Assignment>();
 
   /** Ticks the sim for `seconds`, driving every kept slot with its bot.
    *  `hold` pins extra inputs (e.g. a stationary target) on top. */
@@ -112,7 +113,6 @@ export function botFixture(
        *  the shot it set up, not whatever else the bot found to shoot at. */
       shotsByDir: {} as Partial<Record<Dir, number>>,
     };
-    const bulletIds = new Set<number>();
     for (let i = 0; i < Math.round(seconds / DT); i++) {
       const inputs: Record<number, SeatInput> = {};
       for (const [slot, bot] of bots) {
@@ -133,14 +133,17 @@ export function botFixture(
         if (e.type === "pickup" && e.slot === 0) seen.pickups++;
         if (e.type === "terrain") seen.bricksOpened++;
       }
-      for (const b of sim.bullets) {
-        if (b.ownerSlot !== 0 || bulletIds.has(b.id)) continue;
-        bulletIds.add(b.id);
-        seen.shotsByDir[b.dir] = (seen.shotsByDir[b.dir] ?? 0) + 1;
+      // A shot is the cooldown being reset this tick. Watching sim.bullets
+      // for new ids instead missed every point-blank shot — a bullet fired
+      // into an adjacent tank hits within the tick it is created, so it is
+      // never in the list afterwards.
+      const me = sim.tankBySlot(0);
+      if (me.alive && me.fireCooldown === FIRE_COOLDOWN) {
+        seen.shots++;
+        seen.shotsByDir[me.dir] = (seen.shotsByDir[me.dir] ?? 0) + 1;
         if (seen.firstShotAt < 0) seen.firstShotAt = sim.time;
       }
     }
-    seen.shots = bulletIds.size;
     return seen;
   }
 
@@ -158,13 +161,13 @@ export function matchFrags(map: MapDef, blue: BotDifficulty, red: BotDifficulty,
     s.owner = null;
     s.botDifficulty = s.team === "blue" ? blue : red;
   }
-  const settings: MatchSettings = { mapId: map.id, winsTarget: 1, timeLimit: 3600, respawnMult: 999, friendlyFire: false };
+  const settings: MatchSettings = { mapId: map.id, winsTarget: 1, timeLimit: 3600, respawnMult: 999, friendlyFire: false, bonusesPerMinute: DEFAULT_BONUS_RATE };
   const sim = new Sim(map, settings, slots, seed);
   const bots = new Map(slots.map((s) => [s.id, new BotController(s.id)]));
   const frags: Record<TeamId, number> = { blue: 0, red: 0 };
 
   for (let i = 0; i < Math.round(seconds / DT); i++) {
-    const roles: Record<TeamId, Map<number, Role>> = {
+    const roles: Record<TeamId, Map<number, Assignment>> = {
       blue: computeTeamRoles(sim, "blue"),
       red: computeTeamRoles(sim, "red"),
     };

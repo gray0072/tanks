@@ -10,6 +10,7 @@ export type MatchSettings = {
   timeLimit: number; // seconds, one round (§2.2)
   respawnMult: number; // starting respawns per team member (§2.2)
   friendlyFire: boolean;
+  bonusesPerMinute: number; // bonus drop rate, 1..10 (§4.3)
 };
 
 export type PlayerStats = {

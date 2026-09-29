@@ -10,6 +10,11 @@ import type { BonusKind } from "../world/bonus";
 import { tankShapeOps, shade as shadeColor } from "./tankShape";
 import { bonusIconOps, bonusSymbolOps, BONUS_PALETTE, type IconOp } from "./bonusShape";
 
+/** Flag pole geometry, shared with Arena's waving cloth so the cloth stays
+ *  attached to the pole it is drawn beside. */
+export const FLAG_POLE_X = TANK_SIZE * 0.15;
+export const FLAG_POLE_W = 3;
+
 export type Atlas = {
   terrain: Record<"steel" | "forest" | "water" | "ice" | "sand", Texture> & {
     /** Index i = the texture for (i + 1) quarters remaining, SPEC §3.3.
@@ -17,7 +22,8 @@ export type Atlas = {
     brick: Texture[];
   };
   tank: Record<TeamId, Texture>;
-  flag: Record<TeamId, Texture>;
+  /** Just the pole: the cloth waves, so Arena draws it per frame. */
+  flagPole: Texture;
   bullet: Texture;
   bonus: Record<BonusKind, Texture>;
   mine: Texture;
@@ -208,14 +214,10 @@ export function createAtlas(app: Application): Atlas {
     return tex;
   };
 
-  const flagTex = (color: number): Texture => {
-    const g = new Graphics();
-    g.rect(TANK_SIZE * 0.15, 2, 3, TANK_SIZE - 6).fill(0xdddddd);
-    g.poly([TANK_SIZE * 0.15 + 3, 3, TANK_SIZE * 0.85, TANK_SIZE * 0.3, TANK_SIZE * 0.15 + 3, TANK_SIZE * 0.55]).fill(color);
-    const tex = toTexture(app, g, TANK_SIZE);
-    g.destroy();
-    return tex;
-  };
+  const flagPoleG = new Graphics();
+  flagPoleG.rect(FLAG_POLE_X, 2, FLAG_POLE_W, TANK_SIZE - 6).fill(0xdddddd);
+  const flagPoleTex = toTexture(app, flagPoleG, TANK_SIZE);
+  flagPoleG.destroy();
 
   // Sized off BULLET_RADIUS — the same value the sim collides bullets
   // against a wall's face with (sim.ts) — so the drawn sprite can never
@@ -251,7 +253,7 @@ export function createAtlas(app: Application): Atlas {
   return {
     terrain,
     tank: { blue: tankTex(TEAM_COLOR.blue), red: tankTex(TEAM_COLOR.red) },
-    flag: { blue: flagTex(TEAM_COLOR.blue), red: flagTex(TEAM_COLOR.red) },
+    flagPole: flagPoleTex,
     bullet: bulletTex,
     bonus,
     mine: mineTex,
