@@ -239,10 +239,28 @@ other.
 ```
 
 The grid is one `<canvas>` (same renderer family as `render/preview.ts`, not PixiJS — this is UI, not
-the arena), scaled to `min(availW / w, availH / h)` with a floor of 8 px and a ceiling of 32 px per
-cell, scrolled inside its pane when the map is bigger than the pane. A 1 px grid line every cell, a
+the arena) that fills all the height the screen has left, with a 1 px grid line every cell, a
 brighter one every 5, and the map border drawn just outside the grid so out-of-bounds solidity
 (`SPEC.md` §3.5) reads visually.
+
+> **Shipped as (2026-09-29):** the grid sits behind a zoom/pan camera (`src/ui/editorCamera.ts`,
+> tested in `tests/editorCamera.test.ts`) instead of a fitted 8–32 px canvas that scrolled in its
+> pane — at 8–12 px a cell was too small to hit on a phone. The layout moved with it: the palette,
+> then the size/anchor controls and the problem list, share a 200 px left column; the pane takes the
+> rest of the viewport. The camera's rules:
+>
+> - It opens **fitted** (whole map visible, cells capped at 40 px) and can't zoom out past that;
+>   zooming in goes up to 64 px a cell. An overflowing map is clamped so it can't be dragged out of
+>   sight; a map smaller than the pane is centered.
+> - Zoom: mouse wheel (around the cursor), trackpad pinch (ctrl+wheel), two-finger pinch on touch,
+>   the pane's `−`/`+` buttons, the `+`/`-` keys. Pan: Space-drag, middle-drag, a press that lands
+>   off the map, a sideways trackpad swipe, two fingers, or the **Pan** toggle for one finger.
+> - **Whole / Back** (`F`) is the preview: one press shows the whole map, the next returns to exactly
+>   the zoom and position you left. While any of the map is off screen, a **minimap** in the pane's
+>   corner shows all of it with the visible part outlined; dragging on it moves the view.
+> - A problem clicked in the list is brought into view if it's off screen.
+> - Phone portrait: palette strip, then a 64 dvh pane, then size and problems a scroll below. Phone
+>   landscape: an icon-only palette column beside a full-height pane.
 
 ### 6.2 New-map default
 
@@ -330,11 +348,12 @@ match returns to the editor with the work and the undo stack intact.
   single pointer via per-pointer capture (the rule the match's touch layer learned in `SPEC.md`
   §5.3), and the grid pane scrolls when the map overflows it.
 
-> **Shipped as:** the `Rect` toggle sits in its own row above the grid rather than in the palette —
-> on a phone the palette is a scrolling strip, and the one control a touch device *cannot* reach
-> another way must not be the one that scrolls out of sight. Pinch-to-zoom isn't implemented: the
-> cell size is fitted to the pane (8–32px) and the pane scrolls, which covers the same need with no
-> gesture to get wrong.
+> **Shipped as:** the `Rect` and `Pan` toggles and the zoom buttons sit on the grid pane itself
+> rather than in the palette — on a phone the palette is a scrolling strip, and the controls a touch
+> device *cannot* reach another way must not be the ones that scroll out of sight. A second finger
+> landing mid-stroke turns the gesture into a pinch and takes the stroke back
+> (`EditorDoc.cancelStroke`), so reaching for a zoom never leaves a stray cell; the pinch lasts
+> until every finger is up. `F` toggles the whole-map view, `+`/`-` zoom, Space held pans.
 
 ---
 

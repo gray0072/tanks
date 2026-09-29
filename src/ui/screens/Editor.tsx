@@ -1,7 +1,8 @@
 // The level editor — specs/level-editor.md §6. Palette on the left, the grid
-// on a Canvas2D in the middle (UI, not the arena: no second WebGL context,
-// same reasoning as render/preview.ts), size/anchor controls and the live
-// problem list under it.
+// on a Canvas2D filling the rest (UI, not the arena: no second WebGL context,
+// same reasoning as render/preview.ts) behind a zoom/pan camera
+// (ui/editorCamera.ts), size/anchor controls and the live problem list under
+// the palette.
 //
 // The document itself (world/maps/editorModel.ts) stays a mutable object in a
 // ref, not React state: it is a big grid with an undo stack, and a paint
@@ -26,6 +27,17 @@ import { hasErrors, validateMapTemplate, type Cell } from "../../world/maps/vali
 import { registerTransientMap } from "../../world/maps/loader";
 import { CHAR_TILE } from "../../world/maps/mapChars";
 import { TILE_COLOR } from "../../render/preview";
+import {
+  cellUnder,
+  centerOn,
+  clampCamera,
+  fitCamera,
+  scaleRange,
+  showsWholeMap,
+  zoomAt,
+  type Camera,
+  type Size,
+} from "../editorCamera";
 import { useModal } from "../hooks/useModal";
 import { loadUserSettings, randomGuestNickname } from "../../game/settings";
 import { RoomHost } from "../../net/host";
@@ -60,8 +72,6 @@ const ENTITY_PALETTE: PaletteEntry[] = [
 
 const PALETTE = [...TERRAIN_PALETTE, ...ENTITY_PALETTE];
 
-const MIN_CELL_PX = 8;
-const MAX_CELL_PX = 32;
 /** Transient id the test match runs under when the map has never been saved. */
 const TEST_MAP_ID = "custom-editor-test";
 
@@ -97,9 +107,12 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
 
   const canvas = useRef<HTMLCanvasElement>(null);
   const pane = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ start: { cx: number; cy: number }; current: { cx: number; cy: number }; rect: boolean } | null>(
-    null,
-  );
+  const drag = useRef<{
+    id: number;
+    start: { cx: number; cy: number };
+    current: { cx: number; cy: number };
+    rect: boolean;
+  } | null>(null);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { show, node: modal } = useModal();
 
@@ -130,39 +143,110 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
   const markDirtyRef = useRef(markDirty);
   markDirtyRef.current = markDirty;
 
+  // --- view (zoom and pan, §6.1) ---------------------------------------------
+
+  /** The camera lives in refs, not state: a pinch moves it 60+ times a second
+   *  and only the canvas needs to know. `fitMode` means "keep showing the
+   *  whole map" — it survives a pane or map resize by refitting. */
+  const cam = useRef<Camera>({ s: 16, ox: 0, oy: 0 });
+  const fitMode = useRef(true);
+  /** Where the view was before the "whole map" peek, to go back to. */
+  const peekFrom = useRef<Camera | null>(null);
+  const paneSize = useRef<Size>({ w: 0, h: 0 });
+  const [wholeVisible, setWholeVisible] = useState(true);
+  const [peeking, setPeeking] = useState(false);
+  const [panMode, setPanMode] = useState(false);
+  const panModeRef = useRef(panMode);
+  panModeRef.current = panMode;
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const spaceHeldRef = useRef(false);
+  const minimap = useRef<HTMLCanvasElement>(null);
+
+  const mapSize = (): Size => ({ w: doc.current.model.width, h: doc.current.model.height });
+
+  const setCamera = (next: Camera) => {
+    cam.current = clampCamera(next, paneSize.current, mapSize());
+    fitMode.current = false;
+    peekFrom.current = null;
+    setPeeking(false);
+    redrawRef.current();
+  };
+
+  const zoomBy = (factor: number, px = paneSize.current.w / 2, py = paneSize.current.h / 2) => {
+    setCamera(zoomAt(cam.current, factor, px, py, paneSize.current, mapSize()));
+  };
+
+  /** One button for both directions: show the whole map, then press again to
+   *  return to exactly where you were zoomed in. */
+  const toggleWhole = () => {
+    if (peekFrom.current) {
+      const back = peekFrom.current;
+      setCamera(back);
+      return;
+    }
+    if (fitMode.current) return;
+    peekFrom.current = cam.current;
+    fitMode.current = true;
+    setPeeking(true);
+    redrawRef.current();
+  };
+  const toggleWholeRef = useRef(toggleWhole);
+  toggleWholeRef.current = toggleWhole;
+  const zoomByRef = useRef(zoomBy);
+  zoomByRef.current = zoomBy;
+
   // --- drawing ---------------------------------------------------------------
 
   const highlightRef = useRef(highlight);
   highlightRef.current = highlight;
 
-  /** One cell is a square of the same size on both axes, floored at 8px so a
-   *  64x64 map stays clickable (it scrolls inside its pane instead). */
+  /** The canvas always fills its pane; the camera decides which cells land
+   *  where. Drawn in device pixels with cell edges rounded, so a fractional
+   *  zoom never leaves hairline seams between cells. */
   const redraw = () => {
     const el = canvas.current;
     const box = pane.current?.getBoundingClientRect();
     if (!el || !box) return;
     const m = doc.current.model;
-    const avail = { w: Math.max(120, box.width - 2), h: Math.max(120, box.height - 2) };
-    const fit = Math.floor(Math.min(avail.w / m.width, avail.h / m.height));
-    const s = Math.max(MIN_CELL_PX, Math.min(MAX_CELL_PX, fit || MIN_CELL_PX));
-    if (el.width !== m.width * s || el.height !== m.height * s) {
-      el.width = m.width * s;
-      el.height = m.height * s;
-    }
+    const map = mapSize();
+    paneSize.current = { w: Math.max(1, box.width - 2), h: Math.max(1, box.height - 2) };
+    cam.current = fitMode.current
+      ? fitCamera(paneSize.current, map)
+      : clampCamera(cam.current, paneSize.current, map);
+    setWholeVisible(showsWholeMap(cam.current, paneSize.current, map));
 
+    const dpr = window.devicePixelRatio || 1;
+    const bw = Math.round(paneSize.current.w * dpr);
+    const bh = Math.round(paneSize.current.h * dpr);
+    if (el.width !== bw || el.height !== bh) {
+      el.width = bw;
+      el.height = bh;
+    }
     const ctx = el.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, el.width, el.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#05080c";
+    ctx.fillRect(0, 0, bw, bh);
 
-    for (let y = 0; y < m.height; y++) {
-      for (let x = 0; x < m.width; x++) {
+    const S = cam.current.s * dpr;
+    const OX = cam.current.ox * dpr;
+    const OY = cam.current.oy * dpr;
+    const X = (x: number) => Math.round(OX + x * S);
+    const Y = (y: number) => Math.round(OY + y * S);
+    const x0 = Math.max(0, Math.floor(-OX / S));
+    const y0 = Math.max(0, Math.floor(-OY / S));
+    const x1 = Math.min(m.width - 1, Math.floor((bw - OX) / S));
+    const y1 = Math.min(m.height - 1, Math.floor((bh - OY) / S));
+
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
         const g = m.at(x, y);
         ctx.fillStyle = cellColor(g);
-        ctx.fillRect(x * s, y * s, s, s);
+        ctx.fillRect(X(x), Y(y), X(x + 1) - X(x), Y(y + 1) - Y(y));
         if (g === "*") {
           ctx.fillStyle = "#ffd23d";
           ctx.beginPath();
-          ctx.arc(x * s + s / 2, y * s + s / 2, Math.max(1.5, s * 0.22), 0, Math.PI * 2);
+          ctx.arc(OX + (x + 0.5) * S, OY + (y + 0.5) * S, Math.max(1.5, S * 0.22), 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -172,44 +256,98 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
     // marker *is* the priority), so the numbering isn't a surprise later.
     for (const glyph of ["r", "b"] as const) {
       m.find(glyph).forEach((p, i) => {
+        const cx = OX + (p.x + 0.5) * S;
+        const cy = OY + (p.y + 0.5) * S;
         ctx.fillStyle = glyph === "r" ? "#ff9a9a" : "#7fb0ff";
         ctx.beginPath();
-        ctx.arc(p.x * s + s / 2, p.y * s + s / 2, Math.max(2, s * 0.34), 0, Math.PI * 2);
+        ctx.arc(cx, cy, Math.max(2, S * 0.34), 0, Math.PI * 2);
         ctx.fill();
-        if (s >= 14) {
+        if (cam.current.s >= 14) {
           ctx.fillStyle = "#0b0f14";
-          ctx.font = Math.round(s * 0.5) + "px system-ui, sans-serif";
+          ctx.font = Math.round(S * 0.5) + "px system-ui, sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(String(i + 1), p.x * s + s / 2, p.y * s + s / 2 + 1);
+          ctx.fillText(String(i + 1), cx, cy + dpr);
         }
       });
     }
 
-    if (s >= 6) {
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    if (cam.current.s >= 6) {
       ctx.lineWidth = 1;
-      for (let x = 0; x <= m.width; x++) line(ctx, x * s, 0, x * s, m.height * s);
-      for (let y = 0; y <= m.height; y++) line(ctx, 0, y * s, m.width * s, y * s);
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      for (let x = x0; x <= x1 + 1; x++) line(ctx, X(x), Y(y0), X(x), Y(y1 + 1));
+      for (let y = y0; y <= y1 + 1; y++) line(ctx, X(x0), Y(y), X(x1 + 1), Y(y));
       ctx.strokeStyle = "rgba(255,255,255,0.16)";
-      for (let x = 0; x <= m.width; x += 5) line(ctx, x * s, 0, x * s, m.height * s);
-      for (let y = 0; y <= m.height; y += 5) line(ctx, 0, y * s, m.width * s, y * s);
+      for (let x = Math.ceil(x0 / 5) * 5; x <= x1 + 1; x += 5) line(ctx, X(x), Y(y0), X(x), Y(y1 + 1));
+      for (let y = Math.ceil(y0 / 5) * 5; y <= y1 + 1; y += 5) line(ctx, X(x0), Y(y), X(x1 + 1), Y(y));
     }
 
+    // The map's edge is solid in play (SPEC §3.5), so it gets a visible border
+    // just outside the grid.
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 2 * dpr;
+    ctx.strokeRect(X(0) - dpr, Y(0) - dpr, X(m.width) - X(0) + 2 * dpr, Y(m.height) - Y(0) + 2 * dpr);
+
+    ctx.lineWidth = 2 * dpr;
     for (const c of highlightRef.current) {
       ctx.strokeStyle = "#ffd23d";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(c.cx * s + 1, c.cy * s + 1, s - 2, s - 2);
+      ctx.strokeRect(X(c.cx) + dpr, Y(c.cy) + dpr, X(c.cx + 1) - X(c.cx) - 2 * dpr, Y(c.cy + 1) - Y(c.cy) - 2 * dpr);
     }
 
     const d = drag.current;
     if (d?.rect) {
       const r = m.normalizeRect(d.start.cx, d.start.cy, d.current.cx, d.current.cy);
       ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(r.x0 * s, r.y0 * s, (r.x1 - r.x0 + 1) * s, (r.y1 - r.y0 + 1) * s);
+      ctx.strokeRect(X(r.x0), Y(r.y0), X(r.x1 + 1) - X(r.x0), Y(r.y1 + 1) - Y(r.y0));
     }
+
+    drawMinimap();
   };
+
+  /** The overview in the pane's corner: the whole map small, with the part
+   *  on screen outlined. Only shown while zoomed in far enough to hide some
+   *  of the map. */
+  const minimapScale = () => {
+    const m = doc.current.model;
+    const box = paneSize.current.w < 420 ? 92 : 140;
+    return Math.max(1, Math.min(box / m.width, box / m.height));
+  };
+  const drawMinimap = () => {
+    const el = minimap.current;
+    if (!el) return;
+    const m = doc.current.model;
+    const dpr = window.devicePixelRatio || 1;
+    const ms = minimapScale();
+    const cssW = m.width * ms;
+    const cssH = m.height * ms;
+    el.style.width = cssW + "px";
+    el.style.height = cssH + "px";
+    const bw = Math.round(cssW * dpr);
+    const bh = Math.round(cssH * dpr);
+    if (el.width !== bw || el.height !== bh) {
+      el.width = bw;
+      el.height = bh;
+    }
+    const ctx = el.getContext("2d");
+    if (!ctx) return;
+    const k = ms * dpr;
+    for (let y = 0; y < m.height; y++) {
+      for (let x = 0; x < m.width; x++) {
+        const g = m.at(x, y);
+        ctx.fillStyle = g === "r" ? "#ff9a9a" : g === "b" ? "#7fb0ff" : g === "*" ? "#ffd23d" : cellColor(g);
+        ctx.fillRect(Math.floor(x * k), Math.floor(y * k), Math.ceil(k), Math.ceil(k));
+      }
+    }
+    const c = cam.current;
+    const vx = Math.max(0, -c.ox / c.s);
+    const vy = Math.max(0, -c.oy / c.s);
+    const vw = Math.min(m.width, (paneSize.current.w - c.ox) / c.s) - vx;
+    const vh = Math.min(m.height, (paneSize.current.h - c.oy) / c.s) - vy;
+    ctx.strokeStyle = "#ffd23d";
+    ctx.lineWidth = 2 * dpr;
+    ctx.strokeRect(vx * k + dpr, vy * k + dpr, vw * k - 2 * dpr, vh * k - 2 * dpr);
+  };
+
   const redrawRef = useRef(redraw);
   redrawRef.current = redraw;
 
@@ -218,28 +356,66 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
   }, [version, highlight]);
 
   useEffect(() => {
-    const onResize = () => redrawRef.current();
-    window.addEventListener("resize", onResize);
+    const el = pane.current;
+    const ro = el ? new ResizeObserver(() => redrawRef.current()) : null;
+    if (el && ro) ro.observe(el);
     return () => {
-      window.removeEventListener("resize", onResize);
+      ro?.disconnect();
       if (draftTimer.current) clearTimeout(draftTimer.current);
     };
   }, []);
 
+  const setCameraRef = useRef(setCamera);
+  setCameraRef.current = setCamera;
+
+  // Wheel zooms around the cursor; a sideways scroll (a trackpad's two-finger
+  // swipe) pans instead. A native listener, because React's onWheel is
+  // passive and couldn't stop the page from scrolling.
+  useEffect(() => {
+    const el = pane.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1;
+      const dx = e.deltaX * unit;
+      const dy = e.deltaY * unit;
+      if (!e.ctrlKey && dx !== 0) {
+        const c = cam.current;
+        setCameraRef.current({ s: c.s, ox: c.ox - dx, oy: c.oy - dy });
+        return;
+      }
+      const box = el.getBoundingClientRect();
+      // A trackpad pinch arrives as ctrl+wheel with small deltas.
+      const factor = Math.pow(e.ctrlKey ? 1.01 : 1.0015, -dy);
+      zoomByRef.current(factor, e.clientX - box.left - 1, e.clientY - box.top - 1);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
   useEffect(() => {
     setWField(String(doc.current.model.width));
     setHField(String(doc.current.model.height));
   }, [version]);
 
-  // --- painting --------------------------------------------------------------
+  // --- painting and gestures ---------------------------------------------------
 
-  const cellAt = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  /** Every pointer currently down on the grid, in pane coordinates. */
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  /** A one-pointer pan (middle button, Space, the Pan tool, or a press off the
+   *  map), or a two-finger pinch that zooms and pans together. */
+  const gesture = useRef<
+    | { kind: "pan"; id: number; x: number; y: number }
+    | { kind: "pinch"; d0: number; cam0: Camera; mx: number; my: number }
+    | null
+  >(null);
+
+  const local = (e: React.PointerEvent) => {
     const box = e.currentTarget.getBoundingClientRect();
-    const m = doc.current.model;
-    return {
-      cx: Math.floor(((e.clientX - box.left) / box.width) * m.width),
-      cy: Math.floor(((e.clientY - box.top) / box.height) * m.height),
-    };
+    return { x: e.clientX - box.left, y: e.clientY - box.top };
+  };
+  const cellAt = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const p = local(e);
+    return cellUnder(cam.current, p.x, p.y);
   };
 
   /** Right button / two fingers erase, whatever the palette says (§6.4). */
@@ -251,42 +427,135 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
     else if (result === "entity-rect") showToast("Flags and spawns are placed one at a time, not dragged.");
   };
 
+  const startPinch = () => {
+    const [a, b] = [...pointers.current.values()];
+    const c = cam.current;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    gesture.current = {
+      kind: "pinch",
+      d0: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+      cam0: c,
+      // The map point under the fingers' midpoint, which the pinch keeps
+      // under their midpoint however they move.
+      mx: (mid.x - c.ox) / c.s,
+      my: (mid.y - c.oy) / c.s,
+    };
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    // Per-pointer capture, not a document-level listener: a second finger must
-    // never hijack a stroke (the same rule the match's touch layer learned,
-    // SPEC §5.3).
-    if (drag.current) return;
-    e.preventDefault();
+    const p = local(e);
+    pointers.current.set(e.pointerId, p);
     e.currentTarget.setPointerCapture(e.pointerId);
-    const cell = cellAt(e);
+    e.preventDefault();
+
+    // A second finger turns whatever the first one started into a pinch. The
+    // stroke it may already have painted is taken back, so reaching for a
+    // zoom never leaves a stray cell behind.
+    if (e.pointerType === "touch" && pointers.current.size === 2) {
+      if (drag.current) {
+        drag.current = null;
+        if (doc.current.cancelStroke()) setVersion((v) => v + 1);
+      }
+      startPinch();
+      redrawRef.current();
+      return;
+    }
+    // Per-pointer ownership, not a document-level listener: an extra finger
+    // or button never hijacks a stroke (SPEC §5.3's lesson).
+    if (drag.current || gesture.current) return;
+
+    const cell = cellUnder(cam.current, p.x, p.y);
+    const offMap = !doc.current.model.inBounds(cell.cx, cell.cy);
+    if (e.button === 1 || panModeRef.current || spaceHeldRef.current || offMap) {
+      gesture.current = { kind: "pan", id: e.pointerId, x: p.x, y: p.y };
+      return;
+    }
     const g = brushFor(e);
-    drag.current = { start: cell, current: cell, rect: (rectMode || e.shiftKey) && isTerrainGlyph(g) };
+    drag.current = { id: e.pointerId, start: cell, current: cell, rect: (rectMode || e.shiftKey) && isTerrainGlyph(g) };
     doc.current.beginStroke();
     if (!drag.current.rect) reportPaint(doc.current.model.paint(cell.cx, cell.cy, g));
     redrawRef.current();
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const d = drag.current;
-    if (!d) return;
+    if (!pointers.current.has(e.pointerId)) return;
+    const p = local(e);
+    pointers.current.set(e.pointerId, p);
+
+    const gs = gesture.current;
+    if (gs?.kind === "pan" && gs.id === e.pointerId) {
+      const c = cam.current;
+      setCamera({ s: c.s, ox: c.ox + p.x - gs.x, oy: c.oy + p.y - gs.y });
+      gs.x = p.x;
+      gs.y = p.y;
+      return;
+    }
+    if (gs?.kind === "pinch") {
+      if (pointers.current.size < 2) return;
+      const [a, b] = [...pointers.current.values()];
+      const range = scaleRange(paneSize.current, mapSize());
+      const d = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+      const s = Math.min(range.max, Math.max(range.min, (gs.cam0.s * d) / gs.d0));
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      setCamera({ s, ox: mid.x - gs.mx * s, oy: mid.y - gs.my * s });
+      return;
+    }
+
+    const dr = drag.current;
+    if (!dr || dr.id !== e.pointerId) return;
     const cell = cellAt(e);
-    if (cell.cx === d.current.cx && cell.cy === d.current.cy) return;
-    d.current = cell;
+    if (cell.cx === dr.current.cx && cell.cy === dr.current.cy) return;
+    dr.current = cell;
     const g = brushFor(e);
     // Entity brushes don't drag (§6.4) — only the cell that was clicked.
-    if (!d.rect && isTerrainGlyph(g)) reportPaint(doc.current.model.paint(cell.cx, cell.cy, g));
+    if (!dr.rect && isTerrainGlyph(g)) reportPaint(doc.current.model.paint(cell.cx, cell.cy, g));
     redrawRef.current();
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    pointers.current.delete(e.pointerId);
+    const gs = gesture.current;
+    if (gs) {
+      // A pinch lasts until every finger is up: the one left behind must not
+      // start painting where it happens to rest.
+      if ((gs.kind === "pan" && gs.id === e.pointerId) || (gs.kind === "pinch" && pointers.current.size === 0)) {
+        gesture.current = null;
+      }
+      return;
+    }
     const d = drag.current;
-    if (!d) return;
+    if (!d || d.id !== e.pointerId) return;
     if (d.rect) {
       reportPaint(doc.current.model.fillRect(d.start.cx, d.start.cy, d.current.cx, d.current.cy, brushFor(e)));
     }
     drag.current = null;
     if (doc.current.endStroke()) markDirtyRef.current();
     setVersion((v) => v + 1);
+  };
+
+  /** Drag on the overview to move the view there. */
+  const onMinimapPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.type === "pointerdown") e.currentTarget.setPointerCapture(e.pointerId);
+    else if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const box = e.currentTarget.getBoundingClientRect();
+    const ms = minimapScale();
+    setCamera(centerOn(cam.current, (e.clientX - box.left) / ms, (e.clientY - box.top) / ms, paneSize.current, mapSize()));
+  };
+
+  /** Clicking a problem while zoomed in brings its first cell into view. */
+  const showProblem = (cells: Cell[]) => {
+    setHighlight(cells);
+    const c = cells[0];
+    if (!c || fitMode.current) return;
+    const p = paneSize.current;
+    const onScreen =
+      cam.current.ox + c.cx * cam.current.s >= 0 &&
+      cam.current.oy + c.cy * cam.current.s >= 0 &&
+      cam.current.ox + (c.cx + 1) * cam.current.s <= p.w &&
+      cam.current.oy + (c.cy + 1) * cam.current.s <= p.h;
+    if (!onScreen) setCamera(centerOn(cam.current, c.cx + 0.5, c.cy + 0.5, p, mapSize()));
   };
 
   // --- resize ---------------------------------------------------------------
@@ -446,8 +715,27 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
         void backRef.current();
         return;
       }
+      if (e.key === " ") {
+        // Held Space pans with the left button, as in most paint programs.
+        e.preventDefault();
+        spaceHeldRef.current = true;
+        setSpaceHeld(true);
+        return;
+      }
       if (e.key.toLowerCase() === "e") {
         setBrush(".");
+        return;
+      }
+      if (e.key.toLowerCase() === "f") {
+        toggleWholeRef.current();
+        return;
+      }
+      if (e.key === "+" || e.key === "=") {
+        zoomByRef.current(1.25);
+        return;
+      }
+      if (e.key === "-" || e.key === "_") {
+        zoomByRef.current(0.8);
         return;
       }
       const digit = Number(e.key);
@@ -455,8 +743,17 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
         setBrush(PALETTE[digit - 1].glyph);
       }
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== " ") return;
+      spaceHeldRef.current = false;
+      setSpaceHeld(false);
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
 
   // --- layout -----------------------------------------------------------------
@@ -535,24 +832,7 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
           {ENTITY_PALETTE.map((e, i) => paletteRow(e, i + TERRAIN_PALETTE.length))}
         </div>
         <div className="editor-main">
-          <div className="row wrap editor-tools">
-            {/* The Rectangle toggle lives outside the palette: on a phone the
-                palette is a scrolling strip, and a touch device has no Shift
-                to fall back on. */}
-            <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <input
-                type="checkbox"
-                style={{ width: "auto" }}
-                checked={rectMode}
-                onChange={(e) => setRectMode(e.target.checked)}
-              />{" "}
-              Rectangle
-            </label>
-            <span className="hint">
-              Drag to paint; a rectangle fills a block — terrain only, not flags or spawns.
-            </span>
-          </div>
-          <div className="editor-canvas-pane" ref={pane}>
+          <div className={"editor-canvas-pane" + (panMode || spaceHeld ? " panning" : "")} ref={pane}>
             <canvas
               ref={canvas}
               onPointerDown={onPointerDown}
@@ -561,10 +841,62 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
               onPointerCancel={onPointerUp}
               onContextMenu={(e) => e.preventDefault()}
             />
+            {/* The tools a touch device can't reach any other way (no Shift,
+                no Space, no wheel) sit on the grid itself, so they never
+                scroll out of sight on a phone. */}
+            <div className="editor-overlay editor-overlay-tl">
+              <button
+                className={"overlay-btn " + (rectMode ? "active" : "")}
+                title="Rectangle fill (or hold Shift) — terrain only"
+                onClick={() => setRectMode((v) => !v)}
+              >
+                ▭ Rect
+              </button>
+              <button
+                className={"overlay-btn " + (panMode ? "active" : "")}
+                title="Drag to move the map (or hold Space)"
+                onClick={() => setPanMode((v) => !v)}
+              >
+                ✋ Pan
+              </button>
+            </div>
+            <div className="editor-overlay editor-overlay-tr">
+              <button className="overlay-btn" title="Zoom out (−)" onClick={() => zoomBy(0.8)}>
+                −
+              </button>
+              <button className="overlay-btn" title="Zoom in (+)" onClick={() => zoomBy(1.25)}>
+                +
+              </button>
+              <button
+                className={"overlay-btn " + (peeking ? "active" : "")}
+                title={peeking ? "Back to where you were (F)" : "Show the whole map (F)"}
+                disabled={wholeVisible && !peeking}
+                onClick={toggleWhole}
+              >
+                {peeking ? "↩ Back" : "⤢ Whole"}
+              </button>
+            </div>
+            <canvas
+              ref={minimap}
+              className="editor-minimap"
+              style={{ display: wholeVisible ? "none" : undefined }}
+              onPointerDown={onMinimapPointer}
+              onPointerMove={onMinimapPointer}
+            />
+            {toast && <div className="editor-toast">{toast}</div>}
           </div>
+          <div className="hint editor-tip">
+            <span className="tip-fine">
+              Wheel zooms · Space-drag or middle-drag moves the map · right-drag erases · Shift-drag fills a
+              rectangle
+            </span>
+            <span className="tip-coarse">Pinch to zoom · two fingers move the map · Pan for one-finger scrolling</span>
+          </div>
+        </div>
+        <div className="editor-extras">
           <div className="row wrap editor-size">
             <label>
-              Width <input type="text" inputMode="numeric" value={wField} onChange={(e) => setWField(e.target.value)} />
+              W <input type="text" inputMode="numeric" value={wField} onChange={(e) => setWField(e.target.value)} />
             </label>
             <button className="small" onClick={() => void applyResize(String(model.width - 1), hField)}>
               −
@@ -572,9 +904,10 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
             <button className="small" onClick={() => void applyResize(String(model.width + 1), hField)}>
               +
             </button>
+          </div>
+          <div className="row wrap editor-size">
             <label>
-              Height{" "}
-              <input type="text" inputMode="numeric" value={hField} onChange={(e) => setHField(e.target.value)} />
+              H <input type="text" inputMode="numeric" value={hField} onChange={(e) => setHField(e.target.value)} />
             </label>
             <button className="small" onClick={() => void applyResize(wField, String(model.height - 1))}>
               −
@@ -582,6 +915,8 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
             <button className="small" onClick={() => void applyResize(wField, String(model.height + 1))}>
               +
             </button>
+          </div>
+          <div className="row wrap editor-size">
             <button onClick={() => void applyResize(wField, hField)}>Resize</button>
             <span className="hint">Anchor</span>
             <div className="anchor-grid">
@@ -600,7 +935,6 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
               )}
             </div>
           </div>
-          <div className="hint">{toast}</div>
           <div className="editor-problems">
             {problems.length === 0 ? (
               <div className="editor-ok">Ready to play.</div>
@@ -609,7 +943,7 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
                 <button
                   key={i}
                   className={"problem problem-" + p.severity}
-                  onClick={() => setHighlight(p.cells ?? [])}
+                  onClick={() => showProblem(p.cells ?? [])}
                 >
                   {p.severity === "error" ? "✖" : "⚠"} {p.message}
                 </button>

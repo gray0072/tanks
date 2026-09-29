@@ -469,27 +469,89 @@ button.chip.disabled { opacity: 0.4; cursor: default; }
 .menu-notice { margin-bottom: 8px; text-align: center; max-width: 42ch; }
 
 .editor-screen { justify-content: flex-start; }
-.editor-header { width: min(100%, 1200px); gap: 10px; }
+.editor-header { width: min(100%, 1400px); gap: 10px; flex: none; }
 .editor-name input { min-width: 180px; }
-.editor-layout { display: flex; gap: 14px; width: min(100%, 1200px); align-items: stretch; flex-wrap: wrap; }
-.editor-palette { width: 190px; flex: 0 0 190px; padding: 10px; gap: 4px; }
-.editor-main { flex: 1 1 420px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-/* The grid gets the height that's left; a map too big for it scrolls inside
-   this pane rather than pushing the controls off the screen. */
-.editor-canvas-pane {
+/* The grid takes every pixel the screen has left: palette and the resize /
+   problems column share a narrow left strip, the pane fills the rest and
+   the camera (ui/editorCamera.ts) zooms inside it. */
+.editor-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "palette main" "extras main";
+  gap: 12px 14px;
+  width: min(100%, 1400px);
   flex: 1 1 auto;
-  min-height: 240px;
-  max-height: 60vh;
-  overflow: auto;
+  min-height: 380px;
+}
+.editor-palette { grid-area: palette; padding: 10px; gap: 4px; }
+.editor-extras { grid-area: extras; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; }
+.editor-main { grid-area: main; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+.editor-canvas-pane {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 300px;
+  overflow: hidden;
   background: #05080c;
   border: 1px solid var(--border);
   border-radius: 8px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 1px;
 }
-.editor-canvas-pane canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; }
+.editor-canvas-pane > canvas:first-child {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+.editor-canvas-pane.panning > canvas:first-child { cursor: grab; }
+.editor-canvas-pane.panning > canvas:first-child:active { cursor: grabbing; }
+.editor-overlay { position: absolute; top: 8px; display: flex; gap: 6px; pointer-events: none; }
+.editor-overlay-tl { left: 8px; }
+.editor-overlay-tr { right: 8px; }
+.overlay-btn {
+  pointer-events: auto;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+  background: rgba(21, 28, 36, 0.88);
+  backdrop-filter: blur(2px);
+}
+.overlay-btn.active { border-color: var(--accent); background: rgba(58, 48, 12, 0.92); color: var(--accent); }
+.overlay-btn:disabled { opacity: 0.35; }
+.editor-minimap {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  touch-action: none;
+  cursor: pointer;
+  opacity: 0.92;
+}
+.editor-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 20px);
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(11, 15, 20, 0.92);
+  border: 1px solid rgba(255, 210, 61, 0.4);
+  color: var(--accent);
+  font-size: 0.82rem;
+  pointer-events: none;
+}
+.editor-tip { flex: none; }
+.editor-tip .tip-coarse { display: none; }
+@media (pointer: coarse) {
+  .editor-tip .tip-fine { display: none; }
+  .editor-tip .tip-coarse { display: inline; }
+  .overlay-btn { min-width: 42px; height: 42px; }
+}
 .palette-row {
   display: grid;
   grid-template-columns: 16px 14px 1fr auto;
@@ -503,15 +565,13 @@ button.chip.disabled { opacity: 0.4; cursor: default; }
 .palette-glyph { color: var(--muted); font-family: ui-monospace, monospace; }
 .palette-sep { margin-top: 6px; }
 .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.4); }
-.editor-tools { gap: 10px; }
-.editor-tools label { font-size: 0.85rem; }
 .editor-size { gap: 6px; }
 .editor-size label { flex-direction: row; align-items: center; gap: 6px; }
 .editor-size input { width: 56px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px; font-family: var(--font); }
 .anchor-grid { display: grid; grid-template-columns: repeat(3, 16px); grid-auto-rows: 16px; gap: 2px; }
 .anchor-cell { padding: 0; border-radius: 3px; background: var(--panel-2); }
 .anchor-cell.active { background: var(--accent); border-color: var(--accent); }
-.editor-problems { display: flex; flex-direction: column; gap: 4px; max-height: 22vh; overflow: auto; }
+.editor-problems { display: flex; flex-direction: column; gap: 4px; }
 .editor-ok { color: #4caf50; font-size: 0.85rem; }
 .problem { text-align: left; font-size: 0.82rem; padding: 5px 8px; }
 .problem-error { color: #ffb3b3; border-color: rgba(255,77,77,0.4); }
@@ -541,10 +601,40 @@ button.chip.disabled { opacity: 0.4; cursor: default; }
 @media (max-width: 560px) {
   /* Palette becomes a scrolling strip above the grid — a 190px column on a
      phone leaves nothing for the map itself. */
-  .editor-layout { flex-direction: column; }
-  .editor-palette { width: 100%; flex: 0 0 auto; flex-direction: row; overflow-x: auto; gap: 6px; }
-  .editor-palette .palette-row { grid-template-columns: 16px auto; flex: 0 0 auto; }
+  .editor-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    grid-template-areas: "palette" "main" "extras";
+    flex: none;
+    min-height: 0;
+  }
+  .editor-palette { flex-direction: row; overflow-x: auto; gap: 6px; padding: 8px; }
+  .editor-palette .palette-row { grid-template-columns: 22px; flex: 0 0 auto; padding: 8px; }
+  .editor-palette .swatch { width: 22px; height: 22px; }
   .editor-palette .palette-label, .editor-palette .palette-glyph, .editor-palette .hint { display: none; }
-  .editor-canvas-pane { max-height: 46vh; }
+  /* Most of a portrait phone, leaving the palette strip above it in view;
+     the resize controls and problems are a scroll below. */
+  .editor-canvas-pane { flex: none; height: 64vh; height: 64dvh; min-height: 260px; }
+  .editor-extras { overflow: visible; }
   .map-row-thumb { width: 84px; }
+}
+
+/* Landscape phone: ~390px of height is the scarce axis. The palette turns
+   into an icon column beside the grid, the grid gets the full height under
+   the header, and resize/problems move below it. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .editor-layout {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    grid-template-areas: "palette main" "extras extras";
+    flex: none;
+    min-height: 0;
+  }
+  .editor-palette { flex-direction: column; overflow-y: auto; padding: 6px; gap: 4px; max-height: calc(100dvh - 96px); }
+  .editor-palette .palette-row { grid-template-columns: 22px; padding: 6px; }
+  .editor-palette .swatch { width: 22px; height: 22px; }
+  .editor-palette .palette-label, .editor-palette .palette-glyph, .editor-palette .hint { display: none; }
+  .editor-canvas-pane { flex: none; height: calc(100vh - 96px); height: calc(100dvh - 96px); min-height: 220px; }
+  .editor-tip { display: none; }
+  .editor-extras { overflow: visible; }
 }

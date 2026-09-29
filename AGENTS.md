@@ -208,6 +208,17 @@ Verified by driving Chromium at 1280x720 through a real match (arrow visible ove
 tank, cracked cells in the walls the bots had shot) plus a throwaway page rendering all four brick
 stages side by side; `npm test` (113), `tsc`, `npm run build`.
 
+**2026-09-29 (editor zoom):** the level editor's grid was a fitted canvas at 8–32 px a cell —
+on a phone a 33x25 map came out ~11 px and missed taps. The canvas now fills the whole pane and
+draws through a camera (`src/ui/editorCamera.ts`, pure, `tests/editorCamera.test.ts`): wheel/pinch
+zoom, Space/middle/two-finger/Pan-tool panning, a minimap while zoomed, and a Whole/Back toggle
+(`F`) that previews the full map and returns to the same view. A second finger mid-stroke cancels
+the stroke (`EditorDoc.cancelStroke`) and becomes a pinch. Layout: size/anchor + problems moved
+into the left column under the palette so the pane gets the full height. Verified by driving
+Chromium at 1280x720 (wheel zoom, paint, Space-pan, peek round-trip) and at 412x916 / 916x412 with
+touch (CDP two-finger pinch), plus `npm test` (163), `tsc`, `npm run build`. Not tried on real
+phone hardware.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -244,6 +255,8 @@ Don't trust this paragraph's specifics for long; read the current code and git l
 - `tests/mapEditor.test.ts` — the level editor's document model (`world/maps/editorModel.ts`):
   painting, the terrain-only rectangle fill, entity semantics (a flag *moves*, a spawn toggles and
   is capped), resize with an anchor, and the rule that **one gesture is one undo step**.
+- `tests/editorCamera.test.ts` — the editor grid's zoom/pan camera (fit, zoom-around-a-point,
+  bounds, no dragging the map out of sight) and `EditorDoc.cancelStroke`, which a pinch relies on.
 - `tests/roomCode.test.ts` — room codes (SPEC §9.2): a generated code is short, valid and free of
   look-alikes; a *typed* one may be a name, may contain those same look-alikes, and is cleaned up
   for case and punctuation; length bounds; the peer-id round-trip. Then, over the loopback, the

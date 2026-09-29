@@ -346,6 +346,17 @@ export class EditorDoc {
     return true;
   }
 
+  /** Throw away a stroke in progress, as if it never started — a second
+   *  finger landing turns a one-finger paint into a pinch (§6.9), and the
+   *  cell the first finger already painted must not stay behind. */
+  cancelStroke(): boolean {
+    const before = this.strokeBefore;
+    this.strokeBefore = null;
+    if (before === null || this.model.toTemplate() === before) return false;
+    this.model = EditorModel.fromTemplate(before);
+    return true;
+  }
+
   undo(): boolean {
     const prev = this.past.pop();
     if (prev === undefined) return false;
