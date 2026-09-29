@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 
 import { validateMapTemplate, hasErrors, validateMapName } from "../src/world/maps/validateMap";
 import { MAP_SOURCES } from "../src/world/maps/mapSources";
+import { MAX_PLAYERS_PER_MAP } from "../src/game/constants";
 
 const errors = (template: string) =>
   validateMapTemplate(template).filter((p) => p.severity === "error").map((p) => p.message);
@@ -37,6 +38,23 @@ function withCell(template: string, cx: number, cy: number, glyph: string): stri
   rows[cy] = rows[cy].slice(0, cx) + glyph + rows[cy].slice(cx + 1);
   return rows.join("\n");
 }
+
+/** A 26-wide open map with `red` red and `blue` blue spawns along two rows. */
+function roster(red: number, blue: number): string {
+  const w = 26;
+  const row = (inner: string) => "@" + inner.padEnd(w - 2, ".") + "@";
+  const edge = "@".repeat(w);
+  return [edge, row("r".repeat(red)), row(""), row("...R"), row(""), row("...B"), row(""), row("b".repeat(blue)), edge].join(
+    "\n",
+  );
+}
+
+test("the player cap counts both teams together", () => {
+  const capMsg = (t: string) => errors(t).filter((m) => m.includes("at most " + MAX_PLAYERS_PER_MAP));
+  assert.deepEqual(capMsg(roster(10, 10)), [], "exactly the cap is fine");
+  assert.deepEqual(capMsg(roster(4, 16)), [], "lopsided within the cap is fine");
+  assert.equal(capMsg(roster(11, 10)).length, 1, "one over the cap is an error");
+});
 
 test("a well-formed map has no errors", () => {
   assert.deepEqual(errors(BASE), []);

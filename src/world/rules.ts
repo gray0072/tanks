@@ -1,3 +1,4 @@
+import { ASSIST_WINDOW } from "../game/constants";
 import type { TeamId } from "../game/config";
 import type { Slot } from "./tank";
 
@@ -75,8 +76,6 @@ export function createRules(settings: MatchSettings, slots: Slot[]): MatchRules 
     suddenDeath: false,
   };
 }
-
-const ASSIST_WINDOW = 5; // s, SPEC §2.4
 
 export function otherTeam(t: TeamId): TeamId {
   return t === "blue" ? "red" : "blue";

@@ -11,7 +11,8 @@ import { clearTransientMaps, registerTransientMap } from "../world/maps/loader";
 import type { HostMessage, BotDifficultyTarget, MapPayload } from "./protocol";
 import type { RoomCallbacks, RoomController } from "./room";
 import { NO_INPUT } from "./room";
-import { NET_INPUT_HZ, type BotDifficulty } from "../game/config";
+import { NET_INPUT_HZ } from "../game/constants";
+import type { BotDifficulty } from "../game/config";
 
 export class RoomClient implements RoomController {
   readonly isHost = false;

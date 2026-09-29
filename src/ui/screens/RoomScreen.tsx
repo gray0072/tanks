@@ -17,14 +17,16 @@ import { drawMapPreview } from "../../render/preview";
 import { useEnterKey } from "../hooks/useEnterKey";
 import type { BotDifficultyTarget } from "../../net/protocol";
 import {
-  BOT_DIFFICULTIES as DIFFS,
-  BOT_DIFFICULTY_LABEL as DIFF_LABEL,
   DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
   DEFAULT_WINS_TARGET,
   RESPAWN_MULTIPLIERS,
   TIME_LIMIT_OPTIONS,
   WINS_TARGET_OPTIONS,
+} from "../../game/constants";
+import {
+  BOT_DIFFICULTIES as DIFFS,
+  BOT_DIFFICULTY_LABEL as DIFF_LABEL,
   respawnLabel,
   winsTargetLabel,
   type BotDifficulty,

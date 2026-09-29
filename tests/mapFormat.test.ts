@@ -7,7 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { parseMap, MapValidationError } from "../src/world/maps/mapFormat";
-import { CELL, MIN_MAP_W, MIN_MAP_H } from "../src/game/config";
+import { CELL, MIN_MAP_W, MIN_MAP_H } from "../src/game/constants";
 import { DT, makeSim } from "./helpers";
 
 // One flag and one spawn per team is all a map strictly needs.

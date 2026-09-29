@@ -26,8 +26,8 @@ import {
   BONUS_DURATION,
   RESPAWN_DELAY,
   SPAWN_INVULN,
-  type TeamId,
-} from "../game/config";
+} from "../game/constants";
+import type { TeamId } from "../game/config";
 import { Dir, DIR_VECTOR, RNG } from "../util/math";
 import {
   type Slot,

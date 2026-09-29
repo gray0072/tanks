@@ -5,7 +5,7 @@ power-ups, and a base flag that must be defended. Runs on desktop and mobile, jo
 internet by a short room code, and playable by two people on one keyboard.
 
 > This document is the source of truth for the design. Code follows the spec, not the other way
-> around. Numbers in tables are the tuning defaults — they live in `src/game/config.ts` and are
+> around. Numbers in tables are the tuning defaults — they live in `src/game/constants.ts`, grouped by subsystem, and are
 > expected to change during playtesting.
 
 The spec is split across `specs/`; this file is the index. Section numbers (**§0 – §16**) are stable

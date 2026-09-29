@@ -1,5 +1,7 @@
 // Terrain grid — SPEC §3.3 (surfaces) and §3.5 (map file format).
 
+import { BRICK_QUARTERS } from "../game/constants";
+
 export enum Tile {
   Empty = 0,
   Brick = 1,
@@ -11,8 +13,6 @@ export enum Tile {
   FlagBlue = 7,
   FlagRed = 8,
 }
-
-export const BRICK_QUARTERS = 4;
 
 export type CellPos = { cx: number; cy: number };
 

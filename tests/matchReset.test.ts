@@ -6,7 +6,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { Tile, BRICK_QUARTERS } from "../src/world/grid";
+import { Tile } from "../src/world/grid";
+import { BRICK_QUARTERS } from "../src/game/constants";
 import { Dir } from "../src/util/math";
 import { cells, isolate, makeMap, makeSimFromMap, place } from "./helpers";
 import type { Sim } from "../src/world/sim";

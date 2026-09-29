@@ -7,7 +7,7 @@ import type { Sim, SeatInput } from "../world/sim";
 import type { TankState } from "../world/tank";
 import { tankCenter } from "../world/tank";
 import { Tile } from "../world/grid";
-import type { BonusEntity, BonusKind } from "../world/bonus";
+import type { BonusEntity } from "../world/bonus";
 import { findPath, nearestPassable, type CellPoint } from "./pathfinder";
 import type { Role } from "./teamPlan";
 import { Dir, DIR_VECTOR } from "../util/math";
@@ -19,10 +19,21 @@ import {
   BULLET_SPEED_STAR1,
   TICK_DT,
   BOT_PROFILE,
-  type BotDifficulty,
+  BOT_LANE_TOLERANCE_PX,
+  BOT_DEMOLITION_RANGE_CELLS,
+  BOT_LANE_STEP_RANGE_CELLS,
+  BOT_PREEMPT_RANGE_CELLS,
+  BOT_PREEMPT_COMMIT_TIME,
+  BOT_PREEMPT_REST_TIME,
+  BOT_ENGAGE_RANGE_CELLS,
+  BOT_ACTION_COMMIT_TIME,
+  BOT_COLLECT_COMMIT_TIME,
+  BOT_VELOCITY_SAMPLE_MAX_GAP,
+  BOT_VELOCITY_SMOOTHING,
+  BOT_BONUS_VALUE,
   type BotProfile,
-  type TeamId,
-} from "../game/config";
+} from "../game/constants";
+import type { BotDifficulty, TeamId } from "../game/config";
 
 type Action = "AttackFlag" | "DefendFlag" | "Hunt" | "Collect" | "Regroup";
 
@@ -51,52 +62,6 @@ const AXIS_FOR_DIR: Partial<Record<Dir, "x" | "y">> = {
 
 const CARDINALS: Dir[] = [Dir.Up, Dir.Right, Dir.Down, Dir.Left];
 
-/** How close to a firing lane counts as lined up, in px. One movement step
- *  at TANK_SPEED is ~2.8px, so anything tighter than this just oscillates. */
-const LANE_TOLERANCE_PX = 3;
-
-/** How close a bot has to be before shooting *through* brick at a static
- *  target, and before it will shuffle sideways to line one up. */
-const DEMOLITION_RANGE_CELLS = 4;
-const LANE_STEP_RANGE_CELLS = 6;
-
-/** How close an enemy has to be before its firing lane is worth vacating
- *  pre-emptively (SPEC §10.3 Hard, "leaves enemy firing lanes before a shot
- *  is fired"). */
-const PREEMPT_RANGE_CELLS = 10;
-/** Once a bot decides to vacate a lane it keeps going for this long, then
- *  refuses to do it again for a moment — otherwise it re-decides every tick
- *  and never actually leaves. */
-const PREEMPT_COMMIT_TIME = 0.25; // s
-const PREEMPT_REST_TIME = 0.5; // s
-
-/** Beyond this the bot does not bother shooting at a tank at all. */
-const ENGAGE_RANGE_CELLS = 12;
-
-/** How long a bot sticks with a chosen action before re-rolling it. */
-const ACTION_COMMIT_TIME = 1.5; // s
-const COLLECT_COMMIT_TIME = 8; // s
-
-/** Velocity tracking for target leading: samples further apart than this are
- *  a re-acquisition, not motion, and the smoothing factor damps the
- *  per-tick quantisation noise. */
-const VELOCITY_SAMPLE_MAX_GAP = 0.5; // s
-const VELOCITY_SMOOTHING = 0.25;
-
-/** Baseline desirability of each bonus, before distance. STAR and HELMET
- *  lead for a personal pickup (SPEC §10.3 Medium, "values STAR and HELMET
- *  above the rest"); the team bonuses are re-weighted by the situation for a
- *  profile that times them. */
-const BONUS_VALUE: Record<BonusKind, number> = {
-  STAR: 3,
-  HELMET: 2.5,
-  RESPAWN: 1.8,
-  SPEED: 1.6,
-  CLOCK: 1.6,
-  SHOVEL: 1.4,
-  GRENADE: 2.2,
-  MINE: 1.2,
-};
 
 /** Center of a 1-cell entity in world px. Flags, bonuses and spawns are all
  *  a single cell (SPEC §3.5: "nothing is a 2 x 2 block"). */
@@ -305,11 +270,11 @@ export class BotController {
       let vx = 0;
       let vy = 0;
       const dt = prev ? sim.time - prev.at : 0;
-      if (prev && dt > 0 && dt < VELOCITY_SAMPLE_MAX_GAP) {
+      if (prev && dt > 0 && dt < BOT_VELOCITY_SAMPLE_MAX_GAP) {
         // Exponential smoothing: a single tick's delta is mostly quantisation
         // noise, and an unsmoothed sample makes the lead jitter every frame.
-        vx = prev.vx + (((c.x - prev.x) / dt) - prev.vx) * VELOCITY_SMOOTHING;
-        vy = prev.vy + (((c.y - prev.y) / dt) - prev.vy) * VELOCITY_SMOOTHING;
+        vx = prev.vx + (((c.x - prev.x) / dt) - prev.vx) * BOT_VELOCITY_SMOOTHING;
+        vy = prev.vy + (((c.y - prev.y) / dt) - prev.vy) * BOT_VELOCITY_SMOOTHING;
       } else if (prev) {
         vx = prev.vx;
         vy = prev.vy;
@@ -421,7 +386,7 @@ export class BotController {
       // A bonus run is committed to until the bonus is actually gone:
       // abandoning one halfway across the map is strictly worse than either
       // fetching it or never starting.
-      this.actionHold = this.action === "Collect" ? COLLECT_COMMIT_TIME : ACTION_COMMIT_TIME;
+      this.actionHold = this.action === "Collect" ? BOT_COLLECT_COMMIT_TIME : BOT_ACTION_COMMIT_TIME;
     }
     this.path = null;
     this.pathGoal = null;
@@ -472,7 +437,7 @@ export class BotController {
     const me = tankCenter(tank);
     const c = cellCenter(b.cx, b.cy);
     const distCells = Math.hypot(c.x - me.x, c.y - me.y) / CELL;
-    let value = BONUS_VALUE[b.kind];
+    let value = BOT_BONUS_VALUE[b.kind];
 
     if (b.kind === "SPEED" && tank.speedT > 0) value *= 0.3;
     if (b.kind === "HELMET" && tank.helmetT > 0) value *= 0.3;
@@ -582,15 +547,15 @@ export class BotController {
       // information a player has too — the bullet is right there on screen.
       if (enemy.star < 2 && sim.bullets.some((b) => b.ownerSlot === enemy.slot)) continue;
       const ec = tankCenter(enemy);
-      if (Math.hypot(ec.x - mc.x, ec.y - mc.y) > PREEMPT_RANGE_CELLS * CELL) continue;
+      if (Math.hypot(ec.x - mc.x, ec.y - mc.y) > BOT_PREEMPT_RANGE_CELLS * CELL) continue;
       if (shotObstruction(sim, ec.x, ec.y, mc.x, mc.y) !== "clear") continue;
 
       const perp: Dir[] = axis === "x" ? [Dir.Up, Dir.Down] : [Dir.Left, Dir.Right];
       for (const d of perp) {
         if (!this.canStep(sim, tank, d)) continue;
         this.preemptDir = d;
-        this.preemptT = PREEMPT_COMMIT_TIME;
-        this.preemptCooldown = PREEMPT_COMMIT_TIME + PREEMPT_REST_TIME;
+        this.preemptT = BOT_PREEMPT_COMMIT_TIME;
+        this.preemptCooldown = BOT_PREEMPT_COMMIT_TIME + BOT_PREEMPT_REST_TIME;
         return d;
       }
     }
@@ -704,7 +669,7 @@ export class BotController {
       // A shot from the far side of the map spends most of a second in
       // flight and almost never lands; it just burns the single bullet a
       // non-upgraded tank is allowed to have out at a time.
-      if (range > ENGAGE_RANGE_CELLS) continue;
+      if (range > BOT_ENGAGE_RANGE_CELLS) continue;
 
       let targetX = target.x;
       let targetY = target.y;
@@ -778,14 +743,14 @@ export class BotController {
     if (block === "solid") return null;
     // Punching a wall down is only a plan from close up; from across the map
     // it is just a long shot at a random brick.
-    if (block === "brick" && (!allowBrick || distCells > DEMOLITION_RANGE_CELLS)) return null;
+    if (block === "brick" && (!allowBrick || distCells > BOT_DEMOLITION_RANGE_CELLS)) return null;
     // Sidestepping onto a lane is a short-range manoeuvre too. Without this
     // a bot 20 cells away would shuffle sideways toward a lane whose
     // obstruction flips every step, and stall between the two behaviours.
-    if (Math.abs(cross) > LANE_TOLERANCE_PX && distCells > LANE_STEP_RANGE_CELLS) return null;
+    if (Math.abs(cross) > BOT_LANE_TOLERANCE_PX && distCells > BOT_LANE_STEP_RANGE_CELLS) return null;
 
     this.holdingPosition = true;
-    if (Math.abs(cross) > LANE_TOLERANCE_PX) {
+    if (Math.abs(cross) > BOT_LANE_TOLERANCE_PX) {
       const side = axis === "x"
         ? (cross > 0 ? Dir.Down : Dir.Up)
         : (cross > 0 ? Dir.Right : Dir.Left);

@@ -13,17 +13,10 @@
 // the stick started following *it* and the tank drove off on its own. Pointer
 // capture per zone gives each thumb its own independent stream.
 
-import { FIRE_COOLDOWN } from "./config";
+import { FIRE_COOLDOWN, TOUCH_DEAD_ZONE, TOUCH_STICK_RADIUS } from "./constants";
 import type { Input } from "../util/input";
 import { dirFromAngle } from "../util/math";
 
-/** Radius, in px, the thumb must travel from the stick's origin before the
- *  tank moves at all — below it the stick reads as "stop", so you can hold
- *  still without lifting your thumb. */
-const DEAD_ZONE = 14;
-/** Knob travel. Past this the origin is dragged along behind the thumb, so a
- *  long swipe never runs out of stick and never needs a re-grab. */
-const STICK_RADIUS = 52;
 /** A tap is shorter than the reload, so a bare press-and-release would be
  *  silently swallowed whenever it landed mid-cooldown. Holding `fire` for one
  *  full reload makes every tap produce exactly one shot, as soon as the gun
@@ -103,11 +96,11 @@ export class TouchControls {
     let dx = e.clientX - rect.left - this.originX;
     let dy = e.clientY - rect.top - this.originY;
     const len = Math.hypot(dx, dy);
-    if (len > STICK_RADIUS) {
+    if (len > TOUCH_STICK_RADIUS) {
       // Drag the origin along so it trails the thumb at exactly one radius:
       // the stick stays at full deflection and keeps responding to small
       // corrections instead of pinning at the rim.
-      const k = (len - STICK_RADIUS) / len;
+      const k = (len - TOUCH_STICK_RADIUS) / len;
       this.originX += dx * k;
       this.originY += dy * k;
       this.stick.style.left = `${this.originX}px`;
@@ -116,7 +109,7 @@ export class TouchControls {
       dy -= dy * k;
     }
     this.drawKnob(dx, dy);
-    this.input.setTouchDir(len < DEAD_ZONE ? null : dirFromAngle(Math.atan2(dy, dx)));
+    this.input.setTouchDir(len < TOUCH_DEAD_ZONE ? null : dirFromAngle(Math.atan2(dy, dx)));
   };
 
   private onMoveUp = (e: PointerEvent) => {

@@ -18,7 +18,8 @@ import { computeTeamRoles, type Role } from "../ai/teamPlan";
 import { createPixiApp, type PixiHost } from "../render/app";
 import { createAtlas, type Atlas } from "../render/atlas";
 import { Arena } from "../render/arena";
-import { CELL, TANK_SIZE, TICK_DT, type TeamId } from "./config";
+import { CELL, TANK_SIZE, TICK_DT } from "./constants";
+import type { TeamId } from "./config";
 import { loadUserSettings } from "./settings";
 
 /** Backdrop rounds are short on purpose: a menu session that outlasts one

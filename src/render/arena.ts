@@ -11,8 +11,9 @@ import type { Slot } from "../world/tank";
 import type { BonusKind } from "../world/bonus";
 import { BONUS_PALETTE } from "./bonusShape";
 import { DIR_ANGLE } from "../util/math";
-import { CELL, TANK_SIZE, TEAM_COLOR, NET_SNAPSHOT_HZ, type TeamId } from "../game/config";
-import { BRICK_QUARTERS } from "../world/grid";
+import { CELL, TANK_SIZE, NET_SNAPSHOT_HZ } from "../game/constants";
+import { TEAM_COLOR, type TeamId } from "../game/config";
+import { BRICK_QUARTERS } from "../game/constants";
 
 const SNAP_INTERVAL_MS = 1000 / NET_SNAPSHOT_HZ;
 

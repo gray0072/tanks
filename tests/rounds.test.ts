@@ -8,7 +8,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_WINS_TARGET, WINS_TARGET_OPTIONS, winsTargetLabel } from "../src/game/config";
+import { DEFAULT_WINS_TARGET, WINS_TARGET_OPTIONS } from "../src/game/constants";
+import { winsTargetLabel } from "../src/game/config";
 import {
   addRoundStats,
   createSeries,

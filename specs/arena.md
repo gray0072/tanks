@@ -6,7 +6,7 @@ Part of the [Tanks specification](../SPEC.md) — section numbers (§) are index
 
 No scrolling, no camera — the whole arena is always on screen. There's no fixed size or aspect
 ratio, though: the arena is exactly as big as the loaded map's template (`map.width`/`map.height`,
-§3.5), up to a `MAX_MAP_W`/`MAX_MAP_H` sanity ceiling (`config.ts`). Every built-in map happens to be
+§3.5), up to a `MAX_MAP_W`/`MAX_MAP_H` sanity ceiling (`constants.ts`). Every built-in map happens to be
 33 × 25 cells, but nothing enforces that — the debug map (§3.5) is 8 × 5.
 
 | | |
@@ -168,7 +168,7 @@ Run at load in dev and by `npm run maps:check` in CI. A failure is loud in dev a
 dropped from the lobby list in production.
 
 1. Every row the same length as row 0; only known characters; width and height between
-   `MIN_MAP_W`/`MIN_MAP_H` and `MAX_MAP_W`/`MAX_MAP_H` (`config.ts`). The floor is **2 × 2** — the
+   `MIN_MAP_W`/`MIN_MAP_H` and `MAX_MAP_W`/`MAX_MAP_H` (`constants.ts`). The floor is **2 × 2** — the
    smallest grid that can still hold one flag and one spawn per team; the rest of the game reads
    its dimensions and its roster size off the map, so nothing else has to change.
 2. Exactly one `R` and one `B`.
@@ -183,7 +183,7 @@ dropped from the lobby list in production.
 The level editor runs a **stricter superset** of these (`world/maps/validateMap.ts`,
 `specs/level-editor.md` §7) before it will let a map be saved as playable, reported as a list of
 individually-addressable problems rather than one thrown message: an 8 × 8 … 64 × 64 size window
-inside the engine's own 2 × 2 … 128 × 128, at most 16 spawns a team, no spawn or flag within
+inside the engine's own 2 × 2 … 128 × 128, at most 20 spawns across both teams (`MAX_PLAYERS_PER_MAP`), no spawn or flag within
 Chebyshev distance 2 of an enemy spawn, and per-spawn reachability that names *which* spawn is
 walled in. It also raises non-blocking warnings, including the "no open lane to a flag" design rule
 above — which nothing checked until now.

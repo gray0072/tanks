@@ -8,7 +8,7 @@ import Peer, { type DataConnection, type PeerError } from "peerjs";
 import { peerIdForRoom } from "./roomCode";
 import type { ClientMessage, HostMessage } from "./protocol";
 import { PeerWatchdog, type PeerConnState } from "./liveness";
-import { PEER_DISCONNECT_GRACE, PEER_POLL_INTERVAL } from "../game/config";
+import { PEER_DISCONNECT_GRACE, PEER_POLL_INTERVAL } from "../game/constants";
 
 /** Closing the tab has to take the peer down with it: PeerJS only sends its
  *  goodbye if something tells it to, and `unload` is too late on mobile,

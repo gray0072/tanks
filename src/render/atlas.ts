@@ -3,8 +3,9 @@
 // touching gameplay or arena-layout code.
 
 import { Application, Graphics, Container, type Texture, Rectangle } from "pixi.js";
-import { CELL, TANK_SIZE, TEAM_COLOR, BULLET_RADIUS, type TeamId } from "../game/config";
-import { BRICK_QUARTERS } from "../world/grid";
+import { CELL, TANK_SIZE, BULLET_RADIUS } from "../game/constants";
+import { TEAM_COLOR, type TeamId } from "../game/config";
+import { BRICK_QUARTERS } from "../game/constants";
 import type { BonusKind } from "../world/bonus";
 import { tankShapeOps, shade as shadeColor } from "./tankShape";
 import { bonusIconOps, bonusSymbolOps, BONUS_PALETTE, type IconOp } from "./bonusShape";

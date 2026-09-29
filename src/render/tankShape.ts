@@ -4,7 +4,7 @@
 // atlas.ts (PixiJS, the in-match sprite) and preview.ts (Canvas2D, the
 // room-screen thumbnail) draw the exact same tank at two different sizes.
 
-import { TANK_SIZE, TANK_HITBOX, TANK_MARGIN } from "../game/config";
+import { TANK_SIZE, TANK_HITBOX, TANK_MARGIN } from "../game/constants";
 
 export type TankShapeOp =
   | { kind: "rect"; x: number; y: number; w: number; h: number; color: number }

@@ -14,7 +14,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { loopbackRoom as room, wait } from "./netHelpers";
-import { KICK_CLOSE_DELAY } from "../src/game/config";
+import { KICK_CLOSE_DELAY } from "../src/game/constants";
 
 test("a guest that says hello is seated, and the host knows whose slot it is", () => {
   const r = room();

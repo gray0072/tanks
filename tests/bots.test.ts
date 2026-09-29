@@ -12,7 +12,8 @@ import { findPath, nearestPassable } from "../src/ai/pathfinder";
 import { createBonus } from "../src/world/bonus";
 import { Tile } from "../src/world/grid";
 import { Dir } from "../src/util/math";
-import { BOT_PROFILE, FIRE_COOLDOWN, type BotDifficulty } from "../src/game/config";
+import { BOT_PROFILE, FIRE_COOLDOWN } from "../src/game/constants";
+import type { BotDifficulty } from "../src/game/config";
 import { botFixture, cells, matchFrags, place } from "./helpers";
 
 const DIFFICULTIES: BotDifficulty[] = ["easy", "normal", "hard"];

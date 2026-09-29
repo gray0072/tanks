@@ -7,8 +7,8 @@ import {
   DEFAULT_RESPAWN_MULT,
   DEFAULT_TIME_LIMIT,
   DEFAULT_WINS_TARGET,
-  type BotDifficulty,
-} from "./config";
+} from "./constants";
+import type { BotDifficulty } from "./config";
 
 export type Quality = "auto" | "low" | "high";
 export type TouchSide = "left" | "right";

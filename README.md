@@ -192,8 +192,9 @@ src/
   main.tsx           # entry: debug shortcut, ?room= deep link, or the main menu
   ui/                # React: screens (menu, create, join, room, match, result, settings,
                      # editor), the HUD, and the route value that says which one is up
-  game/              # config, settings, touch controls, the live menu backdrop
-    config.ts        # every tuning number: speeds, timings, bot profiles, editor limits
+  game/              # constants, config, settings, touch controls, the live menu backdrop
+    constants.ts     # every tuning number, grouped: map, tank, shooting, bonuses, rounds, bots, net, editor
+    config.ts        # ids and labels: teams, bot difficulties, the DEBUG switch
   world/             # the simulation — no rendering, no DOM, no network
     sim.ts           # authoritative tick: movement, bullets, bonuses, flags
     grid.ts bullet.ts bonus.ts flag.ts rules.ts tank.ts

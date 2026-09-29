@@ -22,7 +22,7 @@
 
 import { Grid, Tile } from "../grid";
 import type { TeamId } from "../../game/config";
-import { MIN_MAP_W, MIN_MAP_H, MAX_MAP_W, MAX_MAP_H } from "../../game/config";
+import { MIN_MAP_W, MIN_MAP_H, MAX_MAP_W, MAX_MAP_H } from "../../game/constants";
 import { CHAR_TILE } from "./mapChars";
 
 export type MapDef = {

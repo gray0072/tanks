@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 
 import { deepLinkRoute } from "../src/ui/routes";
 import { PeerWatchdog, type PeerConnState } from "../src/net/liveness";
-import { PEER_DISCONNECT_GRACE } from "../src/game/config";
+import { PEER_DISCONNECT_GRACE } from "../src/game/constants";
 import { CODE_MAX_LEN } from "../src/net/roomCode";
 
 // --- 1. the invite link ----------------------------------------------------

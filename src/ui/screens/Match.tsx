@@ -18,7 +18,8 @@ import {
   onFullscreenChange,
   toggleFullscreen,
 } from "../../util/fullscreen";
-import { CELL, DEFAULT_WINS_TARGET, type TeamId } from "../../game/config";
+import { CELL, DEFAULT_WINS_TARGET } from "../../game/constants";
+import type { TeamId } from "../../game/config";
 import { useEnterKey } from "../hooks/useEnterKey";
 import { HudOverlay, HudTop, type HudAction, type HudHandle, type ScoreRow } from "../components/Hud";
 

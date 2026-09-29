@@ -35,9 +35,8 @@ import {
   ROUND_INTERMISSION,
   TICK_DT,
   NET_SNAPSHOT_HZ,
-  type BotDifficulty,
-  type TeamId,
-} from "../game/config";
+} from "../game/constants";
+import type { BotDifficulty, TeamId } from "../game/config";
 
 function makeHostNetwork(roomCode: string, cb: ConstructorParameters<typeof HostNetwork>[1]): HostTransport {
   return new HostNetwork(roomCode, cb);

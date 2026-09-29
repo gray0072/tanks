@@ -173,7 +173,7 @@ For players who want the bot team to actually be a threat. Same information, muc
 >   they can see is actually moving. Leading on "TANK_SPEED in the direction it currently faces"
 >   makes a full-lead profile shoot in front of tanks that are standing still.
 
-All of these live in `config.ts` as three named profiles, so a fourth ("Insane", "Passive" for
+All of these live in `constants.ts` (`BOT_PROFILE`) as three named profiles, so a fourth ("Insane", "Passive" for
 testing) is a data change, not a code change.
 
 ## 10.4 Choosing difficulty in the lobby

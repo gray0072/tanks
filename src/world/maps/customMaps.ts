@@ -9,7 +9,7 @@
 // No DOM beyond localStorage itself, which is looked up off globalThis, so the
 // headless tests can stub it.
 
-import { EDITOR_MAX_NAME } from "../../game/config";
+import { EDITOR_MAX_NAME } from "../../game/constants";
 
 export type CustomMapOrigin =
   | { kind: "blank" }

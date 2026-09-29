@@ -14,7 +14,7 @@ import {
   SAND_SPEED_MULT,
   SPEED_BONUS_MULT,
   ICE_SLIDE_TIME,
-} from "../src/game/config";
+} from "../src/game/constants";
 import { tankCenter, tankHitbox } from "../src/world/tank";
 import { CARDINALS, DT, crossAxis, dirName, hold, isolate, makeSim, place, step } from "./helpers";
 

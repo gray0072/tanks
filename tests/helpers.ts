@@ -10,7 +10,8 @@ import { createDefaultSlots, type TankState } from "../src/world/tank";
 import { BotController } from "../src/ai/bot";
 import { computeTeamRoles, type Role } from "../src/ai/teamPlan";
 import { Dir } from "../src/util/math";
-import { CELL, TICK_DT, type BotDifficulty, type TeamId } from "../src/game/config";
+import { CELL, TICK_DT } from "../src/game/constants";
+import type { BotDifficulty, TeamId } from "../src/game/config";
 
 export const DT = TICK_DT;
 

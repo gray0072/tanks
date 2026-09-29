@@ -20,7 +20,7 @@ Each milestone ends in something playable — no milestone is pure plumbing.
 | **M9** | **Content & polish** — `fortress` and `iceworks` (done), audio, effects, kill feed, balance pass | Six maps, sound, and a tuned game |
 | **M10** | **Ship** — GitHub Pages deploy, README, invite links, first playtest round | Anyone can open a link and play |
 
-**Cross-cutting from M0:** `config.ts` holds every tunable; the simulation stays free of rendering
+**Cross-cutting from M0:** `constants.ts` holds every tunable; the simulation stays free of rendering
 and networking imports (so it can be run headless in tests); a `?debug=1` overlay shows tick rate,
 fps, draw calls, and net stats.
 
@@ -38,7 +38,7 @@ bot-vs-bot soak (100 matches) that asserts every match terminates and no invaria
 | Public PeerJS broker has no SLA | Failures are surfaced clearly; broker host/port/key are configurable; README documents self-hosting |
 | Strict NAT blocks WebRTC | Google STUN handles most cases; TURN is out of scope, and the failure is reported honestly rather than hanging |
 | Mobile perf with 10 tanks + effects | Tilemap batching, pooled effects, quality tiers, an FPS probe that downgrades automatically |
-| Team balance is hard to tune with few testers | Bot-vs-bot soak runs surface degenerate strategies; every number lives in `config.ts` |
+| Team balance is hard to tune with few testers | Bot-vs-bot soak runs surface degenerate strategies; every number lives in `constants.ts` |
 | Scope creep on the room screen | Slot picking + preview is the only pre-match feature; chat, profiles and stats are out of scope |
 
 ## 15. Out of scope

@@ -3,14 +3,11 @@
 // the same lane. Recomputed every tick; cheap enough at a full roster.
 
 import type { Sim } from "../world/sim";
-import { CELL } from "../game/config";
+import { BOT_THREAT_COUNT_FOR_FULL_DEFENSE, BOT_THREAT_RADIUS_CELLS, CELL } from "../game/constants";
 import type { TeamId } from "../game/config";
 import { tankCenter } from "../world/tank";
 
 export type Role = "attack" | "defend";
-
-const THREAT_RADIUS_CELLS = 14;
-const THREAT_COUNT_FOR_FULL_DEFENSE = 2;
 
 function dist(ax: number, ay: number, bx: number, by: number): number {
   return Math.hypot(ax - bx, ay - by);
@@ -29,9 +26,9 @@ export function computeTeamRoles(sim: Sim, team: TeamId): Map<number, Role> {
   for (const t of sim.tanks) {
     if (!t.alive || t.team === team) continue;
     const c = tankCenter(t);
-    if (dist(c.x, c.y, flagPx.x, flagPx.y) <= THREAT_RADIUS_CELLS * CELL) threats++;
+    if (dist(c.x, c.y, flagPx.x, flagPx.y) <= BOT_THREAT_RADIUS_CELLS * CELL) threats++;
   }
-  const defendersWanted = threats >= THREAT_COUNT_FOR_FULL_DEFENSE ? 3 : 2;
+  const defendersWanted = threats >= BOT_THREAT_COUNT_FOR_FULL_DEFENSE ? 3 : 2;
 
   const mySlots = sim.tanks.filter((t) => t.team === team && t.alive);
   const byDistanceToFlag = [...mySlots].sort((a, b) => {

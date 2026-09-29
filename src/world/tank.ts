@@ -5,11 +5,9 @@ import {
   TANK_MARGIN,
   CELL,
   DEFAULT_BOT_DIFFICULTY,
-  BOT_DIFFICULTY_LABEL,
   TEAM_SIZE,
-  type BotDifficulty,
-  type TeamId,
-} from "../game/config";
+} from "../game/constants";
+import { BOT_DIFFICULTY_LABEL, type BotDifficulty, type TeamId } from "../game/config";
 
 export type SlotKind = "human" | "bot";
 
@@ -86,7 +84,7 @@ export function tankCenter(t: TankState): { x: number; y: number } {
 }
 
 /** The tank's actual collision/visual box — smaller than the 32px logical
- *  slot and centered within it (see TANK_HITBOX in config.ts). */
+ *  slot and centered within it (see TANK_HITBOX in constants.ts). */
 export function tankHitbox(t: TankState): { x: number; y: number; w: number; h: number } {
   return { x: t.x + TANK_MARGIN, y: t.y + TANK_MARGIN, w: TANK_HITBOX, h: TANK_HITBOX };
 }

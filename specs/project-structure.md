@@ -23,7 +23,8 @@ tanks/
    │  ├─ components/           # Hud (§6.2), Modal
    │  └─ hooks/                # useEnterKey (Enter = primary action), useModal (await a dialog)
    ├─ game/
-   │  ├─ config.ts             # all tunables from this spec
+   │  ├─ constants.ts          # every tunable from this spec, grouped by subsystem
+   │  ├─ config.ts             # ids and labels: teams, bot difficulties, DEBUG
    │  ├─ settings.ts           # persisted per-viewer settings (volume, quality, ...)
    │  ├─ touchControls.ts      # the mobile two-zone overlay (§5.3): floating stick + fire half
    │  └─ menuBackdrop.ts       # the live bot match behind the menus (§6.3)

@@ -219,6 +219,15 @@ Chromium at 1280x720 (wheel zoom, paint, Space-pan, peek round-trip) and at 412x
 touch (CDP two-finger pinch), plus `npm test` (163), `tsc`, `npm run build`. Not tried on real
 phone hardware.
 
+**2026-09-29 (constants):** every gameplay number now lives in `src/game/constants.ts`, grouped by
+subsystem (players, map, tank, shooting, bonuses, respawns, rounds, sim, touch, bots, net, editor) —
+including the tuning that used to sit as module-locals in `ai/bot.ts` (now `BOT_*`), `ai/teamPlan.ts`,
+`world/rules.ts` (`ASSIST_WINDOW`), `world/grid.ts` (`BRICK_QUARTERS`) and `touchControls.ts`
+(`TOUCH_*`). `game/config.ts` keeps only ids, labels and `DEBUG`. Purely cosmetic numbers (render,
+menu backdrop, editor camera) stayed next to their code. The spawn cap changed meaning:
+`MAX_PLAYERS_PER_MAP = 20` counts **both teams together** (was `EDITOR_MAX_SPAWNS_PER_TEAM = 16`,
+i.e. up to 32), enforced by the editor brush and the validator.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project

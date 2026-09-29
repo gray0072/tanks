@@ -47,8 +47,9 @@ import {
   EDITOR_MAX_W,
   EDITOR_MIN_H,
   EDITOR_MIN_W,
-  TEAM_COLOR,
-} from "../../game/config";
+  MAX_PLAYERS_PER_MAP,
+} from "../../game/constants";
+import { TEAM_COLOR } from "../../game/config";
 
 type PaletteEntry = { glyph: string; label: string; color: string };
 
@@ -422,7 +423,7 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
   const brushFor = (e: React.PointerEvent) => (e.button === 2 || (e.buttons & 2) !== 0 ? "." : brush);
 
   const reportPaint = (result: string) => {
-    if (result === "spawn-limit") showToast("That team already has the maximum number of spawns.");
+    if (result === "spawn-limit") showToast(`The map already holds the maximum of ${MAX_PLAYERS_PER_MAP} players.`);
     else if (result === "bonus-limit") showToast("The map already has the maximum number of bonus points.");
     else if (result === "entity-rect") showToast("Flags and spawns are placed one at a time, not dragged.");
   };

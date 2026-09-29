@@ -13,7 +13,8 @@ import { Sim, type SeatInput } from "../src/world/sim";
 import { createDefaultSlots } from "../src/world/tank";
 import { BotController } from "../src/ai/bot";
 import { computeTeamRoles, type Role } from "../src/ai/teamPlan";
-import { CELL, TICK_DT, TEAMS, type TeamId } from "../src/game/config";
+import { CELL, TICK_DT } from "../src/game/constants";
+import { TEAMS, type TeamId } from "../src/game/config";
 import { dist } from "../src/util/math";
 
 const SECONDS = 20;

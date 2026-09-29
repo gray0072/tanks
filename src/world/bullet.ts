@@ -1,5 +1,6 @@
 import { Dir, DIR_VECTOR } from "../util/math";
-import { BULLET_SPEED_BASE, BULLET_SPEED_STAR1, type TeamId } from "../game/config";
+import { BULLET_SPEED_BASE, BULLET_SPEED_STAR1 } from "../game/constants";
+import type { TeamId } from "../game/config";
 
 export type BulletState = {
   id: number;
