@@ -243,6 +243,16 @@ Don't trust this paragraph's specifics for long; read the current code and git l
   item — don't drop one because it seems minor next to the others. Docs/code/comments in this repo
   are English-only regardless of the language a request came in.
 - Git commits: one-line subject only, no body, no Co-Authored-By trailer (global rule, applies here).
+- **Line endings are mixed and must be preserved per file.** There is no `.gitattributes` and
+  `core.autocrlf` is `false`, so git stores whatever bytes you write: ~70 files are CRLF, ~40 are LF
+  (`git ls-files --eol` shows which). The trap is scripted edits on Windows: Python's text-mode
+  `open(p, "w")` turns every `
+` into `
+`, so an LF file silently becomes CRLF and a one-line
+  change shows up as a whole-file diff (this happened on 2026-09-29 and two commits had to be
+  rewritten). The Edit/Write tools keep a file's endings; for scripts, read and write **bytes**
+  (`open(p, "rb")`/`"wb"`) or pass `newline=""` so nothing is translated. Before committing, check
+  `git diff --stat` against `git diff --stat --ignore-cr-at-eol` — if they differ, endings changed.
 
 ## Testing
 
