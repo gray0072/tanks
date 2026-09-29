@@ -1,0 +1,6 @@
+# Commits git blame should look through: whole-file changes that alter no
+# content. GitHub reads this file automatically; locally run
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Normalize every text file to LF and pin it with .gitattributes
+2b7d50eb96977bf8539b5fe8331a846f7a058f81

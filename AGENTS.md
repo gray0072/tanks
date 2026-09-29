@@ -244,14 +244,19 @@ Don't trust this paragraph's specifics for long; read the current code and git l
   item — don't drop one because it seems minor next to the others. Docs/code/comments in this repo
   are English-only regardless of the language a request came in.
 - Git commits: one-line subject only, no body, no Co-Authored-By trailer (global rule, applies here).
-- **Line endings are mixed and must be preserved per file.** There is no `.gitattributes` and
-  `core.autocrlf` is `false`, so git stores whatever bytes you write: ~70 files are CRLF, ~40 are LF
-  (`git ls-files --eol` shows which). The trap is scripted edits on Windows: Python's text-mode
-  `open(p, "w")` turns every LF into CRLF, so an LF file silently becomes CRLF and a one-line
-  change shows up as a whole-file diff (this happened on 2026-09-29 and two commits had to be
-  rewritten). The Edit/Write tools keep a file's endings; for scripts, read and write **bytes**
-  (`open(p, "rb")`/`"wb"`) or pass `newline=""` so nothing is translated. Before committing, check
-  `git diff --stat` against `git diff --stat --ignore-cr-at-eol` — if they differ, endings changed.
+- **Line endings: LF everywhere, enforced by `.gitattributes`** (`* text=auto eol=lf`). Until
+  2026-09-29 the repo was a CRLF/LF mix with nothing pinning it, and scripted edits on Windows kept
+  breaking it — Python's text-mode `open(p, "w")` writes CRLF, so an LF file turned CRLF and a
+  one-line change showed up as a whole-file diff (two commits had to be rewritten). Now git
+  normalizes whatever gets written back to LF on `git add`, so that can't reach a commit. Still,
+  in scripts prefer bytes (`open(p, "rb")`/`"wb"`) or `newline=""`, so the working tree matches
+  the index and `git status` isn't full of phantom changes. The normalization commit is listed in
+  `.git-blame-ignore-revs`; run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per
+  clone so local `git blame` skips it (GitHub does on its own).
+- **Escape sequences in heredocs become real control bytes.** A `\n` or `\r` meant as literal
+  text, written through a shell heredoc into a Python string, lands in the file as an actual
+  newline/CR — a lone CR made git classify `AGENTS.md` as binary. Write such text with the
+  Edit/Write tools, not through a script.
 
 ## Testing
 
