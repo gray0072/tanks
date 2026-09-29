@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { EditorDoc, EditorModel } from "../src/world/maps/editorModel";
-import { MAX_PLAYERS_PER_MAP } from "../src/game/constants";
+import { MAX_PLAYERS_PER_TEAM } from "../src/game/constants";
 
 const TEMPLATE = [
   "@@@@@@@@@@",
@@ -81,31 +81,27 @@ test("the flag brush moves the flag instead of adding a second one", () => {
   assert.equal(m.count("R"), 1);
 });
 
-test("the spawn brush adds, toggles off, and stops at the per-map player cap", () => {
+test("the spawn brush adds, toggles off, and stops at the per-team cap", () => {
   const m = EditorModel.fromTemplate(TEMPLATE);
   m.paint(3, 5, "r");
   assert.equal(m.count("r"), 3);
   assert.equal(m.paint(3, 5, "r"), "changed");
   assert.equal(m.count("r"), 2, "a second click on the same spawn removes it");
 
-  // The cap counts both teams: fill up alternating red and blue from the
-  // free rows inside the border until the map holds MAX_PLAYERS_PER_MAP.
+  // The free rows inside the border (4 x 8 cells) are enough to reach the
+  // cap from the two red spawns the template already has.
   const free: [number, number][] = [];
   for (const y of [2, 4, 5, 7]) for (let x = 1; x <= 8; x++) free.push([x, y]);
   let i = 0;
-  while (m.count("r") + m.count("b") < MAX_PLAYERS_PER_MAP) {
-    const [x, y] = free[i];
-    assert.equal(m.paint(x, y, i++ % 2 ? "b" : "r"), "changed", `(${x},${y})`);
+  while (m.count("r") < MAX_PLAYERS_PER_TEAM) {
+    const [x, y] = free[i++];
+    assert.equal(m.paint(x, y, "r"), "changed", `(${x},${y})`);
   }
   const [lx, ly] = free[i];
   assert.equal(m.paint(lx, ly, "r"), "spawn-limit");
-  assert.equal(m.paint(lx, ly, "b"), "spawn-limit");
-  assert.equal(m.count("r") + m.count("b"), MAX_PLAYERS_PER_MAP);
-
-  // At the cap, swapping a spawn's team is still allowed — it adds nobody.
-  const blue = m.find("b")[0];
-  assert.equal(m.paint(blue.x, blue.y, "r"), "changed");
-  assert.equal(m.count("r") + m.count("b"), MAX_PLAYERS_PER_MAP);
+  assert.equal(m.count("r"), MAX_PLAYERS_PER_TEAM);
+  // The cap is per team: blue still has room.
+  assert.equal(m.paint(lx, ly, "b"), "changed");
 });
 
 test("a red spawn placed on a blue spawn replaces it", () => {

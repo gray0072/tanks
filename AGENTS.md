@@ -224,9 +224,10 @@ subsystem (players, map, tank, shooting, bonuses, respawns, rounds, sim, touch, 
 including the tuning that used to sit as module-locals in `ai/bot.ts` (now `BOT_*`), `ai/teamPlan.ts`,
 `world/rules.ts` (`ASSIST_WINDOW`), `world/grid.ts` (`BRICK_QUARTERS`) and `touchControls.ts`
 (`TOUCH_*`). `game/config.ts` keeps only ids, labels and `DEBUG`. Purely cosmetic numbers (render,
-menu backdrop, editor camera) stayed next to their code. The spawn cap changed meaning:
-`MAX_PLAYERS_PER_MAP = 20` counts **both teams together** (was `EDITOR_MAX_SPAWNS_PER_TEAM = 16`,
-i.e. up to 32), enforced by the editor brush and the validator.
+menu backdrop, editor camera) stayed next to their code. The spawn cap is now
+`MAX_PLAYERS_PER_TEAM = 20` (was `EDITOR_MAX_SPAWNS_PER_TEAM = 16`), enforced by the editor brush and
+the validator, and `TEAM_SIZE` is gone: there is no default roster, `createDefaultSlots` requires
+both team sizes and every caller takes them from the map's spawns.
 
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 

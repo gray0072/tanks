@@ -106,7 +106,7 @@ the draft in memory, so nothing is silently lost.
 |---|---|---|
 | `EDITOR_MIN_W`, `EDITOR_MIN_H` | **8** | The engine floor is 2 × 2 (`MIN_MAP_W/H`) — enough to *parse*, far too small to be a match. 8 × 8 is the smallest grid where two bases plus cover is a game, and it's still tiny enough for quick test maps. |
 | `EDITOR_MAX_W`, `EDITOR_MAX_H` | **64** | Half the engine's `MAX_MAP_W/H` = 128. At 64 × 64 the arena is 2048 logical px and already letterboxes hard on a phone; the cap also keeps the editor's per-cell work and the stored record small. |
-| `MAX_PLAYERS_PER_MAP` | **20** | Both teams together — 10v10, or lopsided like 8v12. Around what the room screen's two roster columns show comfortably (`SPEC.md` §6.1) and what the bots were tuned for, but nothing in the engine assumes a roster size — it is built from the map's spawn count — so the cap is a deliberate ceiling rather than a structural one. (Was 16 *per team* until 2026-09-29.) |
+| `MAX_PLAYERS_PER_TEAM` | **20** | 20 a side = 40 tanks. Past what the room screen's two roster columns show comfortably (`SPEC.md` §6.1) and past what the bots were tuned for, but nothing in the engine assumes a roster size — it is always built from the map's spawn count, there is no default team size — so the cap is a deliberate ceiling rather than a structural one. |
 | `EDITOR_MAX_BONUS_SPAWNS` | **16** | Sanity bound; `BONUS_MAX_ON_FIELD` is 2, so past a handful of points it's only variety. |
 | `EDITOR_MAX_NAME` | **24** chars | Fits the library card and the room screen's "Map: …" line. |
 
@@ -292,8 +292,8 @@ and `E` (eraser) select brushes; the eraser writes `EMPTY`.
 - Placing `R`/`B` **moves** the existing flag rather than adding one: there is exactly one per team by
   construction, so the flag brush is "pick it up and drop it here". Placing it on the cell it already
   occupies is a no-op, not a delete.
-- Placing `r`/`b` **adds** a spawn, up to `MAX_PLAYERS_PER_MAP` spawns across both teams (past the
-  cap the brush refuses with a toast); placing on an existing spawn of the same team removes it (toggle), which is
+- Placing `r`/`b` **adds** a spawn, up to `MAX_PLAYERS_PER_TEAM` per team (past the cap the brush
+  refuses with a toast); placing on an existing spawn of the same team removes it (toggle), which is
   how you delete one without switching brushes. Placing a red spawn on a blue spawn replaces it.
 - Spawn **priority** is scan order (`SPEC.md` §3.5), not placement order — the editor shows the
   resulting index on each spawn marker so this isn't a surprise.
@@ -376,7 +376,7 @@ calls `parseMap`, converts a `MapValidationError` into errors, and adds the edit
 
 1. **Size** within `EDITOR_MIN_*`..`EDITOR_MAX_*`; every row the same length; only known glyphs.
 2. **Exactly one red flag and one blue flag.**
-3. **At least one spawn per team**, at most `MAX_PLAYERS_PER_MAP` for both teams together. The counts need not
+3. **At least one spawn per team**, at most `MAX_PLAYERS_PER_TEAM` each. The counts need not
    be equal — uneven teams are a **warning**, not an error (see §7.2).
 4. **Reachability — the requested rule, strengthened.** Flood fill over cells a tank can eventually
    occupy — `STEEL` and `WATER` block, `BRICK` is passable (it can be shot open),
@@ -474,7 +474,7 @@ reconnects get it too.
 | `src/ui/screens/CreateRoom.tsx` | inline map grid → `Map: … [Change…]` row (§5.5) |
 | `src/ui/screens/MainMenu.tsx` | `Level Editor` button |
 | `src/ui/screens/RoomScreen.tsx` | size/roster on the map line; `Save to my maps` for a received custom map |
-| `src/game/constants.ts` | `EDITOR_*` and `MAX_PLAYERS_PER_MAP` (§3) |
+| `src/game/constants.ts` | `EDITOR_*` and `MAX_PLAYERS_PER_TEAM` (§3) |
 | `src/net/protocol.ts`, `host.ts`, `client.ts` | optional `mapTemplate` (§9) |
 | `src/render/preview.ts` | reused for library thumbnails; the editor canvas shares `TILE_COLOR` |
 | `src/style.css` | library cards, editor layout, palette, phone breakpoints |
@@ -488,7 +488,7 @@ deliberately free of DOM and Vite imports so they run there):
 
 - `tests/mapEditor.test.ts` — paint one cell; rect fill covers exactly the dragged rectangle, clamped
   at the edges; rect fill with an entity brush is rejected; painting terrain over an entity drops the
-  entity; flag placement moves rather than duplicates; spawn toggle and the per-map player cap; undo/redo
+  entity; flag placement moves rather than duplicates; spawn toggle and the per-team cap; undo/redo
   restores exact templates; resize grow/shrink under each anchor keeps the right cells and drops the
   right entities; template → model → template round-trips byte-identically.
 - `tests/mapValidation.test.ts` — one case per §7.1 error and §7.2 warning on minimal hand-written

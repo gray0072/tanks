@@ -5,7 +5,6 @@ import {
   TANK_MARGIN,
   CELL,
   DEFAULT_BOT_DIFFICULTY,
-  TEAM_SIZE,
 } from "../game/constants";
 import { BOT_DIFFICULTY_LABEL, type BotDifficulty, type TeamId } from "../game/config";
 
@@ -108,8 +107,8 @@ export function botNickname(id: number, difficulty: BotDifficulty): string {
 /** The room always starts with the creator in slot 0 and bots filling the
  *  rest — SPEC §2.1: at most `blueSize + redSize - 1` bots can ever exist,
  *  because the room creator always occupies one human slot. The sizes come
- *  from the loaded map's own spawn counts, one slot per `r`/`b` marker; the
- *  `TEAM_SIZE` default is only for a room built without a map in hand.
+ *  from the loaded map's own spawn counts, one slot per `r`/`b` marker —
+ *  there is no default size.
  *
  *  **The teams need not be the same size** (SPEC §3.5): a map may declare 4
  *  reds against 6 blues, so ids are `0..blueSize-1` blue and
@@ -118,8 +117,8 @@ export function botNickname(id: number, difficulty: BotDifficulty): string {
  *  read `slot.team`. */
 export function createDefaultSlots(
   hostNickname: string,
-  blueSize: number = TEAM_SIZE,
-  redSize: number = blueSize,
+  blueSize: number,
+  redSize: number,
 ): Slot[] {
   const slots: Slot[] = [];
   const total = blueSize + redSize;

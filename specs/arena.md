@@ -183,7 +183,7 @@ dropped from the lobby list in production.
 The level editor runs a **stricter superset** of these (`world/maps/validateMap.ts`,
 `specs/level-editor.md` §7) before it will let a map be saved as playable, reported as a list of
 individually-addressable problems rather than one thrown message: an 8 × 8 … 64 × 64 size window
-inside the engine's own 2 × 2 … 128 × 128, at most 20 spawns across both teams (`MAX_PLAYERS_PER_MAP`), no spawn or flag within
+inside the engine's own 2 × 2 … 128 × 128, at most 20 spawns a team (`MAX_PLAYERS_PER_TEAM`), no spawn or flag within
 Chebyshev distance 2 of an enemy spawn, and per-spawn reachability that names *which* spawn is
 walled in. It also raises non-blocking warnings, including the "no open lane to a flag" design rule
 above — which nothing checked until now.

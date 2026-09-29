@@ -12,7 +12,7 @@ import {
   EDITOR_MAX_BONUS_SPAWNS,
   EDITOR_MAX_H,
   EDITOR_MAX_NAME,
-  MAX_PLAYERS_PER_MAP,
+  MAX_PLAYERS_PER_TEAM,
   EDITOR_MAX_W,
   EDITOR_MIN_H,
   EDITOR_MIN_W,
@@ -98,12 +98,10 @@ export function validateMapTemplate(template: string, opts: ValidateOpts = {}): 
   if (redSpawns.length === 0) err("Red has no player spawns.");
   if (blueSpawns.length === 0) err("Blue has no player spawns.");
 
-  const players = redSpawns.length + blueSpawns.length;
-  if (players > MAX_PLAYERS_PER_MAP) {
-    err(`${players} player spawns — a map holds at most ${MAX_PLAYERS_PER_MAP} players in all.`, [
-      ...redSpawns,
-      ...blueSpawns,
-    ]);
+  for (const [team, spawns] of [["Red", redSpawns], ["Blue", blueSpawns]] as const) {
+    if (spawns.length > MAX_PLAYERS_PER_TEAM) {
+      err(`${team} has ${spawns.length} spawns — at most ${MAX_PLAYERS_PER_TEAM} per team.`, spawns);
+    }
   }
   if (bonuses.length > EDITOR_MAX_BONUS_SPAWNS) {
     err(`${bonuses.length} bonus spawn points — at most ${EDITOR_MAX_BONUS_SPAWNS}.`, bonuses);

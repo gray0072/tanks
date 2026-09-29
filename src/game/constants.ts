@@ -10,16 +10,12 @@ import type { BonusKind } from "../world/bonus";
 // Players and teams (SPEC §2, §3.5)
 // =============================================================================
 
-// Most tanks one map may field, both teams together — one per `r`/`b` spawn
-// marker in its template. The roster is built from the map's own spawn count,
-// so nothing in the engine assumes a size; this is a deliberate ceiling (the
-// room's two roster columns and the bot layer's tuning), enforced by the
-// editor and the map validator. Lopsided maps are fine as long as the total
-// fits.
-export const MAX_PLAYERS_PER_MAP = 20;
-// Fallback roster size only, for a room created without a map in hand. The
-// real team size is whatever the loaded map declares.
-export const TEAM_SIZE = 5;
+// Most tanks one team may field — one per `r`/`b` spawn marker in the map's
+// template, so up to 20v20. There is no default team size: the roster is
+// always built from the loaded map's own spawn counts, and nothing in the
+// engine assumes a size. This is a deliberate ceiling, enforced by the editor
+// and the map validator. The teams need not be equal (4 vs 6 is fine).
+export const MAX_PLAYERS_PER_TEAM = 20;
 
 // =============================================================================
 // Map and arena (SPEC §3)
@@ -103,7 +99,7 @@ export const MINE_BLAST_RADIUS_CELLS = 1;
 export const RESPAWN_DELAY = 3; // s
 export const SPAWN_INVULN = 3; // s
 // Respawns are a *multiplier on team size*, not a flat pool: a 1v1 map and a
-// 10v10 one want wildly different pools, and the roster is whatever the map
+// 20v20 one want wildly different pools, and the roster is whatever the map
 // declares. Each team starts with mult x (its own slot count), so lopsided
 // maps (4 vs 6) give each side the same respawns per player.
 export const RESPAWN_MULTIPLIERS = [0, 1, 2, 3, 5, 10, 20, 50, 100];

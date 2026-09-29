@@ -13,7 +13,7 @@ import {
   EDITOR_DEFAULT_W,
   EDITOR_MAX_BONUS_SPAWNS,
   EDITOR_MAX_H,
-  MAX_PLAYERS_PER_MAP,
+  MAX_PLAYERS_PER_TEAM,
   EDITOR_MAX_W,
   EDITOR_MIN_H,
   EDITOR_MIN_W,
@@ -166,10 +166,7 @@ export class EditorModel {
         this.set(x, y, EMPTY);
         return "changed";
       }
-      // The cap counts both teams (MAX_PLAYERS_PER_MAP); turning a blue
-      // spawn into a red one doesn't add a player.
-      const players = this.count("r") + this.count("b") - (before === "r" || before === "b" ? 1 : 0);
-      if (players >= MAX_PLAYERS_PER_MAP) return "spawn-limit";
+      if (this.count(glyph) >= MAX_PLAYERS_PER_TEAM) return "spawn-limit";
       this.set(x, y, glyph);
       return "changed";
     }
