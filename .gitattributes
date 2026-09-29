@@ -1,0 +1,10 @@
+# One line ending for every text file, whatever the editor or script that
+# wrote it: git stores LF and checks out LF on every OS. See AGENTS.md,
+# "Line endings".
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
