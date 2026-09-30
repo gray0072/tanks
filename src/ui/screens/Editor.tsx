@@ -39,6 +39,7 @@ import {
   type Size,
 } from "../editorCamera";
 import { useModal } from "../hooks/useModal";
+import { MODAL_ALT } from "../components/Modal";
 import { loadUserSettings, randomGuestNickname } from "../../game/settings";
 import { RoomHost } from "../../net/host";
 import {
@@ -630,9 +631,19 @@ export function Editor({ go, route }: { go: Navigate; route: EditorRoute }) {
         ? "This map still has problems, so it can't be saved — leaving keeps it as a draft you can restore next time."
         : "You have unsaved changes.",
       confirmLabel: blocked ? "Leave as draft" : "Save and leave",
+      altLabel: "Leave without saving",
       cancelLabel: "Keep editing",
     });
     if (ok === null) return;
+    if (ok === MODAL_ALT) {
+      // Discarding means gone: the crash-recovery draft goes too, or the
+      // next visit would offer to restore exactly what was thrown away.
+      dirty.current = false;
+      if (draftTimer.current) clearTimeout(draftTimer.current);
+      clearEditorDraft();
+      go(route.from);
+      return;
+    }
     if (blocked) {
       saveEditorDraft({ mapId: mapId.current, name, template: doc.current.template, savedAt: Date.now() });
       go(route.from);

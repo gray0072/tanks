@@ -10,7 +10,7 @@ and whatever a new map asks for. Every slot is always occupied, by a human or by
 are always full and always symmetric.
 
 - A slot is either **human** (nickname, 2–12 chars) or **bot**. A bot's name is its difficulty plus
-  its 1-based slot position — `Easy1`, `Medium2`, `Hard3` — assigned the lowest free index, unique room-wide,
+  its 1-based slot position — `Easy1`, `Medium2`, `Hard3`, `Extreme4` — assigned the lowest free index, unique room-wide,
   and re-derived whenever that bot's difficulty changes, so the name always states how it plays.
 - A joining player takes **any** slot, on either team, replacing the bot that sat there.
 - A leaving player's slot reverts to a bot mid-match, keeping the tank's current state (position,

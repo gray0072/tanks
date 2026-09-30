@@ -39,7 +39,7 @@ with no server, no install and no account.
 | 🧩 **Teams sized by the map** | The roster is the map's spawn count, not a fixed number — a 1v1 test arena and a 16-a-side brawl are the same engine, and every free slot is filled by a bot |
 | ⚔️ **Team battle with an objective** | Destroy the enemy flag to take the round, or grind the enemy out of respawns before the clock runs out |
 | 🏆 **Played as a series** | A match is best-of: rounds run back to back on rebuilt terrain, and the first team to the room's win target (1–10, default 5) takes it. No draws — a round the clock ran out on goes to whoever has lives left, or got deepest into the enemy base |
-| 🤖 **Bots on every free slot** | Easy / Medium / Hard, set per bot or for the whole roster — genuinely different tactics, not just better aim |
+| 🤖 **Bots on every free slot** | Easy / Medium / Hard / Extreme, set per bot or for the whole roster — genuinely different tactics, not just better aim |
 | 🧱 **Destructible terrain** | Brick crumbles cell by cell, steel resists until you're upgraded, forest conceals, water stops tanks but not bullets, ice slides, sand slows |
 | ✨ **Eight power-ups** | Four are yours, four swing the whole team |
 | 🌐 **Peer-to-peer multiplayer** | Join by code or invite link over WebRTC — no server to run, no public IP, no accounts |

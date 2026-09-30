@@ -41,11 +41,12 @@ Mirror-symmetric along the horizontal axis:
 | `STEEL` | blocks | blocks | Only `STAR 3` bullets destroy it |
 | `FOREST` | passes | passes | Drawn **above** tanks — hides tanks and bullets inside it. An enemy whose whole footprint is on forest is not drawn at all, including the parts that reach past its hull (nickname, rank pips, shield ring, bonus auras); one straddling a forest edge stays drawn and is only partly covered. Teammates stay visible through forest, faded |
 | `WATER` | blocks | passes | Impassable; animated |
-| `ICE` | passes | passes | Low friction — the tank keeps sliding ~0.4 s after the key is released and cannot turn instantly |
+| `ICE` | passes | passes | Low friction — the tank keeps sliding ~0.4 s after the key is released and cannot turn instantly: a new direction takes effect once the slide has run out, at most ~0.4 s after it is pressed (holding it does not keep the slide going — only driving the way the tank faces does) |
 | `SAND` | passes | passes | ×0.55 move speed |
 | `FLAG` | blocks | **destroys → match ends** | 1 cell, one per team, team-colored |
 
-Render layer order: ground → water → ice/sand decals → bonuses → flags → tanks → bullets → brick &
+Render layer order: ground → water → ice/sand decals → bonuses → flags → mines (on the ground, so a
+tank on top of one covers it) → tanks → bullets → brick &
 steel → forest → friendly-in-forest overlay → own-tank markers (§7) → effects → HUD.
 
 ## 3.4 Maps

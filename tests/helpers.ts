@@ -10,7 +10,7 @@ import { createDefaultSlots, type TankState } from "../src/world/tank";
 import { BotController } from "../src/ai/bot";
 import { computeTeamRoles, type Assignment } from "../src/ai/teamPlan";
 import { Dir } from "../src/util/math";
-import { CELL, DEFAULT_BONUS_RATE, FIRE_COOLDOWN, TICK_DT } from "../src/game/constants";
+import { CELL, DEFAULT_BONUS_RATE, DEFAULT_RESPAWN_MULT, DEFAULT_TIME_LIMIT, FIRE_COOLDOWN, TICK_DT } from "../src/game/constants";
 import type { BotDifficulty, TeamId } from "../src/game/config";
 
 export const DT = TICK_DT;
@@ -189,4 +189,53 @@ export function matchFrags(map: MapDef, blue: BotDifficulty, red: BotDifficulty,
     }
   }
   return frags;
+}
+
+export type RoundResult = {
+  winner: TeamId | null;
+  /** How it was decided: the flag fell, a side ran out of lives, or the clock. */
+  how: "flag" | "lives" | "time";
+  frags: Record<TeamId, number>;
+  teamkills: Record<TeamId, number>;
+};
+
+/** One whole round under the default rules (lives, clock, flags), all bots.
+ *  Frags over a fixed window (matchFrags) miss how a round is actually won —
+ *  a side that sets up before it fights loses the opening minute and still
+ *  takes the round. `blue`/`red` are profile ids, so the bot league can
+ *  pass candidate profiles it registered next to the real ones. */
+export function playRound(map: MapDef, blue: string, red: string, seed: number, friendlyFire = false): RoundResult {
+  const slots = createDefaultSlots("host", map.spawns.blue.length, map.spawns.red.length);
+  for (const s of slots) {
+    s.kind = "bot";
+    s.owner = null;
+    s.botDifficulty = (s.team === "blue" ? blue : red) as BotDifficulty;
+  }
+  const settings: MatchSettings = {
+    mapId: map.id, winsTarget: 1, timeLimit: DEFAULT_TIME_LIMIT, respawnMult: DEFAULT_RESPAWN_MULT,
+    friendlyFire, bonusesPerMinute: DEFAULT_BONUS_RATE,
+  };
+  const sim = new Sim(map, settings, slots, seed);
+  const bots = new Map(slots.map((s) => [s.id, new BotController(s.id)]));
+  const frags = { blue: 0, red: 0 };
+  const teamkills = { blue: 0, red: 0 };
+  let flagFell = false;
+  // Sudden death can run past the clock; the cap only guards a hang.
+  for (let i = 0; i < (DEFAULT_TIME_LIMIT + 120) / DT && !sim.rules.ended; i++) {
+    const roles: Record<TeamId, Map<number, Assignment>> = {
+      blue: computeTeamRoles(sim, "blue"),
+      red: computeTeamRoles(sim, "red"),
+    };
+    const inputs: Record<number, SeatInput> = {};
+    for (const s of slots) inputs[s.id] = bots.get(s.id)!.decide(sim, roles[s.team], s.botDifficulty);
+    for (const e of sim.step(inputs, DT)) {
+      if (e.type === "flagHit") flagFell = true;
+      if (e.type !== "kill" || e.killerSlot === null) continue;
+      const k = sim.tankBySlot(e.killerSlot).team;
+      if (k === sim.tankBySlot(e.victimSlot).team) teamkills[k]++;
+      else frags[k]++;
+    }
+  }
+  const how = flagFell ? "flag" : sim.rules.timeLeft <= 0 ? "time" : "lives";
+  return { winner: sim.rules.winner, how, frags, teamkills };
 }

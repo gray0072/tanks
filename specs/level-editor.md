@@ -333,9 +333,10 @@ match returns to the editor with the work and the undo stack intact.
 ### 6.8 Dirty state, autosave, leaving
 
 - Any mutation marks the editor dirty and writes `tanks.editorDraft` (debounced ~1 s).
-- `Back` while dirty → dialog: `Save` / `Discard` / `Cancel`. `Save` is blocked by validation errors
-  (§7) and the dialog says so, offering `Save as draft` (keeps `tanks.editorDraft`, doesn't touch the
-  library) instead.
+- `Back` while dirty → dialog: `Save and leave` / `Leave without saving` / `Keep editing`. `Save` is
+  blocked by validation errors (§7) and the dialog says so, offering `Leave as draft` (keeps
+  `tanks.editorDraft`, doesn't touch the library) instead. `Leave without saving` also clears the
+  draft, so the next visit doesn't offer to restore what was just thrown away.
 - On opening the editor, if `tanks.editorDraft` exists and is newer than the stored map it belongs to,
   offer to restore it ("Unsaved changes from <relative time> — Restore / Discard").
 - A successful save clears the draft.

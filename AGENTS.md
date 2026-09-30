@@ -296,6 +296,36 @@ resets; and the lead test's score was, with a helmeted target, only measuring fl
   is suspended between matches. **Needs confirming on the user's machine.**
 - README screenshots re-shot (Playwright, 2x) for the backdrop and the grass.
 
+**2026-09-30 (Extreme bots, mines):** a fourth difficulty, **Extreme** (SPEC §10.3), and mines
+now render under tanks (the mine layer sat above the tank layer).
+- Every new behaviour is a `BotProfile` flag, and the shipped profile was *picked by a league*:
+  `npx tsx scripts/botLeague.ts [seeds] [--ff] [--only a,b] [--vs x]` plays full default rounds on
+  all six maps, both sides (~1.5 s a round). SPEC §10.3 has the whole run. Short version: pro
+  timings alone ("reflex") already beat Hard; of the teamwork ideas only call-outs, spacing, forest
+  ambush and recon fire held their own, while group pushes (pincer or column) and reacting to every
+  approaching enemy *lost* rounds even after retuning. They are still in the code, off.
+- Team state (call-outs, who hunts whom, push staging) is `ai/teamIntel.ts`, a board per Sim.
+- Friendly-fire awareness is on for Hard and Extreme. The instrument that made it work: tag every
+  shot at fire time and classify each teamkill (in lane at the trigger vs teammate drove in). The
+  second kind dominated, hence the movement prediction and dodging friendly bullets.
+- Fixed on the way, all difficulties: a bot escaping a stuck spot fired its planned shot along the
+  random escape direction.
+- The ladder test's Extreme rung is on **rounds won** (`playRound` in `tests/helpers.ts`), not
+  frags: Extreme trails Hard on frags in the first 75 s and still wins ~61 % of rounds. One seed a
+  map was a coin toss; three is stable.
+- Open: the Extreme edge from teamwork is small next to its reflexes.
+
+**2026-09-30 (ice, editor exit):**
+- **Tanks couldn't turn on ice while a key was held.** Any held direction re-armed the slide
+  (`slideT`), and a turn on ice waits for the slide to run out — so a *new* direction held down
+  never took effect. Bots always hold a direction, so they drove on into walls and each other and
+  piled up. Now only driving the way the tank faces keeps the slide going. On `iceworks` over full
+  rounds, bots on ice stood still 37-51 % of the time before, 6-7 % after (time on ice itself
+  ~30 % -> ~16 %). `tests/movement.test.ts` pins it; the old ice test only checked the key-release path.
+- **The editor's leave dialog had no "discard".** SPEC said Save / Discard / Cancel, only two were
+  built. `Modal` has an optional third button (`altLabel`, resolves `MODAL_ALT`); `Leave without
+  saving` also clears `tanks.editorDraft`.
+
 Don't trust this paragraph's specifics for long; read the current code and git log, this rots fast.
 
 ## How to work with this project
@@ -390,7 +420,8 @@ Don't trust this paragraph's specifics for long; read the current code and git l
   start, and drops per minute following the room's `bonusesPerMinute` across the range.
 - `tests/bots.test.ts` — bot tactics per difficulty (SPEC §10): objective play, shooting through
   brick, bonus behaviour, fair perception, rate of fire, and an integration test that plays
-  full bot-vs-bot matches and asserts **Hard > Medium > Easy**. That last one is the important
+  full bot-vs-bot matches and asserts **Hard > Medium > Easy**, plus **Extreme > Hard** on
+  rounds won. That last one is the important
   one — every individual behaviour can look right while the profiles still rank backwards in a
   fight, which is exactly what was happening.
 

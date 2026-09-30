@@ -14,9 +14,9 @@ import { Tile } from "../src/world/grid";
 import { Dir } from "../src/util/math";
 import { BOT_LAST_RESORT_BRICK_COST, BOT_PROFILE, CELL, FIRE_COOLDOWN } from "../src/game/constants";
 import type { BotDifficulty } from "../src/game/config";
-import { botFixture, cells, matchFrags, place } from "./helpers";
+import { botFixture, cells, matchFrags, place, playRound } from "./helpers";
 
-const DIFFICULTIES: BotDifficulty[] = ["easy", "normal", "hard"];
+const DIFFICULTIES: BotDifficulty[] = ["easy", "normal", "hard", "extreme"];
 
 // A wide-open arena. Both flags sit in the far corners, out of every lane
 // used below, so a test that watches for a shot can only be seeing the one
@@ -152,6 +152,45 @@ test("only Hard fires through brick at an enemy it knows is behind it", () => {
   assert.ok(shots.hard > 0, "Hard should spend ammunition punching through brick");
   assert.ok(shots.hard > shots.normal, `hard ${shots.hard} vs normal ${shots.normal}`);
   assert.equal(shots.easy, 0, "Easy never shoots brick at all (SPEC §10.3)");
+});
+
+// LANE with a second blue spawn: slots 0 and 1 are blue, 2 is red.
+const TEAM_LANE = `
+@@@@@@@@@@@@@@@@
+@B...........R.@
+@.@@@@@@@@@@@@@@
+@bb...........r@
+@@@@@@@@@@@@@@@@
+`;
+
+/** Shooter (slot 0), a teammate parked between it and the enemy, and the
+ *  enemy (slot 2) at the far end of the corridor — shots fired down it. */
+function shotsPastTeammate(difficulty: BotDifficulty, friendlyFire: boolean): number {
+  const f = botFixture(TEAM_LANE, difficulty, { seed: 4, keep: [1, 2] });
+  f.sim.settings.friendlyFire = friendlyFire;
+  const ally = f.sim.tankBySlot(1);
+  const enemy = f.sim.tankBySlot(2);
+  place(f.tank, cells(3), cells(3));
+  place(ally, cells(7), cells(3));
+  place(enemy, cells(11), cells(3));
+  f.tank.dir = Dir.Right;
+  ally.dir = Dir.Up;
+  enemy.dir = Dir.Up;
+  ally.helmetT = 999;
+  enemy.helmetT = 999;
+  const pinned = { 1: { dir: null, fire: false, mine: false }, 2: { dir: null, fire: false, mine: false } };
+  return f.run(3, pinned).shotsByDir[Dir.Right] ?? 0;
+}
+
+test("Hard and Extreme never shoot through a teammate with friendly fire on", () => {
+  for (const difficulty of ["hard", "extreme"] as BotDifficulty[]) {
+    assert.equal(shotsPastTeammate(difficulty, true), 0, `${difficulty} fired through its own teammate`);
+    // Friendly fire off, the bullet passes the teammate harmlessly: the
+    // same shot is then the right one to take.
+    assert.ok(shotsPastTeammate(difficulty, false) > 0, `${difficulty} held fire with friendly fire off`);
+  }
+  // Medium doesn't think about it — which is what keeps the test honest.
+  assert.ok(shotsPastTeammate("normal", true) > 0, "the setup should tempt a bot that ignores friendly fire");
 });
 
 for (const difficulty of DIFFICULTIES) {
@@ -419,4 +458,27 @@ test("the difficulty ladder holds up over full bot matches", () => {
   assert.ok(easyBlue.rf > easyBlue.bf, `normal ${easyBlue.rf} vs easy ${easyBlue.bf}`);
   const topOfLadder = outcome("hard", "normal");
   assert.ok(topOfLadder.bf > topOfLadder.rf, `hard ${topOfLadder.bf} vs normal ${topOfLadder.rf}`);
+
+});
+
+test("Extreme wins more rounds than Hard", () => {
+  // Rounds, not a frag window: Extreme spends the opening getting into
+  // position (bushes, spacing) and trails Hard on frags over the first 75 s,
+  // then wins the round more often than not — 110 : 70 over 180 rounds on
+  // fresh seeds. Three seeds a map, both sides: every set of five tried
+  // passed, the narrowest 20 : 16. One seed a map was a coin toss.
+  let extreme = 0;
+  let hard = 0;
+  for (const src of MAP_SOURCES) {
+    const map = parseMap(src.id, src.name, src.template);
+    for (const seed of [1, 2, 3]) {
+      for (const [blue, red] of [["extreme", "hard"], ["hard", "extreme"]]) {
+        const w = playRound(map, blue, red, seed).winner;
+        if (w === null) continue;
+        if ((w === "blue" ? blue : red) === "extreme") extreme++;
+        else hard++;
+      }
+    }
+  }
+  assert.ok(extreme > hard, `extreme ${extreme} rounds vs hard ${hard}`);
 });

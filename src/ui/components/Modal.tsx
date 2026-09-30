@@ -14,8 +14,14 @@ export type ModalOptions = {
   readOnlyText?: boolean;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** A third choice between Cancel and confirm (the editor's "Leave without
+   *  saving"); picking it resolves with MODAL_ALT. */
+  altLabel?: string;
   danger?: boolean;
 };
+
+/** What `show()` resolves with when the `altLabel` button is picked. */
+export const MODAL_ALT = "\u0000alt";
 
 export function Modal({ opts, onDone }: { opts: ModalOptions; onDone: (value: string | null) => void }) {
   const area = useRef<HTMLTextAreaElement>(null);
@@ -56,8 +62,13 @@ export function Modal({ opts, onDone }: { opts: ModalOptions; onDone: (value: st
             defaultValue={opts.text}
           />
         ) : null}
-        <div className="row between" style={{ marginTop: 12 }}>
+        <div className="row between wrap" style={{ marginTop: 12 }}>
           <button onClick={() => onDone(null)}>{opts.cancelLabel ?? "Cancel"}</button>
+          {opts.altLabel ? (
+            <button className="danger" onClick={() => onDone(MODAL_ALT)}>
+              {opts.altLabel}
+            </button>
+          ) : null}
           <button
             ref={ok}
             className={opts.danger ? "danger" : "primary"}

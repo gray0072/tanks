@@ -17,16 +17,17 @@ export const TEAM_COLOR: Record<TeamId, number> = {
 
 // --- Bot difficulty (SPEC §10) ---
 // The tuning behind each one is BOT_PROFILE in ./constants.ts.
-export type BotDifficulty = "easy" | "normal" | "hard";
-export const BOT_DIFFICULTIES: BotDifficulty[] = ["easy", "normal", "hard"];
+export type BotDifficulty = "easy" | "normal" | "hard" | "extreme";
+export const BOT_DIFFICULTIES: BotDifficulty[] = ["easy", "normal", "hard", "extreme"];
 
 /** Display name of a difficulty — the single source of truth for the UI
- *  labels and for bot nicknames ("Easy1", "Medium2", "Hard3"). The middle
+ *  labels and for bot nicknames ("Easy1", "Medium2", "Hard3", "Extreme4"). The middle
  *  tier reads "Medium" to players; the internal id stays `normal`. */
 export const BOT_DIFFICULTY_LABEL: Record<BotDifficulty, string> = {
   easy: "Easy",
   normal: "Medium",
   hard: "Hard",
+  extreme: "Extreme",
 };
 
 // --- Lobby labels for match rules (SPEC §2) ---

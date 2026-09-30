@@ -107,7 +107,7 @@ This is what makes difficulty a real dial: harder bots think better, they don't 
 
 ## 10.3 Difficulty levels
 
-Three levels — **Easy**, **Medium** (default), **Hard** — the internal ids are `easy`/`normal`/`hard`
+Four levels — **Easy**, **Medium** (default), **Hard**, **Extreme** — the internal ids are `easy`/`normal`/`hard`/`extreme`
 (`config.ts`), with `BOT_DIFFICULTY_LABEL` supplying the displayed names. They differ in mechanical precision *and*
 in which behaviors are unlocked at all, so higher difficulty reads as smarter play rather than just
 faster twitching.
@@ -183,27 +183,89 @@ For players who want the bot team to actually be a threat. Same information, muc
   pickup. `CLOCK` is used to open a flag rush.
 - **Mines:** placed at chokepoints and around the flag pocket, not scattered.
 - **Retreat:** disengages when outnumbered locally and regroups instead of trading badly.
+- **Friendly fire:** with friendly fire on, never fires down a lane with a teammate in it (the same
+  check as Extreme's, below).
+
+> **As implemented.** Two lines above were never built for Hard: its attackers do *not* wait to
+> push together, and it does not ambush from forest. Both were built for Extreme instead and
+> measured in the bot league — the push lost rounds and is off there too; the forest play is on.
+
+### Extreme — "a team of strong players"
+
+Hard's decisions with a pro's reflexes, and above all *teamwork*. The perception rules (§10.2)
+still hold per bot; what is new is that the bots talk to each other.
+
+- **Reflexes:** 160 ms reaction, no between-shot hesitation, 150 ms re-score, 0.75° aim error,
+  5 s memory. Fast, still human.
+- **Call-outs** (`ai/teamIntel.ts`): what one bot sees reaches its teammates after
+  `BOT_COMMS_DELAY` (0.3 s, the time it takes to say it) — the voice channel a human team has. A
+  heard sighting is a memory like any other: it decays from when it was *seen*, is never
+  "visible" (no lead on hearsay), and a kill clears it. A call-out from across the map is
+  information, not an order: a bot only hunts what is within engagement range, a defender only
+  what is near its flag.
+- **Spread attention:** the team board records who is hunting whom; at most `BOT_MAX_HUNTERS` (2)
+  chase one enemy, so the rest of the team stays on its jobs. Point-blank is everyone's business.
+- **No crowding:** a bot doesn't park on a spot a nearer teammate already holds — it takes a free
+  cell two or three off — and steps round a teammate in its way instead of shoving into its back.
+- **Friendly fire:** with it on, a shot is refused if a teammate is anywhere in the bullet's path
+  — not only before the target, since a dodged bullet flies on — *or will be* by the time the
+  bullet gets there, if it keeps driving the way it faces. A teammate's bullet is dodged like an
+  enemy's. With friendly fire off bullets pass through teammates, so none of this applies.
+- **Bushes, both ways:** waits in forest near its post (guard point, the far end of a midfield
+  patrol) rather than in the open, and fires into a bush in its lane where an enemy it knew about
+  went out of sight — recon by fire, at most every `BOT_PROBE_INTERVAL`.
+
+> **As implemented — how Extreme was picked.** Each idea is a profile flag, so a candidate is a
+> data set. `scripts/botLeague.ts` plays full rounds under the default rules (x10 lives, 5 min,
+> flags live) on all six built-in maps from both sides.
+>
+> 1. A round robin of full-featured candidates: every one beat Hard, but barely beat *reflex*
+>    (Extreme's timings with none of the teamwork).
+> 2. An ablation, reflex + one idea against reflex, 96 rounds each: spacing 52, forest ambush 52,
+>    recon fire 50, call-outs 48 — and below even: firing positions 45, pincer push 43, reacting
+>    to every approaching enemy 42 (it pulled attackers off the objective).
+> 3. Push and reaction retuned (quorum 2/3 to 1/2, wait 7 s to 4 s; react within 6 cells and not
+>    while pushing) and re-tried on top of the four keepers ("core"), against reflex / Hard:
+>    core 54 : 42 / 69 : 27; + column push 49 : 47 / 70 : 26; + reaction 51 : 45 / 61 : 35;
+>    + pincer push 46 : 50 / 64 : 32.
+> 4. A final round robin of core, core + column push and core + reaction: core first with
+>    friendly fire off (51.6 %) and on (53.1 %), and it beat core + column push 53 : 43.
+>
+> So Extreme ships as core. `groupPush`, `reactsToApproach` and `firingPositions` stay in the code,
+> off, for the next attempt.
+>
+> Against Hard on fresh seeds Extreme takes 110 of 180 rounds (61 %), K/D about 1.15. It *trails*
+> Hard on frags over the first 75 s — it spends the opening getting into position — so
+> `tests/bots.test.ts` checks it on rounds won, not on the frag window the lower rungs use.
+>
+> Friendly fire on, Extreme mirror, 12 rounds: the plain lane check took teamkills from about 100
+> to 49; predicting teammates' movement and dodging their bullets took it to 18 — about 1.5 a
+> round, out of some 100 kills.
 
 ### Parameters
 
-| Parameter | Easy | Medium | Hard |
-|---|---|---|---|
-| Reaction time | 600 ms | 350 ms | 200 ms |
-| Between-shot hesitation | 800 ms | 150 ms | 0 |
-| Re-score interval | 500 ms | 300 ms | 200 ms |
-| Aim error (±) | 18° | 5° | 1.5° |
-| Fire tolerance | wide | medium | tight |
-| Target leading | none | ~50 % | full |
-| Target selection | sticky (tunnel vision) | nearest | most dangerous |
-| Enemy memory | 1.0 s | 2.5 s | 4.0 s |
-| Bullet evasion | late, in-line only | reliable | pre-emptive |
-| Shoots brick to path | only when there is no way round | when it saves time | proactively, for the team |
-| Bonus detour chance | 0 (never detours) | 45 % | 70 % |
-| Bonus behavior | opportunistic | contests | contests + denies |
-| Role adherence | ~35 % | ~85 % | ~100 % + coordinated pushes |
-| Uses mines | no | own flag approach, or a chokepoint | chokepoints only |
-| Times team bonuses | no | no | yes |
-| Retreats when losing | no | sometimes | yes |
+| Parameter | Easy | Medium | Hard | Extreme |
+|---|---|---|---|---|
+| Reaction time | 600 ms | 350 ms | 200 ms | 160 ms |
+| Between-shot hesitation | 800 ms | 150 ms | 0 | 0 |
+| Re-score interval | 500 ms | 300 ms | 200 ms | 150 ms |
+| Aim error (±) | 18° | 5° | 1.5° | 0.75° |
+| Fire tolerance | wide | medium | tight | tight |
+| Target leading | none | ~50 % | full | full |
+| Target selection | sticky (tunnel vision) | nearest | most dangerous | most dangerous |
+| Enemy memory | 1.0 s | 2.5 s | 4.0 s | 5.0 s |
+| Bullet evasion | late, in-line only | reliable | pre-emptive | pre-emptive |
+| Shoots brick to path | only when there is no way round | when it saves time | proactively, for the team | proactively |
+| Bonus detour chance | 0 (never detours) | 45 % | 70 % | 70 % |
+| Bonus behavior | opportunistic | contests | contests + denies | contests + denies |
+| Role adherence | ~35 % | ~85 % | ~100 % | ~100 % |
+| Uses mines | no | own flag approach, or a chokepoint | chokepoints only | chokepoints only |
+| Times team bonuses | no | no | yes | yes |
+| Retreats when losing | no | sometimes | yes | yes |
+| Friendly-fire aware | no | no | yes | yes, and dodges teammates' bullets |
+| Team call-outs, spread hunting | no | no | no | yes |
+| Keeps spacing | no | no | no | yes |
+| Waits in / fires into forest | no | no | no | yes |
 
 > **As implemented.** Two of these carry details the prose above doesn't imply, and both exist
 > because the difficulty dial measurably pointed the *wrong way* without them (`tests/bots.test.ts`
@@ -226,8 +288,9 @@ For players who want the bot team to actually be a threat. Same information, muc
 >   they can see is actually moving. Leading on "TANK_SPEED in the direction it currently faces"
 >   makes a full-lead profile shoot in front of tanks that are standing still.
 
-All of these live in `constants.ts` (`BOT_PROFILE`) as three named profiles, so a fourth ("Insane", "Passive" for
-testing) is a data change, not a code change.
+All of these live in `constants.ts` (`BOT_PROFILE`) as four named profiles, so another one
+("Passive" for testing) is a data change, not a code change — the bot league registers its
+candidates exactly that way.
 
 ## 10.4 Choosing difficulty in the lobby
 
@@ -235,7 +298,7 @@ Difficulty is **per bot slot**, defaulting to **Medium**.
 
 - In **Create room**, `Default bot difficulty` sets the level every bot slot starts at — `Medium`
   unless changed.
-- In the **room screen**, every bot slot carries a difficulty chip (`Easy` / `Medium` / `Hard`),
+- In the **room screen**, every bot slot carries a difficulty chip (`Easy` / `Medium` / `Hard` / `Extreme`),
   shown right before the bot's name. The host clicks it to cycle that single bot's level, and the
   `All bots:` control above the rosters sets every bot
   slot at once — including a per-team variant, so you can hand one side `Hard` and the other `Easy`

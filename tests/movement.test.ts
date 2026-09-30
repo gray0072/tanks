@@ -292,6 +292,15 @@ test("ice defers the turn until the slide decays, then keeps sliding", () => {
   assert.ok(tank.slideT < ICE_SLIDE_TIME);
 });
 
+test("on ice, holding a new direction turns once the slide has run out", () => {
+  // The regression: every held key re-armed the slide, so a turn deferred by
+  // ice never happened while the new key stayed down.
+  const { sim, tank } = soloAt(SURFACES, 4 * CELL, 4 * CELL, Dir.Right);
+  step(sim, 0, Dir.Right);
+  hold(sim, 0, Dir.Down, Math.ceil(ICE_SLIDE_TIME / DT) + 1);
+  assert.equal(tank.dir, Dir.Down, "the turn must come within ICE_SLIDE_TIME of holding the new key");
+});
+
 test("a CLOCK-frozen team cannot move", () => {
   const { sim, tank } = soloAt(OPEN, 5 * CELL, 3 * CELL, Dir.Right);
   sim.clockFrozen[tank.team] = 5;

@@ -41,7 +41,7 @@ the editor's working document) travel inside the route.
 
 ```
 ┌───────────────────────── ROOM  K7QM2X  [copy] [invite link] ──────────────────────┐
-│   All bots: [ Easy | ✦Medium | Hard ]   blue ▾   red ▾                             │
+│   All bots: [ Easy | ✦Medium | Hard | Extreme ]   blue ▾   red ▾                   │
 │   BLUE  (3 humans)                     │  ┌──── PREVIEW ────────────────────────┐  │
 │   ▸ 1         Sergey        host  ✔    │  │                                     │  │
 │   ▸ 2  Medium Medium2       bot   ✔    │  │      [ map thumbnail, live ]        │  │
@@ -78,7 +78,7 @@ the editor's working document) travel inside the route.
 - Preview is also how the map choice is communicated — the host changing maps re-renders it for
   everyone in real time.
 - Keyboard and touch navigable: arrow keys / swipe move the highlight, `Enter` / tap claims.
-- Every bot slot shows its **difficulty (`Easy` / `Medium` / `Hard`)** as a button right before the
+- Every bot slot shows its **difficulty (`Easy` / `Medium` / `Hard` / `Extreme`)** as a button right before the
   bot's name — the host's per-bot difficulty control (§10.4), tap to cycle; `All bots:` sets every
   bot slot at once, or one team's at a time.
 - **The match rules live here**, as host-only dropdowns, live for everyone (§2.2): **rounds to

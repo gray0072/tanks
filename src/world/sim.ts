@@ -229,7 +229,12 @@ export class Sim {
         } else {
           tank.dir = input.dir;
         }
-        if (onIce) tank.slideT = ICE_SLIDE_TIME;
+        // Only driving the way the tank already faces keeps the slide going.
+        // Refreshing it for *any* held key meant a new direction held down
+        // never let the slide decay, so the turn above never came: the tank
+        // drove on in its old direction for as long as the key was held —
+        // bots, which always hold some direction, piled up on ice for good.
+        if (onIce && input.dir === tank.dir) tank.slideT = ICE_SLIDE_TIME;
         moving = true;
       } else if (onIce && tank.slideT > 0) {
         moving = true; // still sliding after key release

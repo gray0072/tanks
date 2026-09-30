@@ -217,6 +217,33 @@ export type BotProfile = {
     timesTeamBonuses: boolean;
     retreatsWhenLosing: boolean;
     deniesBonuses: boolean;
+    /** With friendly fire on, never fire down a lane with a teammate in it
+     *  (before the target, or past it on a long shot that could miss). */
+    friendlyFireAware: boolean;
+    /** Team call-outs (ai/teamIntel.ts): what this bot sees reaches its
+     *  teammates after BOT_COMMS_DELAY, and it hears theirs. Also spreads
+     *  the team's attention: at most BOT_MAX_HUNTERS chase one enemy. */
+    sharesIntel: boolean;
+    /** Keeps clear of teammates: steps round one parked in its way instead
+     *  of queueing behind it, and doesn't park on a spot a closer teammate
+     *  is already heading for. */
+    keepsSpacing: boolean;
+    /** Attackers wait at their staging point and go in together once most
+     *  of them are there: "pincer" keeps each on its own flank, "column"
+     *  puts them all on one; "off" trickles in one at a time. */
+    groupPush: "off" | "pincer" | "column";
+    /** An enemy closing in within BOT_APPROACH_RANGE_CELLS interrupts
+     *  whatever this bot was committed to, and it turns to meet it. */
+    reactsToApproach: boolean;
+    /** Hunts by driving to a cell *in line* with the enemy (preferring one
+     *  off its barrel, and forest) rather than straight at its position. */
+    firingPositions: boolean;
+    /** Waits in forest near its post — guard point, hold point, staging —
+     *  instead of in the open. */
+    ambushesFromForest: boolean;
+    /** Shoots into forest: "suspects" only where an enemy it knows of went
+     *  out of sight, "sweep" also clears bushes in its lane when idle. */
+    probesForest: "off" | "suspects" | "sweep";
 };
 
 export const BOT_PROFILE: Record<BotDifficulty, BotProfile> = {
@@ -240,6 +267,14 @@ export const BOT_PROFILE: Record<BotDifficulty, BotProfile> = {
     timesTeamBonuses: false,
     retreatsWhenLosing: false,
     deniesBonuses: false,
+    friendlyFireAware: false,
+    sharesIntel: false,
+    keepsSpacing: false,
+    groupPush: "off",
+    reactsToApproach: false,
+    firingPositions: false,
+    ambushesFromForest: false,
+    probesForest: "off",
   },
   // A regular player.
   normal: {
@@ -260,6 +295,14 @@ export const BOT_PROFILE: Record<BotDifficulty, BotProfile> = {
     timesTeamBonuses: false,
     retreatsWhenLosing: true,
     deniesBonuses: false,
+    friendlyFireAware: false,
+    sharesIntel: false,
+    keepsSpacing: false,
+    groupPush: "off",
+    reactsToApproach: false,
+    firingPositions: false,
+    ambushesFromForest: false,
+    probesForest: "off",
   },
   // Close to a strong player — fast, but still human-fast.
   hard: {
@@ -280,6 +323,45 @@ export const BOT_PROFILE: Record<BotDifficulty, BotProfile> = {
     timesTeamBonuses: true,
     retreatsWhenLosing: true,
     deniesBonuses: true,
+    friendlyFireAware: true,
+    sharesIntel: false,
+    keepsSpacing: false,
+    groupPush: "off",
+    reactsToApproach: false,
+    firingPositions: false,
+    ambushesFromForest: false,
+    probesForest: "off",
+  },
+  // A strong team of experienced players: pro reflexes, call-outs, spacing,
+  // bushes used both ways. Picked from a bot league (scripts/botLeague.ts,
+  // SPEC §10.3): group pushes and reacting to every approaching tank were
+  // tried too and lost rounds, so they are here but off.
+  extreme: {
+    reactionDelay: 0.16,
+    fireHesitation: 0,
+    rescoreInterval: 0.15,
+    aimErrorDeg: 0.75,
+    fireToleranceDeg: 2,
+    leadFactor: 1,
+    memory: 5.0,
+    preemptiveDodge: true,
+    shootsBrickToPath: "proactive",
+    targetPriority: "threat",
+    roleAdherence: 1,
+    bonusDetour: 0.7,
+    usesMines: true,
+    minesAtChokepointsOnly: true,
+    timesTeamBonuses: true,
+    retreatsWhenLosing: true,
+    deniesBonuses: true,
+    friendlyFireAware: true,
+    sharesIntel: true,
+    keepsSpacing: true,
+    groupPush: "off",
+    reactsToApproach: false,
+    firingPositions: false,
+    ambushesFromForest: true,
+    probesForest: "suspects",
   },
 };
 
@@ -364,6 +446,25 @@ export const BOT_POSTURE_SHARES: Record<BotPosture, { defend: number; midfield: 
   balanced: { defend: 0.25, midfield: 0.3 },
   defensive: { defend: 0.4, midfield: 0.35 },
 };
+/** Extreme's teamwork (ai/teamIntel.ts). A call-out takes this long to
+ *  reach the rest of the team; at most this many bots chase one enemy; an
+ *  enemy this close interrupts a committed action; a teammate this close
+ *  counts as in the way. */
+export const BOT_COMMS_DELAY = 0.3; // s
+export const BOT_MAX_HUNTERS = 2;
+export const BOT_APPROACH_RANGE_CELLS = 6;
+export const BOT_SPACING_CELLS = 1.6;
+/** A group push goes once this share of the living attackers is staged, or
+ *  when the first to arrive has waited this long. A push called within the
+ *  join window is joined by attackers that stage after it. */
+export const BOT_PUSH_QUORUM = 0.5;
+export const BOT_PUSH_MAX_WAIT = 4; // s
+export const BOT_PUSH_JOIN_WINDOW = 6; // s
+/** How far from its post a bot looks for a bush to wait in, and how often
+ *  it will spend a bullet on a bush it can't see into. */
+export const BOT_AMBUSH_RADIUS_CELLS = 3;
+export const BOT_PROBE_INTERVAL = 1.2; // s
+export const BOT_PROBE_RANGE_CELLS = 8;
 /** One flank per this many cells of map width across the flag-to-flag
  *  line, up to three (left, middle, right). */
 export const BOT_LANE_MIN_WIDTH_CELLS = 8;

@@ -140,9 +140,10 @@ export class Arena {
     this.world.addChild(this.decalLayer);
     this.world.addChild(this.bonusLayer);
     this.world.addChild(this.flagLayer);
+    // Mines lie on the ground: a tank driving over one covers it.
+    this.world.addChild(this.mineLayer);
     this.world.addChild(this.tankLayer);
     this.world.addChild(this.bulletLayer);
-    this.world.addChild(this.mineLayer);
     this.world.addChild(this.wallLayer);
     this.world.addChild(this.forestLayer);
     this.world.addChild(this.friendlyOverlayLayer);
