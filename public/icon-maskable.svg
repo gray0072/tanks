@@ -1,15 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" shape-rendering="crispEdges">
-  <!-- Tank favicon: the same silhouette tankShape.ts bakes (canvasSize 32,
-       team blue), rotated to face up the way a Battle City tank does, on light
-       grass so the dark tracks and barrel stand out. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" shape-rendering="crispEdges">
+  <!-- Android home-screen icon: full-bleed grass, the tank inside the central safe circle (r ≈ 170). -->
   <defs>
     <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#b5e08a"/>
       <stop offset="1" stop-color="#7fbf55"/>
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="6" fill="url(#grass)"/>
-  <g transform="rotate(-90 16 16)">
+  <rect width="512" height="512" fill="url(#grass)"/>
+  <g transform="translate(256 256) scale(9.5) translate(-16 -14.5) rotate(-90 16 16)">
     <!-- tracks -->
     <rect x="6.88" y="4" width="18.24" height="5.28" fill="#0f1f3f"/>
     <rect x="6.88" y="22.72" width="18.24" height="5.28" fill="#0f1f3f"/>
