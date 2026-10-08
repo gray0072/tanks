@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { menuBackdrop } from "../game/menuBackdrop";
-import { wantsBackdrop, type Route } from "./routes";
+import { setUpdateIdle } from "../util/appUpdate";
+import { isIdleRoute, wantsBackdrop, type Route } from "./routes";
 import { MainMenu } from "./screens/MainMenu";
 import { JoinRoom } from "./screens/JoinRoom";
 import { CreateRoom } from "./screens/CreateRoom";
@@ -27,6 +28,8 @@ function syncBackdrop(on: boolean) {
 export function App({ initial }: { initial: Route }) {
   const [route, go] = useState<Route>(initial);
   syncBackdrop(wantsBackdrop(route));
+  const idle = isIdleRoute(route);
+  useEffect(() => setUpdateIdle(idle), [idle]);
 
   switch (route.k) {
     case "menu":

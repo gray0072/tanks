@@ -70,6 +70,13 @@ export function deepLinkRoute(search: string): Route | null {
   return isValidRoomCode(code) ? { k: "join", code } : null;
 }
 
+/** Screens a reload costs nothing on, so a new deploy may be applied there
+ *  (util/appUpdate.ts): never a form being filled in, a room, a match, its
+ *  result or the editor. */
+export function isIdleRoute(route: Route): boolean {
+  return route.k === "menu" || route.k === "settings" || (route.k === "library" && route.mode === "manage");
+}
+
 /** Screens that draw their own canvas take the WebGL context over from the
  *  live menu backdrop (SPEC §6.3). */
 export function wantsBackdrop(route: Route): boolean {

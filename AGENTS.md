@@ -348,6 +348,19 @@ Don't trust this paragraph's specifics for long; read the current code and git l
   (with `favicon.svg`) draw the same tank on light grass, so the dark tracks and barrel stay
   visible. The PNGs are rendered, not hand-made: `bash ../ivan/tools/pwa-icons.sh public` (headless
   Chrome). Re-render and bump the `?v=N` in `index.html` and the manifest whenever an icon changes.
+  The manifest `id` is the absolute path `"/tanks/"`, while `start_url` / `scope` stay `"./"`: a
+  relative `id` resolves against the *origin* of `start_url`, not the manifest's folder, so `"./"`
+  would give every app on `gray0072.github.io` (`/swedish/`, `/ivan/…`) the same id and Android
+  would treat them as one app.
+- **A new deploy never interrupts a game.** `util/appUpdate.ts` reloads into a new version only
+  while `isIdleRoute` (`ui/routes.ts`) is true — main menu, settings, the map library. A new screen
+  that holds a game, a room or unsaved input stays out of that list.
+- **Storage is shared with every app on the origin.** `gray0072.github.io` also serves `/swedish/`
+  and `/ivan/…`; folders do not separate `localStorage`, `sessionStorage`, IndexedDB or Cache
+  Storage. Every key, database and cache name starts with `tanks.` (`util/storage.ts` adds it to
+  settings; `customMaps.ts` writes `tanks.customMaps` itself). Never call `localStorage.clear()` or
+  delete every cache or database — remove only `tanks.` names. Library keys built from a unique id
+  (Supabase's `sb-<project-ref>-…`) are already apart.
 - **Line endings: LF everywhere, enforced by `.gitattributes`** (`* text=auto eol=lf`). Until
   2026-09-29 the repo was a CRLF/LF mix with nothing pinning it, and scripted edits on Windows kept
   breaking it — Python's text-mode `open(p, "w")` writes CRLF, so an LF file turned CRLF and a

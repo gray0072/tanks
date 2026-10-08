@@ -8,6 +8,7 @@ import { RoomHost } from "./net/host";
 import { DEBUG } from "./game/config";
 import { DEBUG_MAP_ID } from "./world/maps/debugMap";
 import { startCloudSync } from "./cloud/cloudSync";
+import { watchForUpdates } from "./util/appUpdate";
 
 const root = document.getElementById("ui");
 if (!root) throw new Error("#ui not found");
@@ -24,6 +25,9 @@ menuBackdrop.attach(backdropLayer);
 
 // Optional Google sign-in + map sync (SPEC §6.4); a no-op without Supabase configured.
 startCloudSync();
+
+// A new deploy reloads the page only on an idle screen — util/appUpdate.ts.
+if (import.meta.env.PROD) watchForUpdates();
 
 function initialRoute(): Route {
   if (DEBUG) {

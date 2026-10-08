@@ -59,7 +59,8 @@ tanks/
    │  └─ preview.ts            # room-screen map & tank preview (Canvas2D)
    ├─ audio/audio.ts
    └─ util/                    # math (incl. seeded RNG), input, storage,
-                               # fullscreen (§5.4: prefixes + orientation lock, all failure-tolerant)
+                               # fullscreen (§5.4: prefixes + orientation lock, all failure-tolerant),
+                               # appUpdate (picks up a new deploy, reloading only on an idle screen)
 ```
 
 ## Deployment — GitHub Pages
@@ -73,6 +74,12 @@ The build is a static site with no backend, published to `https://gray0072.githu
 - `.github/workflows/deploy.yml` is the normal path: every push to `main` runs `npm ci`,
   `npm run build` and `peaceiris/actions-gh-pages@v4` with `permissions: contents: write`,
   publishing `./dist` to the `gh-pages` branch.
+- There is no service worker, so a cold start always loads the deployed version. A page left open —
+  above all the installed Android app, which is resumed rather than restarted — is updated by
+  `util/appUpdate.ts`: on every return to the foreground and once an hour it fetches `index.html`
+  and compares its hashed script and stylesheet names with its own, and a new version reloads the
+  page only on the main menu, settings or the map library (`isIdleRoute` in `ui/routes.ts`) —
+  never in a form, a room, a match, a result or the editor.
 
 Two deliberate deviations from the wording above, both explained where they matter: the network
 protocol carries JSON, not packed binary (§9.3), and client-side prediction is simplified rather than
