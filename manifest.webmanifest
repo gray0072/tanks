@@ -2,7 +2,7 @@
   "name": "Tanks — browser team tank battle",
   "short_name": "Tanks",
   "description": "Battle City–style team battle in the browser: destructible terrain, power-ups, bots, a level editor, and peer-to-peer play by room code.",
-  "id": "./",
+  "id": "/tanks/",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
