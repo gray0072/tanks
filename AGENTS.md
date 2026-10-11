@@ -275,6 +275,13 @@ two-device fake (`tests/mapSync.test.ts`). The Supabase side is `supabase/schema
 project** — only against a fake cloud and a dummy URL (sign-in reaches `/auth/v1/authorize` with
 PKCE and the right redirect).
 
+**2026-10-11 (shared Supabase project):** the cloud maps moved to the Supabase project of
+`swedish` (same URL and publishable key in `.env.local` and the Actions secrets), shared with
+`world-aviation` too. The table is now `tanks_custom_maps` (every table there carries its app's
+prefix) and the session is kept under `tanks.auth` instead of the library's default key, which
+`/swedish/` uses on the same origin. Maps in the old project are not carried over: each device
+pushes its library up on its first sync.
+
 Two test-harness bugs surfaced on the way: `botFixture` counted shots by new bullet ids, which
 misses every point-blank shot (the bullet hits within the tick it's born) — it now counts cooldown
 resets; and the lead test's score was, with a helmeted target, only measuring flag damage.
@@ -359,8 +366,12 @@ Don't trust this paragraph's specifics for long; read the current code and git l
   and `/ivan/…`; folders do not separate `localStorage`, `sessionStorage`, IndexedDB or Cache
   Storage. Every key, database and cache name starts with `tanks.` (`util/storage.ts` adds it to
   settings; `customMaps.ts` writes `tanks.customMaps` itself). Never call `localStorage.clear()` or
-  delete every cache or database — remove only `tanks.` names. Library keys built from a unique id
-  (Supabase's `sb-<project-ref>-…`) are already apart.
+  delete every cache or database — remove only `tanks.` names.
+- **One Supabase project is shared with the other apps** (`swedish`, `ivan`'s `world-aviation`), so
+  every table this app adds starts with `tanks_` (`tanks_custom_maps`), and its policies and
+  functions are named after it — never a bare `maps` or `saves` that another app may own. The
+  session is kept under `tanks.auth` (`cloud/supabaseClient.ts`), not the library's default
+  `sb-<project-ref>-auth-token`, which `/swedish/` uses on the same origin.
 - **Line endings: LF everywhere, enforced by `.gitattributes`** (`* text=auto eol=lf`). Until
   2026-09-29 the repo was a CRLF/LF mix with nothing pinning it, and scripted edits on Windows kept
   breaking it — Python's text-mode `open(p, "w")` writes CRLF, so an LF file turned CRLF and a

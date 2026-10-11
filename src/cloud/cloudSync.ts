@@ -19,7 +19,8 @@ type CloudState = { status: CloudStatus; user: CloudUser | null };
 const PUSH_DEBOUNCE_MS = 3000;
 /** A tab coming back sooner than this after the last sync doesn't sync again. */
 const FOCUS_RESYNC_MIN_MS = 15_000;
-const TABLE = "custom_maps";
+/** The Supabase project is shared with other apps (swedish, world-aviation): the table carries the app's prefix. */
+const TABLE = "tanks_custom_maps";
 
 let state: CloudState = { status: supabase ? "signedOut" : "unavailable", user: null };
 const listeners = new Set<() => void>();

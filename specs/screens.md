@@ -173,7 +173,7 @@ with no `.env.local`) doesn't show the section at all (`cloud/supabaseClient.ts`
   `/tanks/` on Pages, `http://localhost:5173/tanks/` in dev — both must be in Supabase's allowed
   redirect URLs). The returning `?code=` is exchanged by supabase-js and then stripped from the URL.
   Unsaved Settings edits are saved before leaving for Google.
-- **Storage:** one row per map in `public.custom_maps` (`supabase/schema.sql`), keyed by
+- **Storage:** one row per map in `public.tanks_custom_maps` (`supabase/schema.sql`), keyed by
   `(user_id, map id)`, row-level security limiting every row to its owner. A deleted map stays as a
   **tombstone** row, and locally as `tanks.customMapsDeleted` — without it, the next sync would pull
   a map deleted on this device straight back down from the cloud.
